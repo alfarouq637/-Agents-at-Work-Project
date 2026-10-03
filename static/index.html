@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AutoCorp — وكالة ذكاء اصطناعي</title>
+<meta name="description" content="AutoCorp: وكالة ذكاء اصطناعي ذاتية التشغيل تخدم الشركات المصرية الصغيرة. مواقع، محتوى، استشارات.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--bg2:#12121a;--bg3:#1a1a28;
+  --fg:#e8e8f0;--fg2:#a0a0b8;--fg3:#70708a;
+  --accent:#6c5ce7;--accent2:#a29bfe;--accent-glow:rgba(108,92,231,.15);
+  --success:#00cec9;--warning:#fdcb6e;--danger:#ff7675;--info:#74b9ff;
+  --glass:rgba(255,255,255,.04);--glass2:rgba(255,255,255,.08);
+  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.12);
+  --radius:14px;--radius-sm:8px;
+}
+body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--fg);min-height:100vh;overflow-x:hidden}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ===== Animated background ===== */
+.bg-mesh{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.bg-mesh::before,.bg-mesh::after{content:'';position:absolute;border-radius:50%;filter:blur(120px);opacity:.18;animation:float 20s ease-in-out infinite alternate}
+.bg-mesh::before{width:600px;height:600px;background:var(--accent);top:-200px;right:-100px}
+.bg-mesh::after{width:500px;height:500px;background:#00cec9;bottom:-150px;left:-100px;animation-delay:-10s}
+@keyframes float{0%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.1)}100%{transform:translate(-20px,20px) scale(.95)}}
+
+/* ===== Layout ===== */
+.container{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;padding:20px 0;flex-wrap:wrap;gap:12px}
+header h1{font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,var(--accent2),var(--success));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+header .subtitle{color:var(--fg2);font-size:.85rem}
+.badge{display:inline-flex;align-items:center;gap:4px;background:var(--glass2);border:1px solid var(--border2);border-radius:20px;padding:4px 12px;font-size:.75rem;color:var(--fg2)}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ===== Stats Grid ===== */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:all .3s ease;position:relative;overflow:hidden}
+.stat-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 30px var(--accent-glow)}
+.stat-card .label{font-size:.75rem;color:var(--fg3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.stat-card .value{font-size:1.5rem;font-weight:800;background:linear-gradient(135deg,var(--fg),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-card .unit{font-size:.7rem;color:var(--fg3);margin-top:2px}
+
+/* ===== Cards ===== */
+.card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:all .3s ease}
+.card:hover{border-color:var(--border2)}
+.card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+
+/* ===== Tags ===== */
+.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.3px;border:1px solid}
+.tag-planning{color:var(--warning);border-color:rgba(253,203,110,.3);background:rgba(253,203,110,.08)}
+.tag-running{color:var(--info);border-color:rgba(116,185,255,.3);background:rgba(116,185,255,.08);animation:pulse 2s ease infinite}
+.tag-awaiting_plan,.tag-awaiting_delivery{color:#fd79a8;border-color:rgba(253,121,168,.3);background:rgba(253,121,168,.08)}
+.tag-delivered{color:var(--success);border-color:rgba(0,206,201,.3);background:rgba(0,206,201,.08)}
+.tag-rejected,.tag-failed{color:var(--danger);border-color:rgba(255,118,117,.3);background:rgba(255,118,117,.08)}
+.tag-created{color:var(--fg2);border-color:var(--border2);background:var(--glass)}
+.tag-pending{color:var(--warning);border-color:rgba(253,203,110,.3);background:rgba(253,203,110,.08)}
+.tag-approved,.tag-applied{color:var(--success);border-color:rgba(0,206,201,.3);background:rgba(0,206,201,.08)}
+.tag-dropped,.tag-rolled_back{color:var(--fg3);border-color:var(--border);background:var(--glass)}
+
+/* ===== Form ===== */
+.form-card{background:linear-gradient(135deg,var(--glass2),var(--glass));backdrop-filter:blur(20px);border:1px solid var(--accent);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:0 4px 40px var(--accent-glow)}
+.form-card h3{font-size:.95rem;margin-bottom:12px;color:var(--accent2)}
+input,textarea{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 14px;color:var(--fg);font-family:inherit;font-size:.85rem;transition:border-color .3s}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px}
+.form-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center}
+
+/* ===== Buttons ===== */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .25s ease;letter-spacing:.3px}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#8c7ae6);color:#fff;box-shadow:0 4px 15px var(--accent-glow)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 25px rgba(108,92,231,.3)}
+.btn-success{background:linear-gradient(135deg,#00b894,#00cec9);color:#fff}
+.btn-success:hover{transform:translateY(-1px)}
+.btn-danger{background:linear-gradient(135deg,#e17055,#d63031);color:#fff}
+.btn-danger:hover{transform:translateY(-1px)}
+.btn-ghost{background:var(--glass2);color:var(--fg2);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--fg);border-color:var(--fg3)}
+.btn-sm{padding:5px 12px;font-size:.72rem}
+
+/* ===== Event Log ===== */
+.events{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.7rem;color:var(--fg3);direction:ltr;text-align:left;margin-top:8px;max-height:200px;overflow-y:auto;line-height:1.7}
+.events::-webkit-scrollbar{width:3px}
+.events::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.ev-line{padding:2px 0;border-bottom:1px solid var(--border)}
+.ev-line:last-child{border-bottom:none}
+
+/* ===== Section Header ===== */
+.section-header{display:flex;align-items:center;gap:10px;margin:24px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.section-header h2{font-size:1.05rem;font-weight:700;color:var(--fg)}
+.section-header .count{background:var(--accent);color:#fff;font-size:.65rem;padding:2px 8px;border-radius:10px;font-weight:700}
+
+/* ===== Agent Roster ===== */
+.roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-bottom:20px}
+.roster-chip{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:.7rem;text-align:center;transition:all .2s}
+.roster-chip:hover{border-color:var(--accent);background:var(--accent-glow)}
+.roster-chip .dept{color:var(--fg3);font-size:.6rem;margin-top:2px}
+
+/* ===== Pipeline Steps ===== */
+.pipeline{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.pipeline .step{font-size:.65rem;padding:3px 8px;border-radius:12px;background:var(--glass2);color:var(--fg2);border:1px solid var(--border);white-space:nowrap}
+.pipeline .arrow{color:var(--fg3);font-size:.7rem}
+.pipeline .step.active{border-color:var(--accent);color:var(--accent2);background:var(--accent-glow)}
+.pipeline .step.done{border-color:var(--success);color:var(--success);background:rgba(0,206,201,.08)}
+
+/* ===== Request text ===== */
+.req-text{color:var(--fg2);font-size:.82rem;line-height:1.6;margin:6px 0;max-height:80px;overflow:hidden}
+.price-info{font-size:.75rem;color:var(--fg3)}
+.price-info b{color:var(--fg)}
+
+/* ===== Tabs ===== */
+.tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:6px 16px;border-radius:20px;font-size:.78rem;cursor:pointer;background:var(--glass);border:1px solid var(--border);color:var(--fg2);transition:all .2s;font-weight:600}
+.tab:hover{border-color:var(--fg3)}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ===== Responsive ===== */
+@media(max-width:640px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  header h1{font-size:1.3rem}
+  .container{padding:10px}
+  .roster-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+}
+</style>
+</head>
+<body>
+<div class="bg-mesh"></div>
+<div class="container">
+
+<!-- Header -->
+<header>
+  <div>
+    <h1>⚡ AutoCorp</h1>
+    <div class="subtitle">وكالة ذكاء اصطناعي ذاتية التشغيل · للشركات المصرية الصغيرة</div>
+  </div>
+  <div class="badge"><span class="dot"></span> <span id="mode-badge">يتحقّق...</span></div>
+</header>
+
+<!-- Stats -->
+<div class="stats" id="stats">
+  <div class="stat-card"><div class="label">الإيراد</div><div class="value" id="s-rev">—</div><div class="unit">جنيه (محاكاة)</div></div>
+  <div class="stat-card"><div class="label">رواتب الموظفين</div><div class="value" id="s-pay">—</div><div class="unit">جنيه</div></div>
+  <div class="stat-card"><div class="label">صافي الربح</div><div class="value" id="s-profit">—</div><div class="unit">جنيه</div></div>
+  <div class="stat-card"><div class="label">موظفين / الكادر</div><div class="value" id="s-agents">—</div><div class="unit">AI Agent</div></div>
+  <div class="stat-card"><div class="label">الطلبات</div><div class="value" id="s-jobs">—</div><div class="unit">طلب</div></div>
+</div>
+
+<!-- New Job Form -->
+<div class="form-card">
+  <h3>📋 طلب جديد</h3>
+  <input id="client" placeholder="اسم العميل أو النشاط (مثلاً: عيادة د. أحمد)" autocomplete="off">
+  <div style="height:8px"></div>
+  <textarea id="req" placeholder="اطلب أي خدمة: موقع لعيادة أسنان، خطة محتوى لمطعم، دراسة جدوى لمشروع..."></textarea>
+  <div class="form-row">
+    <button class="btn btn-primary" onclick="send()" id="send-btn">🚀 ابعت الطلب</button>
+    <input id="key" placeholder="🔑 Admin Key" style="max-width:200px;font-size:.78rem" autocomplete="off">
+    <button class="btn btn-ghost btn-sm" onclick="tick()">⚙️ دورة تطوير</button>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="jobs" onclick="switchTab('jobs')">📦 الطلبات</div>
+  <div class="tab" data-tab="agents" onclick="switchTab('agents')">👥 الموظفين</div>
+  <div class="tab" data-tab="posts" onclick="switchTab('posts')">📣 التسويق</div>
+  <div class="tab" data-tab="proposals" onclick="switchTab('proposals')">🧠 التطوير الذاتي</div>
+  <div class="tab" data-tab="providers" onclick="switchTab('providers')">🔌 الموفّرين</div>
+</div>
+
+<!-- Tab Content -->
+<div id="tab-jobs"></div>
+<div id="tab-agents" style="display:none"></div>
+<div id="tab-posts" style="display:none"></div>
+<div id="tab-proposals" style="display:none"></div>
+<div id="tab-providers" style="display:none"></div>
+
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=t=>String(t??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const H=()=>({"content-type":"application/json","x-admin-key":$("#key").value});
+let currentTab='jobs';
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  ['jobs','agents','posts','proposals','providers'].forEach(t=>{
+    const el=$('#tab-'+t);if(el)el.style.display=t===tab?'':'none';
+  });
+  currentTab=tab;
+  if(tab==='providers')loadProviders();
+  if(tab==='agents')loadAgents();
+}
+
+function tagClass(s){return'tag tag-'+(s||'').replace(/\s/g,'_')}
+
+async function send(){
+  const r=$("#req").value.trim();if(!r)return;
+  const btn=$("#send-btn");btn.disabled=true;btn.textContent="⏳ جاري الإرسال...";
+  try{
+    await fetch("/api/jobs",{method:"POST",headers:H(),body:JSON.stringify({client:$("#client").value||"web-client",request:r})});
+    $("#req").value="";
+    load();
+  }catch(e){alert("خطأ: "+e.message)}
+  finally{btn.disabled=false;btn.textContent="🚀 ابعت الطلب"}
+}
+
+async function dec(u,d){await fetch(u,{method:"POST",headers:H(),body:JSON.stringify({decision:d})});load()}
+async function tick(){await fetch("/api/tick",{method:"POST",headers:H()});load()}
+
+function renderPipeline(status){
+  const steps=['created','planning','running','awaiting_delivery','delivered'];
+  const labels={'created':'إنشاء','planning':'تخطيط','running':'تنفيذ','awaiting_delivery':'مراجعة','delivered':'تسليم','awaiting_plan':'موافقة'};
+  const idx=steps.indexOf(status);
+  if(status==='awaiting_plan')return`<div class="pipeline"><span class="step active">⏳ ينتظر موافقتك</span></div>`;
+  if(status==='rejected')return`<div class="pipeline"><span class="step" style="border-color:var(--danger);color:var(--danger)">❌ مرفوض</span></div>`;
+  if(status==='failed')return`<div class="pipeline"><span class="step" style="border-color:var(--danger);color:var(--danger)">⚠️ فشل</span></div>`;
+  return`<div class="pipeline">${steps.map((s,i)=>`<span class="step ${i<idx?'done':i===idx?'active':''}">${labels[s]||s}</span>${i<steps.length-1?'<span class="arrow">→</span>':''}`).join('')}</div>`;
+}
+
+async function load(){
+  try{
+    const [s,j,p,pr]=await Promise.all(["/api/summary","/api/jobs","/api/posts","/api/proposals"].map(u=>fetch(u).then(r=>r.json())));
+    
+    // Stats
+    $("#s-rev").textContent=Number(s.revenue_egp).toLocaleString('ar-EG');
+    $("#s-pay").textContent=Number(s.payroll_egp).toLocaleString('ar-EG');
+    $("#s-profit").textContent=Number(s.profit_egp).toLocaleString('ar-EG');
+    $("#s-agents").textContent=`${s.hired_agents} / ${s.roster_roles}`;
+    $("#s-jobs").textContent=s.jobs;
+    
+    // Mode badge
+    fetch("/api/providers").then(r=>r.json()).then(pv=>{
+      const n=pv.length;
+      $("#mode-badge").textContent=n>0?`${n} مزوّد نشط`:'وضع المحاكاة';
+    });
+
+    // Jobs
+    $("#tab-jobs").innerHTML=j.length===0?'<div class="card" style="text-align:center;color:var(--fg3)"><p>لا يوجد طلبات بعد. أرسل أول طلب! 🎯</p></div>'
+      :j.map(x=>{
+      const cost=Number(x.cost||0).toFixed(2);
+      const price=Math.round(x.price||0);
+      const events=(x.events||[]).map(e=>esc(e.msg));
+      return`<div class="card">
+        <div class="card-header">
+          <div><b style="color:var(--accent2)">#${x.id}</b> ${esc(x.client)} <span class="${tagClass(x.status)}">${x.status}</span></div>
+          <div class="price-info">عرض: <b>${price} ج</b> · تكلفة: <b>${cost} ج</b></div>
+        </div>
+        ${renderPipeline(x.status)}
+        <div class="req-text">${esc(x.request)}</div>
+        ${x.site_url?`<a href="${x.site_url}" target="_blank" class="btn btn-ghost btn-sm" style="margin:4px 0">🔗 فتح الموقع</a>`:''}
+        ${x.status==='awaiting_plan'||x.status==='awaiting_delivery'?
+          `<div style="display:flex;gap:6px;margin:6px 0"><button class="btn btn-success btn-sm" onclick="dec('/api/jobs/${x.id}/decision','approve')">✅ موافقة</button> <button class="btn btn-danger btn-sm" onclick="dec('/api/jobs/${x.id}/decision','reject')">❌ رفض</button></div>`:''}
+        ${events.length?`<div class="events">${events.map(e=>`<div class="ev-line">${e}</div>`).join('')}</div>`:''}
+      </div>`}).join('');
+
+    // Posts
+    $("#tab-posts").innerHTML=p.length===0?'<div class="card" style="text-align:center;color:var(--fg3)">لا يوجد منشورات بعد</div>'
+      :p.map(x=>`<div class="card">
+        <div class="card-header"><span class="${tagClass(x.status)}">${x.status}</span> <span style="color:var(--fg3);font-size:.7rem">طلب #${x.job_id}</span></div>
+        <div style="color:var(--fg2);font-size:.82rem;line-height:1.6;white-space:pre-wrap">${esc(x.text)}</div>
+        ${x.status==='pending'?`<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-success btn-sm" onclick="dec('/api/posts/${x.id}/decision','approve')">📢 نشر</button> <button class="btn btn-danger btn-sm" onclick="dec('/api/posts/${x.id}/decision','reject')">تجاهل</button></div>`:''}
+      </div>`).join('');
+
+    // Proposals
+    $("#tab-proposals").innerHTML=pr.length===0?'<div class="card" style="text-align:center;color:var(--fg3)">لا يوجد اقتراحات تطوير</div>'
+      :pr.map(x=>`<div class="card">
+        <div class="card-header">
+          <div><span class="${tagClass(x.status)}">${x.status}</span> <span style="color:var(--fg3);font-size:.7rem">${x.kind}: ${esc(x.target)}</span></div>
+        </div>
+        <div style="color:var(--fg3);font-size:.72rem;margin-bottom:4px">${esc(x.reason)}</div>
+        <div class="events" style="max-height:120px">${esc(x.content)}</div>
+        ${x.status==='pending'?`<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-success btn-sm" onclick="dec('/api/proposals/${x.id}/decision','approve')">✅ تطبيق</button> <button class="btn btn-danger btn-sm" onclick="dec('/api/proposals/${x.id}/decision','reject')">تجاهل</button></div>`:''}
+        ${x.status==='applied'&&x.kind==='prompt'?`<button class="btn btn-danger btn-sm" style="margin-top:6px" onclick="dec('/api/proposals/${x.id}/decision','rollback')">↩️ تراجع</button>`:''}
+      </div>`).join('');
+  }catch(e){console.error('load error',e)}
+}
+
+async function loadAgents(){
+  try{
+    const [ag,roster]=await Promise.all([fetch("/api/agents").then(r=>r.json()),fetch("/api/roster").then(r=>r.json())]);
+    let html='';
+    // Active agents
+    if(ag.length){
+      html+=`<div class="section-header"><h2>الموظفين النشطين</h2><span class="count">${ag.length}</span></div>`;
+      html+=ag.map(a=>`<div class="card" style="padding:10px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+          <div><b style="font-size:.85rem">${esc(a.name)}</b> <span style="color:var(--fg3);font-size:.7rem">${esc(a.department)} · ${a.origin}</span></div>
+          <div style="font-size:.72rem;color:var(--fg3)">مهام: ${a.uses} · رصيد: ${a.balance} ج</div>
+        </div>
+      </div>`).join('');
+    }
+    // Roster by department
+    html+=`<div class="section-header"><h2>الكادر الكامل</h2><span class="count">${roster.total} دور</span></div>`;
+    for(const[dept,roles] of Object.entries(roster.departments)){
+      html+=`<div style="margin-bottom:12px"><div style="font-size:.78rem;font-weight:700;color:var(--accent2);margin-bottom:6px">📂 ${dept}</div>`;
+      html+=`<div class="roster-grid">${Object.keys(roles).map(r=>`<div class="roster-chip">${r}<div class="dept">${dept}</div></div>`).join('')}</div></div>`;
+    }
+    $("#tab-agents").innerHTML=html;
+  }catch(e){console.error(e)}
+}
+
+async function loadProviders(){
+  try{
+    const pv=await fetch("/api/providers").then(r=>r.json());
+    $("#tab-providers").innerHTML=pv.length===0
+      ?'<div class="card" style="text-align:center;color:var(--fg3)">لا يوجد مزوّدين. ضع مفاتيح API في .env</div>'
+      :pv.map(p=>`<div class="card" style="padding:10px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+          <div><b style="font-size:.85rem;color:var(--accent2)">${esc(p.name)}</b></div>
+          <div style="font-size:.7rem;color:var(--fg3)">${p.keys} مفتاح · Model: <code style="color:var(--fg2)">${esc(p.model)}</code>${p.vision_model?' · 👁️ '+esc(p.vision_model):''}</div>
+        </div>
+      </div>`).join('')
+      +`<div style="margin-top:10px"><button class="btn btn-ghost" onclick="testProviders()">🧪 اختبار المزوّدين</button></div>
+         <div id="test-results"></div>`;
+  }catch(e){console.error(e)}
+}
+
+async function testProviders(){
+  const el=$("#test-results");
+  el.innerHTML='<div class="card" style="color:var(--fg3)">⏳ جاري الاختبار...</div>';
+  try{
+    const res=await fetch("/api/providers/test",{method:"POST",headers:H()}).then(r=>r.json());
+    el.innerHTML=res.map(r=>`<div class="card" style="padding:8px 14px;border-color:${r.ok?'var(--success)':'var(--danger)'}">
+      <span style="color:${r.ok?'var(--success)':'var(--danger)'}">●</span>
+      <b>${esc(r.provider)}</b> Key #${r.key}: ${r.ok?'✅ يعمل':'`❌ ${esc(r.error||"فشل")}`'}
+    </div>`).join('');
+  }catch(e){el.innerHTML=`<div class="card" style="color:var(--danger)">خطأ: ${e.message}</div>`}
+}
+
+// Initial load + auto-refresh
+load();
+setInterval(()=>{if(currentTab==='jobs'||currentTab==='posts'||currentTab==='proposals')load()},4000);
+</script>
+</body>
+</html>
