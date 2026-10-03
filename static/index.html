@@ -3,219 +3,470 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AutoCorp — لوحة تحكم الوكالة الذكية ومشاريع الـ Full-Stack</title>
-<meta name="description" content="AutoCorp: وكالة ذكاء اصطناعي ذاتية التشغيل تخدم الشركات المصرية الصغيرة. مواقع متكاملة فرونت وباك إند، بوابات دفع، وأتمتة كاملة.">
+<title>AutoCorp — منصة بناء المتاجر والمواقع بالذكاء الاصطناعي للشركات المصرية</title>
+<meta name="description" content="AutoCorp: منصة أتمتة كاملة لبناء مواقع ومتاجر الشركات المصرية الناشئة في دقيقتين مع بوابات الدفع والسلة والنشر على الاستضافات.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Readex+Pro:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0a10;--bg2:#12121c;--bg3:#1a1a2b;
-  --fg:#e8e8f2;--fg2:#a0a0ba;--fg3:#6e6e88;
-  --accent:#6c5ce7;--accent2:#a29bfe;--accent-glow:rgba(108,92,231,.2);
+  --bg:#080811;--bg2:#0f0f1a;--bg3:#161626;
+  --fg:#f1f2f6;--fg2:#a4b0be;--fg3:#747d8c;
+  --accent:#6c5ce7;--accent2:#a29bfe;--accent-glow:rgba(108,92,231,.25);
+  --emerald:#059669;--emerald-light:#10b981;
+  --sunset:#d97706;--ocean:#0284c7;--royal:#7c3aed;--crimson:#dc2626;
   --success:#00cec9;--warning:#fdcb6e;--danger:#ff7675;--info:#74b9ff;--gold:#f39c12;
-  --glass:rgba(255,255,255,.03);--glass2:rgba(255,255,255,.07);
-  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.14);
-  --radius:16px;--radius-sm:10px;
+  --glass:rgba(255,255,255,.03);--glass2:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.15);
+  --radius:18px;--radius-sm:10px;
 }
 body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--fg);min-height:100vh;overflow-x:hidden}
 a{color:var(--accent2);text-decoration:none}
 a:hover{text-decoration:underline}
 
-/* Background animated glow */
+/* Background mesh */
 .bg-mesh{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
 .bg-mesh::before,.bg-mesh::after{content:'';position:absolute;border-radius:50%;filter:blur(140px);opacity:.18;animation:float 20s ease-in-out infinite alternate}
-.bg-mesh::before{width:650px;height:650px;background:var(--accent);top:-200px;right:-100px}
-.bg-mesh::after{width:550px;height:550px;background:#00cec9;bottom:-150px;left:-100px;animation-delay:-10s}
+.bg-mesh::before{width:700px;height:700px;background:var(--accent);top:-200px;right:-100px}
+.bg-mesh::after{width:600px;height:600px;background:#00cec9;bottom:-150px;left:-100px;animation-delay:-10s}
 @keyframes float{0%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.1)}100%{transform:translate(-20px,20px) scale(.95)}}
 
-/* Layout */
 .container{position:relative;z-index:1;max-width:1150px;margin:0 auto;padding:18px}
-header{display:flex;align-items:center;justify-content:space-between;padding:18px 0;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--border);margin-bottom:18px}
-header h1{font-size:1.9rem;font-weight:900;background:linear-gradient(135deg,var(--accent2),var(--success));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-header .subtitle{color:var(--fg2);font-size:.85rem;margin-top:2px}
-.badge{display:inline-flex;align-items:center;gap:6px;background:var(--glass2);border:1px solid var(--border2);border-radius:24px;padding:6px 14px;font-size:.78rem;color:var(--fg2)}
-.badge .dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 2s ease infinite}
-.badge-admin{border-color:rgba(243,156,18,.4);background:rgba(243,156,18,.1);color:var(--gold);font-weight:700}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Header */
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 0;flex-wrap:wrap;gap:14px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.brand-box{display:flex;align-items:center;gap:12px}
+.brand-logo{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--success));display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#fff;box-shadow:0 6px 20px var(--accent-glow)}
+header h1{font-size:1.6rem;font-weight:900;background:linear-gradient(135deg,#fff,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+header .subtitle{color:var(--fg2);font-size:.8rem;font-family:'Readex Pro',sans-serif}
+
+/* Nav Modes */
+.nav-modes{display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:4px;gap:4px}
+.mode-btn{padding:8px 18px;border-radius:10px;font-size:.82rem;font-weight:700;color:var(--fg2);background:transparent;border:none;cursor:pointer;transition:all .2s ease;font-family:'Cairo',sans-serif;display:flex;align-items:center;gap:6px}
+.mode-btn:hover{color:#fff;background:rgba(255,255,255,.04)}
+.mode-btn.active{background:linear-gradient(135deg,var(--accent),#5641e5);color:#fff;box-shadow:0 4px 15px var(--accent-glow)}
+.mode-btn.admin-mode.active{background:linear-gradient(135deg,var(--gold),#d35400);box-shadow:0 4px 15px rgba(243,156,18,.3)}
 
 /* Stats Grid */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:22px}
 .stat-card{background:var(--glass);backdrop-filter:blur(25px);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:all .3s ease;position:relative;overflow:hidden}
 .stat-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 30px var(--accent-glow)}
 .stat-card .label{font-size:.75rem;color:var(--fg3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
 .stat-card .value{font-size:1.6rem;font-weight:900;background:linear-gradient(135deg,var(--fg),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .stat-card .unit{font-size:.72rem;color:var(--fg3);margin-top:2px}
 
-/* Cards */
-.card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;transition:all .3s ease}
+/* Cards & Sections */
+.card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;transition:all .3s ease}
 .card:hover{border-color:var(--border2)}
-.card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-
-/* Tags */
-.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;border:1px solid}
-.tag-planning{color:var(--warning);border-color:rgba(253,203,110,.3);background:rgba(253,203,110,.08)}
-.tag-running{color:var(--info);border-color:rgba(116,185,255,.3);background:rgba(116,185,255,.08);animation:pulse 2s ease infinite}
-.tag-awaiting_plan,.tag-awaiting_delivery{color:#fd79a8;border-color:rgba(253,121,168,.3);background:rgba(253,121,168,.08)}
-.tag-delivered{color:var(--success);border-color:rgba(0,206,201,.3);background:rgba(0,206,201,.08)}
-.tag-rejected,.tag-failed{color:var(--danger);border-color:rgba(255,118,117,.3);background:rgba(255,118,117,.08)}
-
-/* Forms */
-.form-card{background:linear-gradient(135deg,var(--glass2),var(--glass));backdrop-filter:blur(25px);border:1px solid var(--accent);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:0 4px 40px var(--accent-glow)}
-.form-card h3{font-size:1.05rem;margin-bottom:12px;color:var(--accent2);font-weight:800}
-input,textarea,select{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;color:var(--fg);font-family:inherit;font-size:.85rem;transition:border-color .3s}
-input:focus,textarea:focus{outline:none;border-color:var(--accent)}
-textarea{resize:vertical;min-height:75px}
-.form-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .25s ease;letter-spacing:.3px;text-decoration:none!important}
-.btn-primary{background:linear-gradient(135deg,var(--accent),#8c7ae6);color:#fff;box-shadow:0 4px 15px var(--accent-glow)}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 25px rgba(108,92,231,.35)}
-.btn-success{background:linear-gradient(135deg,#00b894,#00cec9);color:#0a0a10}
-.btn-success:hover{transform:translateY(-1px)}
-.btn-danger{background:linear-gradient(135deg,#e17055,#d63031);color:#fff}
-.btn-ghost{background:var(--glass2);color:var(--fg2);border:1px solid var(--border2)}
-.btn-ghost:hover{color:var(--fg);border-color:var(--fg3)}
-.btn-gold{background:linear-gradient(135deg,#f39c12,#f1c40f);color:#0a0a10}
-.btn-sm{padding:6px 14px;font-size:.75rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:var(--radius-sm);font-size:.82rem;font-weight:700;border:none;cursor:pointer;transition:all .2s ease;font-family:'Cairo',sans-serif;text-decoration:none}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#5641e5);color:#fff;box-shadow:0 4px 15px var(--accent-glow)}
+.btn-primary:hover{opacity:.92;transform:translateY(-1px);text-decoration:none}
+.btn-success{background:linear-gradient(135deg,var(--emerald-light),var(--emerald));color:#fff;box-shadow:0 4px 15px rgba(5,150,105,.25)}
+.btn-success:hover{opacity:.92;transform:translateY(-1px);text-decoration:none}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#e67e22);color:#fff;box-shadow:0 4px 15px rgba(243,156,18,.3)}
+.btn-danger{background:linear-gradient(135deg,var(--danger),#d63031);color:#fff}
+.btn-ghost{background:var(--glass2);border:1px solid var(--border);color:var(--fg)}
+.btn-ghost:hover{border-color:var(--border2);background:rgba(255,255,255,.08);text-decoration:none}
+.btn-sm{padding:6px 12px;font-size:.75rem;border-radius:8px}
 
-/* Event Log */
-.events{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--fg3);direction:ltr;text-align:left;margin-top:10px;max-height:180px;overflow-y:auto;line-height:1.7;background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm)}
-.ev-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+/* Form inputs */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:14px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:.78rem;font-weight:700;color:var(--fg2);margin-bottom:6px}
+input,textarea,select{width:100%;background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--fg);font-size:.85rem;font-family:'Cairo',sans-serif;outline:none;transition:border-color .2s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
+textarea{resize:vertical;min-height:75px}
 
-/* Pipeline */
-.pipeline{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin:8px 0}
-.pipeline .step{font-size:.68rem;padding:4px 10px;border-radius:14px;background:var(--glass2);color:var(--fg2);border:1px solid var(--border);white-space:nowrap}
-.pipeline .arrow{color:var(--fg3);font-size:.7rem}
-.pipeline .step.active{border-color:var(--accent);color:var(--accent2);background:var(--accent-glow);font-weight:700}
-.pipeline .step.done{border-color:var(--success);color:var(--success);background:rgba(0,206,201,.08)}
+/* Palette Swatches */
+.palette-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:8px}
+.palette-card{background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;cursor:pointer;transition:all .2s ease;display:flex;align-items:center;gap:10px}
+.palette-card:hover{border-color:var(--border2);transform:scale(1.02)}
+.palette-card.selected{border-color:var(--accent2);background:rgba(108,92,231,.12);box-shadow:0 0 15px var(--accent-glow)}
+.palette-swatch{width:32px;height:32px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
 
-/* Tabs */
-.tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
-.tab{padding:8px 18px;border-radius:24px;font-size:.82rem;cursor:pointer;background:var(--glass);border:1px solid var(--border);color:var(--fg2);transition:all .2s;font-weight:700}
-.tab:hover{border-color:var(--fg3)}
-.tab.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 15px var(--accent-glow)}
+/* Modals */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);max-width:640px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.8);position:relative}
 
-/* Full-stack links box */
-.links-box{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:rgba(0,0,0,.2);padding:8px 12px;border-radius:var(--radius-sm);margin:8px 0;border:1px solid var(--border)}
+/* Badges & Tags */
+.badge{display:inline-flex;align-items:center;gap:6px;background:var(--glass2);border:1px solid var(--border2);border-radius:24px;padding:5px 12px;font-size:.75rem;color:var(--fg2)}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 2s ease infinite}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700;border:1px solid}
+.tag-delivered{color:var(--success);border-color:rgba(0,206,201,.3);background:rgba(0,206,201,.08)}
+.tag-running{color:var(--info);border-color:rgba(116,185,255,.3);background:rgba(116,185,255,.08);animation:pulse 2s ease infinite}
+.tag-awaiting_plan,.tag-awaiting_delivery{color:#fd79a8;border-color:rgba(253,121,168,.3);background:rgba(253,121,168,.08)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-/* Modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:999;display:none;align-items:center;justify-content:center;padding:16px}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:24px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+/* Custom scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 </style>
 </head>
 <body>
+
 <div class="bg-mesh"></div>
+
 <div class="container">
 
-<!-- Header -->
-<header>
-  <div>
-    <h1>⚡ AutoCorp</h1>
-    <div class="subtitle">وكالة الذكاء الاصطناعي ذاتية التشغيل · للشركات المصرية الصغيرة</div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <div class="badge"><span class="dot"></span> <span id="mode-badge">يتحقّق...</span></div>
+  <!-- Header -->
+  <header>
+    <div class="brand-box">
+      <div class="brand-logo">⚡</div>
+      <div>
+        <h1>AutoCorp</h1>
+        <p class="subtitle">وكالة الذكاء الاصطناعي ذاتية التشغيل لبناء المتاجر والشركات المصرية</p>
+      </div>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div class="nav-modes">
+      <button class="mode-btn active" id="btn-mode-builder" onclick="switchMode('builder')">
+        🚀 بناء متجر جديد
+      </button>
+      <button class="mode-btn" id="btn-mode-stores" onclick="switchMode('stores')">
+        📱 متاجري المنشورة (<span id="stores-count-badge">0</span>)
+      </button>
+      <button class="mode-btn admin-mode" id="btn-mode-admin" onclick="switchMode('admin')">
+        👑 لوحة المشرف العام
+      </button>
+    </div>
+
+    <!-- Admin Status Badge -->
     <div id="admin-badge-container">
       <button class="btn btn-ghost btn-sm" onclick="showAdminModal()">👑 دخول المشرف</button>
     </div>
+  </header>
+
+  <!-- ========================================================= -->
+  <!-- MODE 1: STORE BUILDER WIZARD                              -->
+  <!-- ========================================================= -->
+  <div id="view-builder">
+    <div class="card" style="border-color:rgba(108,92,231,.3);background:linear-gradient(135deg,rgba(108,92,231,.05),transparent)">
+      <div class="card-header">
+        <div>
+          <h2 style="font-size:1.35rem;font-weight:900;color:#fff">🛠️ معالج بناء وتخصيص المتجر الرقمي المتكامل</h2>
+          <p style="color:var(--fg2);font-size:.82rem;font-family:'Readex Pro',sans-serif;margin-top:2px">
+            املأ بيانات مشروعك وهوية ألوانك، وسيتولى فريق الـ 70 Agent كتابة الكود وتجهيز السلة وبوابات الدفع في دقيقتين.
+          </p>
+        </div>
+        <span class="badge"><span class="dot"></span> أتمتة كاملة 100%</span>
+      </div>
+
+      <form id="store-builder-form" onsubmit="handleCreateStore(event)">
+        <!-- Step 1: الهوية والنشاط -->
+        <div style="margin-bottom:18px">
+          <div style="font-weight:800;font-size:.9rem;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+            <span>1️⃣ بيانات المتجر والنشاط الأساسي</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>اسم المتجر / البراند *</label>
+              <input type="text" id="b-brand" required placeholder="مثال: خضار العمدة فريش، مطعم كبابجي زمان">
+            </div>
+            <div class="form-group">
+              <label>نوع النشاط / المجال *</label>
+              <select id="b-category" onchange="onCategoryChanged()">
+                <option value="خضار وفواكه">خضار وفواكه وأغذية طازجة 🥦🍎</option>
+                <option value="مطاعم ومأكولات">مطاعم ومأكولات سريعة ومشاوي 🍔🍗</option>
+                <option value="سوبرماركت وبقالة">سوبرماركت وبقالة منزلية 🛒🧀</option>
+                <option value="ملابس وموضة">ملابس وأزياء ومستلزمات 👗👕</option>
+                <option value="عيادات وصحة">عيادات ومراكز طبية وصحية 🩺💊</option>
+                <option value="خدمات وصيانة">شركات خدمات وحلول تقنية ⚡💻</option>
+                <option value="عقارات ومقاولات">عقارات ومقاولات وتشطيبات 🏢🔑</option>
+                <option value="أخرى">نشاط مخصص آخر 📦✨</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>الشعار التسويقي (Slogan)</label>
+              <input type="text" id="b-slogan" placeholder="مثال: من المزرعة لباب بيتك طازج يومياً">
+            </div>
+            <div class="form-group">
+              <label>رابط الشعار أو صورة البراند (اختياري)</label>
+              <input type="url" id="b-logo" placeholder="https://example.com/logo.png">
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: هوية التصميم والألوان -->
+        <div style="margin-bottom:18px">
+          <div style="font-weight:800;font-size:.9rem;color:var(--accent2);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+            <span>2️⃣ هوية التصميم ونظام الألوان (Color Palette)</span>
+          </div>
+          <div class="palette-grid">
+            <div class="palette-card selected" onclick="selectPalette('emerald', this)">
+              <div class="palette-swatch" style="background:linear-gradient(135deg,#059669,#10b981)"></div>
+              <div>
+                <b style="font-size:.8rem;color:#fff">زمردي طبيعي</b>
+                <p style="font-size:.7rem;color:var(--fg3)">للخضار والصحة</p>
+              </div>
+            </div>
+            <div class="palette-card" onclick="selectPalette('sunset', this)">
+              <div class="palette-swatch" style="background:linear-gradient(135deg,#d97706,#f59e0b)"></div>
+              <div>
+                <b style="font-size:.8rem;color:#fff">عنبر وغروب دافئ</b>
+                <p style="font-size:.7rem;color:var(--fg3)">للمطاعم والمأكولات</p>
+              </div>
+            </div>
+            <div class="palette-card" onclick="selectPalette('ocean', this)">
+              <div class="palette-swatch" style="background:linear-gradient(135deg,#0284c7,#38bdf8)"></div>
+              <div>
+                <b style="font-size:.8rem;color:#fff">أزرق محيطي</b>
+                <p style="font-size:.7rem;color:var(--fg3)">للشركات والخدمات</p>
+              </div>
+            </div>
+            <div class="palette-card" onclick="selectPalette('royal', this)">
+              <div class="palette-swatch" style="background:linear-gradient(135deg,#7c3aed,#a78bfa)"></div>
+              <div>
+                <b style="font-size:.8rem;color:#fff">بنفسجي ملكي</b>
+                <p style="font-size:.7rem;color:var(--fg3)">للموضة والجمال</p>
+              </div>
+            </div>
+            <div class="palette-card" onclick="selectPalette('crimson', this)">
+              <div class="palette-swatch" style="background:linear-gradient(135deg,#dc2626,#f87171)"></div>
+              <div>
+                <b style="font-size:.8rem;color:#fff">أحمر ياقوتي</b>
+                <p style="font-size:.7rem;color:var(--fg3)">للعروض والفاست فود</p>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="b-palette" value="emerald">
+        </div>
+
+        <!-- Step 3: المقابلة الاستكشافية الذكية -->
+        <div style="margin-bottom:18px;background:rgba(0,0,0,.2);padding:14px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+            <div style="font-weight:800;font-size:.9rem;color:var(--info);display:flex;align-items:center;gap:6px">
+              <span>3️⃣ استشارة الذكاء الاصطناعي لفهم تفاصيل مشروعك</span>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="loadDiscoveryQuestions()">
+              🤖 تشغيل المقابلة الذكية وتوليد الأسئلة
+            </button>
+          </div>
+          <p style="font-size:.78rem;color:var(--fg3);font-family:'Readex Pro',sans-serif;margin-bottom:10px">
+            يجري وكيل استشارات المشاريع (AI Consultant) فحصاً استكشافياً لنشاطك لطرح أسئلة دقيقة حول العروض ومناطق التوصيل.
+          </p>
+          <div id="discovery-questions-container" class="space-y-3">
+            <!-- Dynamic questions injected here -->
+          </div>
+        </div>
+
+        <!-- Step 4: إضافة منتجات يدوياً -->
+        <div style="margin-bottom:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:800;font-size:.9rem;color:var(--accent2);display:flex;align-items:center;gap:6px">
+              <span>4️⃣ إدخال منتجات / خدمات الكتالوج (يدوياً)</span>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addCatalogRow()">+ إضافة صنف آخر</button>
+          </div>
+          <p style="font-size:.75rem;color:var(--fg3);margin-bottom:10px">
+            يمكنك إدخال منتجاتك الآن أو تركها ليقوم الذكاء الاصطناعي بتوليد كتالوج متكامل ومطابق لنشاطك تلقائياً.
+          </p>
+          <div id="catalog-rows-container" style="display:flex;flex-direction:column;gap:8px">
+            <!-- Dynamic product rows -->
+          </div>
+        </div>
+
+        <!-- Step 5: ربط بوابات الدفع المصرية -->
+        <div style="margin-bottom:18px">
+          <div style="font-weight:800;font-size:.9rem;color:var(--gold);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+            <span>5️⃣ ربط بوابات الدفع الخاصة بموقعك 🇪🇬</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>📱 رقم محفظة فودافون كاش / المحافظ الذكية</label>
+              <input type="text" id="b-vcash" placeholder="مثال: 01012345678">
+            </div>
+            <div class="form-group">
+              <label>⚡ معرف إنستاباي للدفع اللحظي (InstaPay Handle)</label>
+              <input type="text" id="b-instapay" placeholder="مثال: store@instapay">
+            </div>
+            <div class="form-group">
+              <label>🏪 كود تاجر فوري باي (Fawry Merchant Code)</label>
+              <input type="text" id="b-fawry" placeholder="مثال: 88219 أو اتركه لتوليد كود تلقائي">
+            </div>
+            <div class="form-group" style="display:flex;align-items:center;gap:8px;padding-top:24px">
+              <input type="checkbox" id="b-cod" checked style="width:18px;height:18px">
+              <label for="b-cod" style="margin:0;cursor:pointer">تفعيل الدفع نقداً عند الاستلام (Cash on Delivery)</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 6: بيانات التواصل والمقر -->
+        <div style="margin-bottom:20px">
+          <div style="font-weight:800;font-size:.9rem;color:var(--accent2);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+            <span>6️⃣ بيانات التواصل والمقر الجغرافي</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>رقم هاتف خدمة العملاء</label>
+              <input type="tel" id="b-phone" placeholder="010xxxxxxxx">
+            </div>
+            <div class="form-group">
+              <label>رقم الواتساب للطلبات المباشرة</label>
+              <input type="tel" id="b-whatsapp" placeholder="010xxxxxxxx">
+            </div>
+            <div class="form-group">
+              <label>عنوان المقر أو الفرع الرئيسي</label>
+              <input type="text" id="b-address" placeholder="مثال: مدينة نصر، القاهرة">
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="btn-submit-store" class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem;font-weight:900">
+          🚀 إطلاق وبرمجة المتجر المتكامل بواسطة فريق AutoCorp
+        </button>
+      </form>
+    </div>
   </div>
-</header>
 
-<!-- Stats Grid -->
-<div class="stats" id="stats">
-  <div class="stat-card"><div class="label">إجمالي الإيرادات</div><div class="value" id="s-rev">—</div><div class="unit">جنيه مصري</div></div>
-  <div class="stat-card"><div class="label">رواتب الـ AI Agents</div><div class="value" id="s-pay">—</div><div class="unit">تكلفة توكنز</div></div>
-  <div class="stat-card"><div class="label">صافي أرباح الوكالة</div><div class="value" id="s-profit">—</div><div class="unit">هامش ربح <b id="s-margin" style="color:var(--success)">—%</b></div></div>
-  <div class="stat-card"><div class="label">المشاريع والمواقع</div><div class="value" id="s-jobs">—</div><div class="unit"><span id="s-sites">0</span> موقع Full-Stack</div></div>
-  <div class="stat-card"><div class="label">طلبات المتاجر</div><div class="value" id="s-orders" style="color:var(--gold)">0</div><div class="unit">أوردر عملاء وارد</div></div>
-</div>
-
-<!-- New Job Form -->
-<div class="form-card">
-  <h3>🚀 بدء مشروع جديد وتكليف الوكالة</h3>
-  <input id="client" placeholder="اسم العميل أو النشاط (مثلاً: مطعم الأكيل، عيادة د. سارة، متجر كايرو)" autocomplete="off">
-  <div style="height:8px"></div>
-  <textarea id="req" placeholder="اطلب أي موقع Full-Stack أو خدمة: صفحة هبوط لمطعم مع منيو ودليفري وبوابة فودافون كاش، منصة حجز عيادة، متجر ملابس..."></textarea>
-  <div class="form-row">
-    <button class="btn btn-primary" onclick="sendJob()" id="send-btn">⚡ تكليف الـ CEO والفريق</button>
-    <button class="btn btn-ghost btn-sm" onclick="triggerTick()">⚙️ تشغيل دورة التطوير الذاتي</button>
-  </div>
-</div>
-
-<!-- Tabs Navigation -->
-<div class="tabs">
-  <div class="tab active" data-tab="jobs" onclick="switchTab('jobs')">📦 المشاريع والمواقع (Full-Stack)</div>
-  <div class="tab" data-tab="admin" onclick="switchTab('admin')">👑 لوحة الإشراف المالي والأرباح</div>
-  <div class="tab" data-tab="agents" onclick="switchTab('agents')">👥 كادر الـ AI Agents</div>
-  <div class="tab" data-tab="telegram" onclick="switchTab('telegram')">🤖 بوت تيليجرام</div>
-  <div class="tab" data-tab="posts" onclick="switchTab('posts')">📣 النشر التسويقي</div>
-  <div class="tab" data-tab="providers" onclick="switchTab('providers')">🔌 مزودو الذكاء الاصطناعي</div>
-</div>
-
-<!-- Tab 1: Jobs (Full-Stack Sites) -->
-<div id="tab-jobs"></div>
-
-<!-- Tab 2: Admin Panel -->
-<div id="tab-admin" style="display:none">
-  <div class="card" style="border-color:var(--gold);background:rgba(243,156,18,.03)">
-    <div class="card-header">
-      <h3 style="color:var(--gold);font-size:1.1rem">👑 لوحة إشراف المدير العام (Super Admin)</h3>
-      <span class="badge badge-admin">محمي بكلمة مرور</span>
+  <!-- ========================================================= -->
+  <!-- MODE 2: MY LIVE STORES & DEPLOYMENTS                      -->
+  <!-- ========================================================= -->
+  <div id="view-stores" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="font-size:1.3rem;font-weight:800">📱 متاجرك الإلكترونية المنشورة والجاهزة للعمل</h2>
+      <button class="btn btn-ghost btn-sm" onclick="loadJobs()">🔄 تحديث المتاجر</button>
     </div>
-    <p style="color:var(--fg2);font-size:.85rem;line-height:1.6;margin-bottom:12px">
-      بصفتك المشرف العام على AutoCorp، جميع القرارات الحساسة (تسعير > 2000 ج.م، توظيف كوادر جديدة، واعتماد التسليم النهائي) بيدك، مع تقارير حية للأرباح والمصروفات بالجنيه المصري.
-    </p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="loadLedger()">📑 تحديث سجل اللدجر والرواتب</button>
+    <div id="stores-list-container">
+      <!-- Dynamic stores injected by JS -->
     </div>
   </div>
-  <div id="admin-ledger-content"></div>
-</div>
 
-<!-- Tab 3: Agents -->
-<div id="tab-agents" style="display:none"></div>
+  <!-- ========================================================= -->
+  <!-- MODE 3: SUPER ADMIN SUPERVISION PORTAL                    -->
+  <!-- ========================================================= -->
+  <div id="view-admin" style="display:none">
+    <!-- Authenticated Admin View -->
+    <div id="admin-auth-view" style="display:none">
+      <!-- Agency Financial Stats -->
+      <div class="stats" id="stats-grid">
+        <div class="stat-card">
+          <div class="label">إجمالي إيرادات التعاقدات</div>
+          <div class="value" id="s-rev" style="color:var(--success)">0 ج.م</div>
+          <div class="unit">مبيعات المشاريع المعتمدة</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">رواتب الـ Agents المستحقة</div>
+          <div class="value" id="s-payroll" style="color:var(--danger)">0 ج.م</div>
+          <div class="unit">تكلفة التوكنات والاستهلاك</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">صافي الأرباح المحققة</div>
+          <div class="value" id="s-profit" style="color:var(--gold)">0 ج.م</div>
+          <div class="unit">هامش ربح: <b id="s-margin">0%</b></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">المتاجر والطلبات الواردة</div>
+          <div class="value" id="s-orders" style="color:var(--info)">0</div>
+          <div class="unit"><span id="s-sites">0</span> مواقع منشورة</div>
+        </div>
+      </div>
 
-<!-- Tab 4: Telegram -->
-<div id="tab-telegram" style="display:none">
-  <div class="card">
-    <div class="card-header">
-      <h3 style="color:var(--info);font-size:1.1rem">🤖 ربط وتفعيل بوت تيليجرام (Telegram Bot)</h3>
-      <span class="tag tag-running">تكامل مدمج</span>
+      <!-- Admin Tabs Subnav -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="loadAdminLedger()">📑 سجل اللدجر والعمليات المالية</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadAdminRoster()">🤖 كادر الـ 70 وكيل ذكي</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadAdminProviders()">⚡ فحص مزودي نماذج الـ AI</button>
+        <button class="btn btn-danger btn-sm" onclick="logoutAdmin()" style="margin-right:auto">خروج من وضع المشرف</button>
+      </div>
+
+      <div id="admin-subcontent"></div>
     </div>
-    <p style="color:var(--fg2);font-size:.85rem;line-height:1.6;margin-bottom:12px">
-      يمكن لأي صاحب شركة صغيرة التحدث مع البوت مباشرة وإرسال طلبه أو صورة المنيو/الخدمة، وسيبدأ الـ CEO Agent بتنفيذ المشروع فوراً!
-    </p>
-    <div class="links-box" style="margin-bottom:12px">
-      <span style="color:var(--fg3);font-size:.78rem">طريقة التفعيل:</span>
-      <span style="color:var(--fg2);font-size:.82rem">قم بوضع <code>TELEGRAM_BOT_TOKEN</code> في ملف <code>.env</code> وسيتم تشغيل البوت تلقائياً فور تشغيل السيرفر.</span>
-    </div>
-    <div style="background:rgba(0,0,0,.25);padding:14px;border-radius:var(--radius-sm);font-size:.8rem;line-height:1.7;color:var(--fg2)">
-      <b>الأوامر المتاحة في البوت:</b><br>
-      • <code>/start</code>: رسالة الترحيب وتعريف العميل بخدمات الوكالة.<br>
-      • <code>/admin &lt;كلمة المرور&gt;</code>: تسجيلك كمدير عام لاستلام أزرار الموافقة والاعتمادات على هاتفك مباشرة.<br>
-      • <b>إرسال صورة (منيو/منتجات)</b>: يقوم الـ Vision Analyst بتحليلها والبدء في بناء المتجر.<br>
+
+    <!-- Admin Login Screen -->
+    <div id="admin-unauth-view" class="card" style="max-width:480px;margin:40px auto;text-align:center;padding:32px">
+      <div style="font-size:2.8rem;margin-bottom:12px">👑</div>
+      <h3 style="font-size:1.3rem;font-weight:900;color:var(--gold);margin-bottom:6px">تسجيل دخول المشرف العام</h3>
+      <p style="color:var(--fg2);font-size:.82rem;font-family:'Readex Pro',sans-serif;margin-bottom:18px">
+        هذه اللوحة مخصصة لإدارة العمليات المالية والرواتب والرقابة على فرق الذكاء الاصطناعي.
+      </p>
+      <input type="password" id="inline-admin-pass" placeholder="أدخل كلمة المرور المحددة في .env" style="margin-bottom:14px;text-align:center">
+      <button class="btn btn-gold" onclick="submitInlineAdminLogin()" style="width:100%;padding:12px;font-weight:800">
+        دخول المشرف العام
+      </button>
     </div>
   </div>
-</div>
-
-<!-- Tab 5: Posts -->
-<div id="tab-posts" style="display:none"></div>
-
-<!-- Tab 6: Providers -->
-<div id="tab-providers" style="display:none"></div>
 
 </div>
 
-<!-- Admin Login Modal -->
-<div class="modal-overlay" id="admin-modal">
+<!-- ========================================================= -->
+<!-- MODAL: HOSTING & CUSTOM DOMAIN SETTINGS                   -->
+<!-- ========================================================= -->
+<div class="modal-overlay" id="hosting-modal">
   <div class="modal">
-    <h3 style="color:var(--gold);margin-bottom:8px">👑 تسجيل دخول المشرف العام</h3>
-    <p style="color:var(--fg3);font-size:.8rem;margin-bottom:14px">أدخل كلمة المرور المحددة في ملف البيئة (ADMIN_PASSWORD) للتحكم في الاعتمادات والماليات.</p>
-    <input type="password" id="admin-pass-input" placeholder="أدخل كلمة المرور" autocomplete="off">
-    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">
+      <h3 style="font-weight:900;font-size:1.15rem;color:var(--info)" id="hm-title">⚙️ إعدادات النشر والدومين والتحميل</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeHostingModal()">✕</button>
+    </div>
+
+    <input type="hidden" id="hm-jid">
+
+    <!-- Tab Section 1: Custom Domain -->
+    <div style="margin-bottom:18px">
+      <b style="font-size:.85rem;color:var(--accent2);display:block;margin-bottom:6px">🌐 1. ربط دومين خاص بك (Custom Domain)</b>
+      <p style="font-size:.78rem;color:var(--fg2);font-family:'Readex Pro',sans-serif;margin-bottom:8px">
+        إذا قمت بشراء دومين خاص من هوستينجر أو جودادي أو نيم شيب، أدخله هنا لربطه فوراً:
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="text" id="hm-domain" placeholder="مثال: store.mybrand.com أو mybrand.com">
+        <button class="btn btn-primary btn-sm" onclick="saveCustomDomain()">حفظ الربط</button>
+      </div>
+      <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:var(--radius-sm);font-size:.75rem;line-height:1.6;font-family:'JetBrains Mono',monospace;color:var(--fg2)">
+        <b>إعدادات الـ DNS المطلوبة في لوحة تحكم الدومين:</b><br>
+        • Type: <code>CNAME</code> | Host: <code>@</code> أو <code>store</code> | Target: <code>cname.autocorp.io</code><br>
+        • أو Type: <code>A Record</code> | Target: <code>IP الخاص بالسيرفر</code>
+      </div>
+    </div>
+
+    <!-- Tab Section 2: Hostinger & cPanel Export -->
+    <div style="margin-bottom:18px;background:rgba(0,206,201,.04);border:1px solid rgba(0,206,201,.2);padding:14px;border-radius:var(--radius-sm)">
+      <b style="font-size:.85rem;color:var(--success);display:block;margin-bottom:4px">📦 2. تصدير حزمة استضافة هوستينجر (Hostinger Production Bundle)</b>
+      <p style="font-size:.78rem;color:var(--fg2);font-family:'Readex Pro',sans-serif;margin-bottom:10px">
+        حمّل الموقع بالكامل في ملف ZIP جاهز للرفع على استضافة هوستينجر (Hostinger) أو أي لوحة cPanel في مجلد <code>public_html</code>.
+      </p>
+      <a id="hm-zip-btn" href="#" class="btn btn-success btn-sm" style="font-weight:800;padding:9px 18px">
+        📦 تحميل حزمة الموقع الجاهزة (Download Hostinger ZIP)
+      </a>
+    </div>
+
+    <!-- Tab Section 3: Quick Edit Payments & Colors -->
+    <div style="border-top:1px solid var(--border);padding-top:14px">
+      <b style="font-size:.85rem;color:var(--gold);display:block;margin-bottom:8px">🎨 3. تعديل بوابات الدفع وبيانات المتجر</b>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group">
+          <label>رقم فودافون كاش</label>
+          <input type="text" id="hm-vcash">
+        </div>
+        <div class="form-group">
+          <label>حساب إنستاباي</label>
+          <input type="text" id="hm-instapay">
+        </div>
+      </div>
+      <button class="btn btn-gold btn-sm" onclick="saveSiteSettingsQuick()" style="width:100%">
+        💾 حفظ التعديلات وإعادة بناء الموقع فوراً
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- MODAL: ADMIN LOGIN (Top Badge)                            -->
+<!-- ========================================================= -->
+<div class="modal-overlay" id="admin-modal">
+  <div class="modal" style="max-width:440px">
+    <h3 style="color:var(--gold);margin-bottom:8px;font-weight:900">👑 تسجيل دخول المشرف العام</h3>
+    <p style="color:var(--fg3);font-size:.8rem;font-family:'Readex Pro',sans-serif;margin-bottom:14px">
+      أدخل كلمة المرور المحددة في ملف البيئة (ADMIN_PASSWORD) لمتابعة العمليات واللدجر.
+    </p>
+    <input type="password" id="admin-pass-input" placeholder="كلمة المرور" autocomplete="off" style="margin-bottom:14px">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-ghost btn-sm" onclick="hideAdminModal()">إلغاء</button>
       <button class="btn btn-gold btn-sm" onclick="submitAdminLogin()">تسجيل الدخول</button>
     </div>
@@ -223,260 +474,479 @@ textarea{resize:vertical;min-height:75px}
 </div>
 
 <script>
-const $=s=>document.querySelector(s);
-const esc=t=>String(t??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
-let currentTab='jobs';
-let isAdmin=localStorage.getItem("autocorp_admin")==="1";
+let currentMode = 'builder';
+let isAdmin = localStorage.getItem("autocorp_admin") === "1";
+let allJobs = [];
+let catalogCounter = 0;
 
-function H(){
-  const h={"content-type":"application/json"};
-  const token=localStorage.getItem("autocorp_token")||"autocorp-admin-secret-2026";
-  if(token)h["x-admin-key"]=token;
-  return h;
+function $(s){return document.querySelector(s)}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// Mode switcher
+function switchMode(mode){
+  currentMode = mode;
+  ['builder','stores','admin'].forEach(m => {
+    const btn = $(`#btn-mode-${m}`);
+    const view = $(`#view-${m}`);
+    if(m === mode){
+      btn.classList.add('active');
+      view.style.display = 'block';
+    }else{
+      btn.classList.remove('active');
+      view.style.display = 'none';
+    }
+  });
+
+  if(mode === 'stores') loadJobs();
+  if(mode === 'admin') updateAdminView();
 }
 
-function showAdminModal(){$("#admin-modal").style.display="flex";$("#admin-pass-input").focus()}
-function hideAdminModal(){$("#admin-modal").style.display="none"}
+function updateAdminView(){
+  if(isAdmin){
+    $('#admin-auth-view').style.display = 'block';
+    $('#admin-unauth-view').style.display = 'none';
+    loadSummary();
+    loadAdminLedger();
+  }else{
+    $('#admin-auth-view').style.display = 'none';
+    $('#admin-unauth-view').style.display = 'block';
+  }
+}
+
+// Select Palette
+function selectPalette(key, el){
+  document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  $('#b-palette').value = key;
+}
+
+function onCategoryChanged(){
+  const cat = $('#b-category').value;
+  if(cat.includes('خضار')) selectPalette('emerald', document.querySelectorAll('.palette-card')[0]);
+  else if(cat.includes('مطعم')) selectPalette('sunset', document.querySelectorAll('.palette-card')[1]);
+  else if(cat.includes('خدمات') || cat.includes('عياد')) selectPalette('ocean', document.querySelectorAll('.palette-card')[2]);
+  else if(cat.includes('ملابس')) selectPalette('royal', document.querySelectorAll('.palette-card')[3]);
+  else selectPalette('crimson', document.querySelectorAll('.palette-card')[4]);
+}
+
+// Add Catalog Row
+function addCatalogRow(defTitle='', defPrice='', defCat='', defBadge=''){
+  catalogCounter++;
+  const container = $('#catalog-rows-container');
+  const div = document.createElement('div');
+  div.id = `cat-row-${catalogCounter}`;
+  div.style.cssText = "display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:6px;align-items:center;background:rgba(0,0,0,.2);padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border)";
+  div.innerHTML = `
+    <input type="text" class="cr-title" placeholder="اسم الصنف (مثال: طماطم بلدي كجم)" value="${esc(defTitle)}">
+    <input type="number" class="cr-price" placeholder="السعر (ج.م)" value="${esc(defPrice)}">
+    <input type="text" class="cr-cat" placeholder="القسم" value="${esc(defCat)}">
+    <input type="text" class="cr-badge" placeholder="شارة (الأكثر طلباً)" value="${esc(defBadge)}">
+    <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('cat-row-${catalogCounter}').remove()">✕</button>
+  `;
+  container.appendChild(div);
+}
+
+// AI Discovery Questions
+async function loadDiscoveryQuestions(){
+  const cat = $('#b-category').value;
+  const brand = $('#b-brand').value || 'مشروعي';
+  const container = $('#discovery-questions-container');
+  container.innerHTML = '<div style="color:var(--info);font-size:.8rem;padding:8px">جاري استشارة محلل الذكاء الاصطناعي...</div>';
+
+  try{
+    const res = await fetch('/api/discovery/questions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({category: cat, brand_name: brand})
+    });
+    const d = await res.json();
+    const qs = d.questions || [];
+    container.innerHTML = qs.map((q, idx) => `
+      <div style="background:rgba(255,255,255,.02);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <label style="display:block;font-size:.78rem;font-weight:700;color:var(--fg);margin-bottom:4px">
+          💡 ${esc(q.question)}
+        </label>
+        <input type="text" class="ai-ans-input" data-label="${esc(q.label)}" placeholder="${esc(q.placeholder)}" style="font-size:.8rem">
+      </div>
+    `).join('');
+  }catch(e){
+    container.innerHTML = '<div style="color:var(--danger);font-size:.8rem">حدث خطأ في تحميل الأسئلة</div>';
+  }
+}
+
+// Handle Store Creation Form
+async function handleCreateStore(e){
+  e.preventDefault();
+  const btn = $('#btn-submit-store');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الآن قيادة فريق الـ Agents وتوليد المتجر...';
+
+  // Gather items
+  const items = [];
+  document.querySelectorAll('#catalog-rows-container > div').forEach(row => {
+    const t = row.querySelector('.cr-title')?.value.trim();
+    const p = parseFloat(row.querySelector('.cr-price')?.value) || 0;
+    const c = row.querySelector('.cr-cat')?.value.trim();
+    const b = row.querySelector('.cr-badge')?.value.trim();
+    if(t) items.push({title: t, price: p, category: c, badge: b});
+  });
+
+  // Gather AI answers
+  const aiAnswers = [];
+  document.querySelectorAll('.ai-ans-input').forEach(inp => {
+    const a = inp.value.trim();
+    if(a) aiAnswers.push({label: inp.dataset.label, a: a});
+  });
+
+  const payload = {
+    brand_name: $('#b-brand').value.trim(),
+    category: $('#b-category').value,
+    slogan: $('#b-slogan').value.trim(),
+    logo_url: $('#b-logo').value.trim(),
+    palette: $('#b-palette').value,
+    vodafone_cash: $('#b-vcash').value.trim(),
+    instapay: $('#b-instapay').value.trim(),
+    fawry_code: $('#b-fawry').value.trim(),
+    cod_enabled: $('#b-cod').checked,
+    phone: $('#b-phone').value.trim(),
+    whatsapp: $('#b-whatsapp').value.trim(),
+    address: $('#b-address').value.trim(),
+    items: items,
+    ai_answers: aiAnswers
+  };
+
+  try{
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if(res.ok){
+      alert(`🎉 تم بدء إنشاء متجر (${payload.brand_name}) بنجاح! رقم المشروع: #${d.id}`);
+      switchMode('stores');
+      loadJobs();
+    }else{
+      alert('خطأ: ' + (d.detail || 'فشل البدء'));
+    }
+  }catch(err){
+    alert('حدث خطأ: ' + err.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🚀 إطلاق وبرمجة المتجر المتكامل بواسطة فريق AutoCorp';
+  }
+}
+
+// Load Jobs for "My Stores"
+async function loadJobs(){
+  const container = $('#stores-list-container');
+  try{
+    const res = await fetch('/api/jobs');
+    const jobs = await res.json();
+    allJobs = jobs;
+    $('#stores-count-badge').textContent = jobs.length;
+
+    if(!jobs.length){
+      container.innerHTML = `
+        <div class="card" style="text-align:center;padding:40px">
+          <div style="font-size:3rem;margin-bottom:10px">🛒</div>
+          <h3 style="font-weight:800;margin-bottom:6px">لا توجد متاجر منشورة حتى الآن</h3>
+          <p style="color:var(--fg3);font-size:.82rem;font-family:'Readex Pro',sans-serif;margin-bottom:16px">ابدأ الآن ببناء متجرك الرقمي الأول في أقل من دقيقتين!</p>
+          <button class="btn btn-primary" onclick="switchMode('builder')">🚀 بناء متجر جديد الآن</button>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = jobs.map(j => {
+      const hasSite = j.site_url || j.status === 'delivered';
+      return `
+        <div class="card" style="border:1px solid ${hasSite ? 'rgba(0,206,201,.25)' : 'var(--border)'}">
+          <div class="card-header">
+            <div>
+              <b style="color:var(--accent2);font-size:1.15rem">#${j.id}</b>
+              <span style="font-weight:900;font-size:1.05rem;margin-right:8px;color:#fff">${esc(j.client)}</span>
+              <span class="tag ${j.status === 'delivered' ? 'tag-delivered' : 'tag-running'}">
+                ${j.status === 'delivered' ? 'جاهز ومنشور' : 'جاري البناء...'}
+              </span>
+            </div>
+            <div style="font-size:.8rem;color:var(--fg3)">
+              تاريخ البدء: <b>${new Date((j.created_at || Date.now()/1000) * 1000).toLocaleTimeString('ar-EG')}</b>
+            </div>
+          </div>
+
+          <div style="color:var(--fg2);font-size:.85rem;background:rgba(0,0,0,.25);padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:12px">
+            📋 <b>تفاصيل الطلب:</b> ${esc(j.request)}
+          </div>
+
+          <!-- Actions -->
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(0,206,201,.04);padding:12px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.15)">
+            <a href="/sites/${j.id}/" target="_blank" class="btn btn-success" style="font-weight:900;padding:10px 20px">
+              🌐 فتح وتشغيل الموقع الإلكتروني (Live Website)
+            </a>
+            <button class="btn btn-ghost btn-sm" onclick="openHostingModal(${j.id}, '${esc(j.client)}')">
+              ⚙️ إعدادات النشر والدومين والتحميل
+            </button>
+            <a href="/api/sites/${j.id}/orders" target="_blank" class="btn btn-ghost btn-sm">
+              📦 أوردرات المتجر (<b style="color:var(--gold)">${j.orders_count || 0}</b>)
+            </a>
+            <span style="color:var(--fg3);font-size:.72rem;margin-right:auto">Subdomain: <code>${j.id}.localhost:8000</code></span>
+          </div>
+
+          <!-- Collapsible internal logs -->
+          ${(j.events && j.events.length) ? `
+          <details style="margin-top:10px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px">
+            <summary style="font-size:.75rem;color:var(--fg3);cursor:pointer;font-weight:600">🔍 عرض سجل التعاقدات والـ QA الداخلي للفريق (${j.events.length} خطوة)</summary>
+            <div style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--fg2);line-height:1.7">
+              ${j.events.map(e => `<div>• ${esc(e.msg)}</div>`).join('')}
+            </div>
+          </details>` : ''}
+        </div>
+      `;
+    }).join('');
+  }catch(e){
+    container.innerHTML = `<div style="color:var(--danger)">فشل تحميل المتاجر: ${e.message}</div>`;
+  }
+}
+
+// Hosting & Custom Domain Modal
+async function openHostingModal(jid, brand){
+  $('#hm-jid').value = jid;
+  $('#hm-title').textContent = `⚙️ إعدادات النشر والدومين: #${jid} (${brand})`;
+  $('#hm-zip-btn').href = `/api/sites/${jid}/export-zip`;
+
+  // Fetch current settings
+  try{
+    const res = await fetch(`/api/sites/${jid}/settings`);
+    const s = await res.json();
+    $('#hm-domain').value = s.custom_domain || '';
+    $('#hm-vcash').value = s.vodafone_cash || '';
+    $('#hm-instapay').value = s.instapay || '';
+  }catch(e){}
+
+  $('#hosting-modal').classList.add('open');
+}
+
+function closeHostingModal(){
+  $('#hosting-modal').classList.remove('open');
+}
+
+async function saveCustomDomain(){
+  const jid = $('#hm-jid').value;
+  const dom = $('#hm-domain').value.trim();
+  try{
+    const res = await fetch(`/api/sites/${jid}/settings`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({custom_domain: dom})
+    });
+    alert('✅ تم حفظ الدومين وتوجيه السيرفر بنجاح!');
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
+}
+
+async function saveSiteSettingsQuick(){
+  const jid = $('#hm-jid').value;
+  const payload = {
+    custom_domain: $('#hm-domain').value.trim(),
+    vodafone_cash: $('#hm-vcash').value.trim(),
+    instapay: $('#hm-instapay').value.trim()
+  };
+  try{
+    const res = await fetch(`/api/sites/${jid}/settings`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    alert('✅ تم تحديث بيانات بوابات الدفع وإعادة بناء المتجر بنجاح!');
+    closeHostingModal();
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
+}
+
+// Summary & Admin
+async function loadSummary(){
+  try{
+    const res = await fetch('/api/summary');
+    const d = await res.json();
+    $('#s-rev').textContent = `${d.revenue_egp || 0} ج.م`;
+    $('#s-payroll').textContent = `${d.payroll_egp || 0} ج.م`;
+    $('#s-profit').textContent = `+${d.profit_egp || 0} ج.م`;
+    $('#s-margin').textContent = `${d.margin_percent || 0}%`;
+    $('#s-orders').textContent = d.total_store_orders || 0;
+    $('#s-sites').textContent = d.generated_sites || 0;
+  }catch(e){}
+}
+
+async function loadAdminLedger(){
+  const c = $('#admin-subcontent');
+  c.innerHTML = '<div style="color:var(--fg3);padding:10px">جاري تحميل سجل اللدجر...</div>';
+  try{
+    const token = localStorage.getItem("autocorp_token") || '';
+    const res = await fetch('/api/ledger', {headers: {'x-admin-key': token}});
+    const rows = await res.json();
+    c.innerHTML = `
+      <div class="card">
+        <h4 style="font-weight:800;margin-bottom:10px;color:var(--gold)">📑 سجل اللدجر المحاسبي والرواتب</h4>
+        <div style="overflow-x:auto">
+          <table style="width:100%;font-size:.78rem;border-collapse:collapse;text-align:right">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);color:var(--fg3)">
+                <th style="padding:8px">المعرف</th>
+                <th style="padding:8px">الحساب</th>
+                <th style="padding:8px">المبلغ</th>
+                <th style="padding:8px">البيان</th>
+                <th style="padding:8px">المشروع</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+                  <td style="padding:8px;font-family:'JetBrains Mono',monospace">#${r.id}</td>
+                  <td style="padding:8px;color:var(--info)">${esc(r.account)}</td>
+                  <td style="padding:8px;font-weight:800;color:${r.delta > 0 ? 'var(--success)' : 'var(--danger)'}">
+                    ${r.delta > 0 ? '+' : ''}${r.delta} ج.م
+                  </td>
+                  <td style="padding:8px;color:var(--fg2)">${esc(r.memo)}</td>
+                  <td style="padding:8px">#${r.job_id || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }catch(e){
+    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
+  }
+}
+
+async function loadAdminRoster(){
+  const c = $('#admin-subcontent');
+  c.innerHTML = '<div style="color:var(--fg3);padding:10px">جاري تحميل كادر الـ Agents...</div>';
+  try{
+    const res = await fetch('/api/agents');
+    const ags = await res.json();
+    c.innerHTML = `
+      <div class="card">
+        <h4 style="font-weight:800;margin-bottom:10px;color:var(--accent2)">🤖 كادر الـ 70 وكيل ذكي المسجلين بالشركة</h4>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
+          ${ags.map(a => `
+            <div style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+              <b style="font-size:.8rem;color:#fff">${esc(a.name)}</b>
+              <div style="font-size:.7rem;color:var(--fg3)">${esc(a.department)} · ${esc(a.origin)}</div>
+              <div style="font-size:.72rem;margin-top:4px;color:var(--gold)">
+                استخدامات: <b>${a.uses}</b> · رصيد: <b>${a.balance} ج.م</b>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }catch(e){
+    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
+  }
+}
+
+async function loadAdminProviders(){
+  const c = $('#admin-subcontent');
+  c.innerHTML = '<div style="color:var(--fg3);padding:10px">جاري فحص مزودي النماذج...</div>';
+  try{
+    const res = await fetch('/api/providers');
+    const p = await res.json();
+    c.innerHTML = `
+      <div class="card">
+        <h4 style="font-weight:800;margin-bottom:10px;color:var(--info)">⚡ مزودو نماذج الذكاء الاصطناعي</h4>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+          ${p.map(x => `
+            <div style="background:rgba(0,0,0,.3);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                <b style="color:var(--accent2)">${esc(x.name)}</b>
+                <span class="badge" style="background:rgba(0,206,201,.1);color:var(--success)">${x.keys} مفاتيح</span>
+              </div>
+              <div style="font-size:.72rem;color:var(--fg3);font-family:'JetBrains Mono',monospace">
+                Model: ${esc(x.model)}<br>
+                Vision: ${esc(x.vision_model || 'N/A')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }catch(e){
+    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
+  }
+}
+
+// Admin Auth Modals
+function showAdminModal(){
+  $('#admin-modal').classList.add('open');
+}
+function hideAdminModal(){
+  $('#admin-modal').classList.remove('open');
+}
 
 async function submitAdminLogin(){
-  const pwd=$("#admin-pass-input").value.trim();
+  const pwd = $('#admin-pass-input').value.trim();
+  if(!pwd) return;
+  await doAdminLogin(pwd);
+  hideAdminModal();
+}
+
+async function submitInlineAdminLogin(){
+  const pwd = $('#inline-admin-pass').value.trim();
+  if(!pwd) return;
+  await doAdminLogin(pwd);
+}
+
+async function doAdminLogin(pwd){
   try{
-    const res=await fetch("/api/admin/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:pwd})});
-    const d=await res.json();
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: pwd})
+    });
+    const d = await res.json();
     if(d.ok){
-      localStorage.setItem("autocorp_admin","1");
-      localStorage.setItem("autocorp_token",d.token);
-      isAdmin=true;
-      hideAdminModal();
+      localStorage.setItem("autocorp_admin", "1");
+      localStorage.setItem("autocorp_token", d.token);
+      isAdmin = true;
       updateAdminBadge();
-      alert("✅ " + (d.username ? `أهلاً بك (${d.username})` : "أهلاً بك") + "! تم تسجيل دخولك بنجاح كمدير ومشرف عام.");
-      load();
+      updateAdminView();
+      alert(`✅ ${d.username ? 'أهلاً بك (' + d.username + ')' : 'أهلاً بك'}! تم تسجيل دخولك بنجاح.`);
     }else{
-      alert("❌ "+(d.detail||"كلمة المرور غير صحيحة"));
+      alert('❌ ' + (d.detail || 'كلمة المرور غير صحيحة'));
     }
-  }catch(e){alert("خطأ: "+e.message)}
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
 }
 
 function updateAdminBadge(){
-  const c=$("#admin-badge-container");
+  const c = $('#admin-badge-container');
   if(isAdmin){
-    c.innerHTML=`<div class="badge badge-admin">👑 المشرف العام (مسجل) <button onclick="logoutAdmin()" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-right:6px">خروج</button></div>`;
+    c.innerHTML = `<div class="badge badge-admin">👑 المشرف العام (مسجل) <button onclick="logoutAdmin()" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-right:6px">خروج</button></div>`;
   }else{
-    c.innerHTML=`<button class="btn btn-ghost btn-sm" onclick="showAdminModal()">👑 دخول المشرف</button>`;
+    c.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="showAdminModal()">👑 دخول المشرف</button>`;
   }
 }
 
 function logoutAdmin(){
   localStorage.removeItem("autocorp_admin");
   localStorage.removeItem("autocorp_token");
-  isAdmin=false;
+  isAdmin = false;
   updateAdminBadge();
-  load();
+  updateAdminView();
 }
 
-function switchTab(tab){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
-  ['jobs','admin','agents','telegram','posts','providers'].forEach(t=>{
-    const el=$('#tab-'+t);if(el)el.style.display=t===tab?'':'none';
-  });
-  currentTab=tab;
-  if(tab==='admin')loadLedger();
-  if(tab==='agents')loadAgents();
-  if(tab==='providers')loadProviders();
-}
-
-function tagClass(s){return'tag tag-'+(s||'').replace(/\s/g,'_')}
-
-function renderPipeline(status){
-  const steps=['created','planning','running','awaiting_delivery','delivered'];
-  const labels={'created':'إنشاء','planning':'تخطيط','running':'تنفيذ الـ Full-Stack','awaiting_delivery':'فحص الـ QA والمالك','delivered':'تم التسليم ✅','awaiting_plan':'اعتماد السعر'};
-  const idx=steps.indexOf(status);
-  if(status==='awaiting_plan')return`<div class="pipeline"><span class="step active" style="color:var(--gold);border-color:var(--gold)">⏳ بانتظار موافقة المدير على السعر</span></div>`;
-  if(status==='rejected')return`<div class="pipeline"><span class="step" style="border-color:var(--danger);color:var(--danger)">❌ تم الرفض</span></div>`;
-  if(status==='failed')return`<div class="pipeline"><span class="step" style="border-color:var(--danger);color:var(--danger)">⚠️ حدث خطأ</span></div>`;
-  return`<div class="pipeline">${steps.map((s,i)=>`<span class="step ${i<idx?'done':i===idx?'active':''}">${labels[s]||s}</span>${i<steps.length-1?'<span class="arrow">→</span>':''}`).join('')}</div>`;
-}
-
-async function sendJob(){
-  const r=$("#req").value.trim();if(!r)return;
-  const btn=$("#send-btn");btn.disabled=true;btn.textContent="⏳ جاري تكليف الفريق ووضع الخطة...";
-  try{
-    const res=await fetch("/api/jobs",{method:"POST",headers:H(),body:JSON.stringify({client:$("#client").value||"عميل مصري",request:r,sync:true})});
-    const d=await res.json();
-    $("#req").value="";
-    load();
-  }catch(e){alert("خطأ: "+e.message)}
-  finally{btn.disabled=false;btn.textContent="⚡ تكليف الـ CEO والفريق"}
-}
-
-async function dec(u,d){await fetch(u,{method:"POST",headers:H(),body:JSON.stringify({decision:d})});load()}
-async function triggerTick(){await fetch("/api/tick",{method:"POST",headers:H()});load()}
-
-async function load(){
-  try{
-    updateAdminBadge();
-    const [s,j,p]=await Promise.all(["/api/summary","/api/jobs","/api/posts"].map(u=>fetch(u).then(r=>r.json())));
-    
-    // Stats Update
-    $("#s-rev").textContent=Number(s.revenue_egp).toLocaleString('ar-EG');
-    $("#s-pay").textContent=Number(s.payroll_egp).toLocaleString('ar-EG');
-    $("#s-profit").textContent=Number(s.profit_egp).toLocaleString('ar-EG');
-    $("#s-margin").textContent=(s.margin_percent||0)+'%';
-    $("#s-jobs").textContent=s.jobs;
-    $("#s-sites").textContent=s.generated_sites||0;
-    $("#s-orders").textContent=s.total_store_orders||0;
-    
-    // Providers Badge
-    fetch("/api/providers").then(r=>r.json()).then(pv=>{
-      const n=pv.length;
-      $("#mode-badge").textContent=n>0?`${n} مزوّد ذكاء اصطناعي نشط`:'وضع المحاكاة';
-    });
-
-    // Render Full-Stack Jobs List
-    $("#tab-jobs").innerHTML=j.length===0?'<div class="card" style="text-align:center;color:var(--fg3)"><p>لا توجد مشاريع بعد. أرسل أول طلب لمطعم أو عيادة أو متجر! 🎯</p></div>'
-      :j.map(x=>{
-      const cost=Number(x.cost||0).toFixed(2);
-      const price=Math.round(x.price||0);
-      const profit=Math.round(price-cost);
-      const events=(x.events||[]).map(e=>esc(e.msg));
-      const hasSite=x.site_url||x.status==='delivered';
-
-      return`<div class="card" style="border:1px solid ${hasSite?'rgba(0,206,201,.25)':'var(--border)'}">
-        <div class="card-header">
-          <div>
-            <b style="color:var(--accent2);font-size:1.15rem">#${x.id}</b> 
-            <span style="font-weight:800;font-size:1.05rem;margin-right:6px">${esc(x.client)}</span> 
-            <span class="${tagClass(x.status)}">${x.status==='delivered'?'جاهز ومنشور':x.status==='running'?'جاري البناء...':x.status}</span>
-          </div>
-          <div style="font-size:.82rem;color:var(--fg3)">
-            إيراد العرض: <b style="color:var(--success)">${price} ج</b> · تكلفة الذكاء: <b>${cost} ج</b> · صافي الربح: <b style="color:var(--gold)">+${profit} ج</b>
-          </div>
-        </div>
-        ${renderPipeline(x.status)}
-        <div class="req-text" style="color:var(--fg);font-size:.9rem;background:rgba(255,255,255,.02);padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border)">
-          📋 <b>الطلب:</b> ${esc(x.request)}
-        </div>
-        
-        <!-- Live Action Buttons -->
-        ${hasSite?`
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0;background:rgba(0,206,201,.04);padding:12px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.2)">
-          <a href="/sites/${x.id}/" target="_blank" class="btn btn-success" style="font-size:.92rem;font-weight:800;padding:10px 22px">
-            🌐 فتح وتشغيل الموقع الإلكتروني (Live Website)
-          </a>
-          <a href="/api/sites/${x.id}/info" target="_blank" class="btn btn-ghost btn-sm">⚡ فحص الباك إند والـ Endpoints</a>
-          <span class="badge" style="background:rgba(243,156,18,.15);color:var(--gold);font-weight:700">📦 ${x.orders_count||0} أوردر عملاء</span>
-          <span style="color:var(--fg3);font-size:.72rem;margin-right:auto">Subdomain: <code>${x.id}.localhost:8000</code></span>
-        </div>`: x.status==='running'? `
-        <div style="margin:10px 0;padding:10px;border-radius:var(--radius-sm);background:rgba(116,185,255,.08);color:var(--info);font-size:.82rem;display:flex;align-items:center;gap:8px">
-          <span class="dot" style="background:var(--info)"></span> جاري الآن برمجة الموقع وتصميم الواجهة وتجهيز بوابات الدفع بواسطة فريق الـ Agents...
-        </div>`: ''}
-        
-        <!-- Approval Buttons (Only shown if halted) -->
-        ${x.status==='awaiting_plan'||x.status==='awaiting_delivery'?
-          `<div style="display:flex;gap:8px;margin:10px 0;background:rgba(253,121,168,.08);padding:12px;border-radius:var(--radius-sm);border:1px solid rgba(253,121,168,.25)">
-            <span style="font-size:.82rem;color:#fd79a8;align-self:center;font-weight:700">⚠️ مطلوب قرار المشرف:</span>
-            <button class="btn btn-success btn-sm" onclick="dec('/api/jobs/${x.id}/decision','approve')">✅ اعتماد وموافقة فورية</button> 
-            <button class="btn btn-danger btn-sm" onclick="dec('/api/jobs/${x.id}/decision','reject')">❌ رفض</button>
-          </div>`:''}
-        
-        <!-- Collapsible Events (Clean, hidden by default!) -->
-        ${events.length?`
-        <details style="margin-top:10px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px">
-          <summary style="font-size:.75rem;color:var(--fg3);cursor:pointer;font-weight:600">🔍 عرض سجل التعاقدات والـ QA الداخلي للفريق (${events.length} خطوة)</summary>
-          <div class="events" style="margin-top:8px">${events.map(e=>`<div class="ev-line">${e}</div>`).join('')}</div>
-        </details>`:''}
-      </div>`}).join('');
-
-    // Render Posts
-    $("#tab-posts").innerHTML=p.length===0?'<div class="card" style="text-align:center;color:var(--fg3)">لا توجد منشورات تسويقية بعد</div>'
-      :p.map(x=>`<div class="card">
-        <div class="card-header"><span class="${tagClass(x.status)}">${x.status}</span> <span style="color:var(--fg3);font-size:.7rem">مشروع #${x.job_id}</span></div>
-        <div style="color:var(--fg2);font-size:.82rem;line-height:1.6;white-space:pre-wrap">${esc(x.text)}</div>
-        ${x.status==='pending'?`<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-success btn-sm" onclick="dec('/api/posts/${x.id}/decision','approve')">📢 نشر الآن</button> <button class="btn btn-danger btn-sm" onclick="dec('/api/posts/${x.id}/decision','reject')">تجاهل</button></div>`:''}
-      </div>`).join('');
-
-  }catch(e){console.error('load error',e)}
-}
-
-async function loadLedger(){
-  try{
-    const rows=await fetch("/api/ledger",{headers:H()}).then(r=>r.json());
-    $("#admin-ledger-content").innerHTML=`<div class="card" style="margin-top:14px">
-      <h4 style="margin-bottom:10px;color:var(--accent2)">سجل المعاملات المالية الحقيقية (Ledger):</h4>
-      <div style="overflow-x:auto">
-        <table style="width:100%;font-size:.78rem;border-collapse:collapse;color:var(--fg2)">
-          <thead><tr style="border-bottom:1px solid var(--border);text-align:right">
-            <th style="padding:6px">الحساب / الطرف</th>
-            <th style="padding:6px">القيمة (ج.م)</th>
-            <th style="padding:6px">المشروع</th>
-            <th style="padding:6px">الوصف / البيان</th>
-          </tr></thead>
-          <tbody>
-            ${rows.map(r=>`<tr style="border-bottom:1px solid rgba(255,255,255,.02)">
-              <td style="padding:6px"><code style="color:${r.account.includes('payroll')?'var(--danger)':'var(--success)'}">${esc(r.account)}</code></td>
-              <td style="padding:6px;font-weight:700;color:${r.delta>=0?'var(--success)':'var(--danger)'}">${r.delta>=0?'+':''}${r.delta} ج</td>
-              <td style="padding:6px">#${r.job_id||'-'}</td>
-              <td style="padding:6px">${esc(r.memo||'')}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>`;
-  }catch(e){console.error(e)}
-}
-
-async function loadAgents(){
-  try{
-    const [ag,roster]=await Promise.all([fetch("/api/agents").then(r=>r.json()),fetch("/api/roster").then(r=>r.json())]);
-    let html='';
-    if(ag.length){
-      html+=`<div class="section-header"><h2>الموظفين النشطين المنفذين</h2><span class="count">${ag.length}</span></div>`;
-      html+=ag.map(a=>`<div class="card" style="padding:10px 14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
-          <div><b style="font-size:.85rem">${esc(a.name)}</b> <span style="color:var(--fg3);font-size:.7rem">${esc(a.department)} · ${a.origin}</span></div>
-          <div style="font-size:.72rem;color:var(--fg3)">إجمالي المهام: <b>${a.uses}</b> · رصيد الرواتب: <b style="color:var(--gold)">${a.balance} ج</b></div>
-        </div>
-      </div>`).join('');
-    }
-    html+=`<div class="section-header"><h2>الكادر الكامل المتاح للتوظيف</h2><span class="count">${roster.total} تخصص</span></div>`;
-    for(const[dept,roles] of Object.entries(roster.departments)){
-      html+=`<div style="margin-bottom:12px"><div style="font-size:.8rem;font-weight:700;color:var(--accent2);margin-bottom:6px">📂 قسم ${dept}</div>`;
-      html+=`<div class="roster-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">${Object.keys(roles).map(r=>`<div style="background:var(--glass);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font-size:.72rem;text-align:center">${r}</div>`).join('')}</div></div>`;
-    }
-    $("#tab-agents").innerHTML=html;
-  }catch(e){console.error(e)}
-}
-
-async function loadProviders(){
-  try{
-    const pv=await fetch("/api/providers").then(r=>r.json());
-    $("#tab-providers").innerHTML=pv.length===0
-      ?'<div class="card" style="text-align:center;color:var(--fg3)">لا يوجد مزوّدين نشطين</div>'
-      :pv.map(p=>`<div class="card" style="padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
-          <div><b style="color:var(--accent2)">${esc(p.name)}</b></div>
-          <div style="font-size:.72rem;color:var(--fg3)">${p.keys} مفتاح API · الموديل: <code>${esc(p.model)}</code></div>
-        </div>
-      </div>`).join('')
-      +`<div style="margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="testProviders()">🧪 فحص واختبار المزودين</button></div><div id="test-results"></div>`;
-  }catch(e){console.error(e)}
-}
-
-async function testProviders(){
-  const el=$("#test-results");
-  el.innerHTML='<div class="card" style="color:var(--fg3)">⏳ جاري اختبار الاستجابة لجميع المزوّدين...</div>';
-  try{
-    const res=await fetch("/api/providers/test",{method:"POST",headers:H()}).then(r=>r.json());
-    el.innerHTML=res.map(r=>`<div class="card" style="padding:8px 14px;border-color:${r.ok?'var(--success)':'var(--danger)'}">
-      <span style="color:${r.ok?'var(--success)':'var(--danger)'}">●</span>
-      <b>${esc(r.provider)}</b> Key #${r.key}: ${r.ok?'✅ يعمل بسرعة':'❌ '+esc(r.error||"فشل")}
-    </div>`).join('');
-  }catch(e){el.innerHTML=`<div class="card" style="color:var(--danger)">خطأ: ${e.message}</div>`}
-}
-
-// Initial boot
-load();
-setInterval(()=>{if(currentTab==='jobs'||currentTab==='admin')load()},4000);
+// Initial Setup
+updateAdminBadge();
+loadJobs();
+// Pre-populate 2 default catalog rows
+addCatalogRow('طماطم بلدي نخب أول (كيلو)', '18', 'خضار طازج', 'طازج اليوم');
+addCatalogRow('بطاطس تحمير سبونتا (كيلو)', '20', 'خضار طازج', 'الأكثر طلباً');
 </script>
 </body>
 </html>

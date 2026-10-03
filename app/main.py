@@ -20,10 +20,10 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import corp, db, llm, roles, skills, tools
+from . import builder, corp, db, llm, roles, skills, tools
 
 IS_VERCEL = os.getenv("VERCEL", "0") == "1"
 BASE = os.path.dirname(os.path.dirname(__file__))
@@ -195,13 +195,64 @@ def home():
 @app.post("/api/jobs")
 async def new_job(body: dict, x_admin_key: str = Header(default="")):
     req = (body.get("request") or "").strip()
-    if not req:
-        raise HTTPException(400, "طلب المشروع مطلوب")
-    check_guardrails(req)
+    brand_name = (body.get("brand_name") or body.get("client") or "").strip()
+    category = (body.get("category") or "").strip()
+    slogan = (body.get("slogan") or "").strip()
+    
+    # Build a structured request if user used the visual wizard
+    full_req = req
+    if brand_name:
+        parts = [f"مشروع بناء موقع وتطبيق ويب متكامل لـ '{brand_name}'"]
+        if category:
+            parts.append(f"تصنيف النشاط: {category}")
+        if slogan:
+            parts.append(f"الشعار التسويقي: {slogan}")
+        if req:
+            parts.append(f"تفاصيل الطلب: {req}")
+        
+        # AI answers
+        ai_answers = body.get("ai_answers") or []
+        for ans in ai_answers:
+            if ans.get("a"):
+                parts.append(f"- {ans.get('label', 'ملاحظة')}: {ans.get('a')}")
+        full_req = "\n".join(parts)
+        
+    if not full_req:
+        raise HTTPException(400, "طلب المشروع أو بيانات المتجر مطلوبة")
+    check_guardrails(full_req)
     
     sync = body.get("sync", False) or IS_VERCEL
-    jid = make_job(body.get("client"), req, sync=sync)
+    client_name = brand_name or body.get("client") or "عميل-AutoCorp"
+    jid = make_job(client_name, full_req, sync=sync)
     
+    # Save site settings
+    db.x("""
+        INSERT OR REPLACE INTO site_settings (
+            job_id, brand_name, category, custom_domain, color_primary, color_secondary,
+            logo_url, phone, whatsapp, address, vodafone_cash, instapay, fawry_code,
+            cod_enabled, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        jid, brand_name, category, body.get("custom_domain") or "",
+        body.get("color_primary") or "", body.get("color_secondary") or "",
+        body.get("logo_url") or "", body.get("phone") or "", body.get("whatsapp") or "",
+        body.get("address") or "", body.get("vodafone_cash") or "", body.get("instapay") or "",
+        body.get("fawry_code") or "", 1 if body.get("cod_enabled", True) else 0,
+        time.time()
+    ))
+    
+    # Save manual items if provided
+    items = body.get("items") or []
+    for it in items:
+        if it.get("title"):
+            db.x("""
+                INSERT INTO site_items (job_id, title, price, category, description, badge, image_url, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                jid, it.get("title"), float(it.get("price") or 0), it.get("category") or "عام",
+                it.get("description") or "", it.get("badge") or "", it.get("image_url") or "", time.time()
+            ))
+            
     if sync:
         try:
             await corp.plan_job(jid)
@@ -210,7 +261,7 @@ async def new_job(body: dict, x_admin_key: str = Header(default="")):
                 await corp.run_job(jid)
         except Exception as e:
             print(f"[SYNC JOB ERROR] {e}")
-    return {"id": jid}
+    return {"id": jid, "brand_name": brand_name, "message": "تم إنشاء المشروع وبدأ فريق الـ Agents في التنفيذ"}
 
 
 @app.post("/api/hooks/job")
@@ -414,6 +465,115 @@ def site_backend_get_orders(jid: int, x_admin_key: str = Header(default="")):
     return db.q("select * from site_orders where job_id=? order by id desc", (jid,))
 
 
+@app.get("/api/sites/{jid}/settings")
+def get_site_settings(jid: int):
+    return db.one("select * from site_settings where job_id=?", (jid,)) or {}
+
+
+@app.post("/api/sites/{jid}/settings")
+def update_site_settings(jid: int, body: dict):
+    db.x("""
+        INSERT OR REPLACE INTO site_settings (
+            job_id, brand_name, category, custom_domain, color_primary, color_secondary,
+            logo_url, phone, whatsapp, address, vodafone_cash, instapay, fawry_code,
+            cod_enabled, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        jid, body.get("brand_name"), body.get("category"), body.get("custom_domain"),
+        body.get("color_primary"), body.get("color_secondary"), body.get("logo_url"),
+        body.get("phone"), body.get("whatsapp"), body.get("address"), body.get("vodafone_cash"),
+        body.get("instapay"), body.get("fawry_code"), 1 if body.get("cod_enabled", True) else 0,
+        time.time()
+    ))
+    # Rebuild site HTML with updated settings!
+    job_row = db.one("select * from jobs where id=?", (jid,)) or {}
+    items_rows = db.q("select * from site_items where job_id=?", (jid,))
+    new_html = builder.build_site_html(jid, job_row.get("client") or "", job_row.get("request") or "", settings=body, items=items_rows)
+    db.x("update site_pages set html=? where job_id=?", (new_html, jid))
+    # Update local sites directory if exists
+    d = os.path.join(corp.SITES, str(jid))
+    if os.path.exists(d):
+        with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
+            f.write(new_html)
+    return {"ok": True, "message": "تم تحديث إعدادات وهوية المتجر وإعادة بناء الصفحة بنجاح"}
+
+
+@app.get("/api/sites/{jid}/export-zip")
+def export_site_zip(jid: int):
+    row = db.one("select * from site_pages where job_id=?", (jid,))
+    if not row or not row.get("html"):
+        raise HTTPException(404, "الموقع غير جاهز للتحميل بعد")
+    
+    settings = db.one("select * from site_settings where job_id=?", (jid,)) or {}
+    brand = settings.get("brand_name") or f"site_{jid}"
+    
+    import io, zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("index.html", row["html"])
+        zf.writestr("api_config.json", json.dumps({
+            "site_id": jid,
+            "brand_name": brand,
+            "backend_url": f"http://localhost:8000/api/sites/{jid}",
+            "payment_support": ["vodafone_cash", "instapay", "fawry", "cod"],
+            "generated_by": "AutoCorp AI Autonomous Agency"
+        }, ensure_ascii=False, indent=2))
+        readme_txt = (
+            "===========================================================\n"
+            "⚡ AutoCorp — تعليمات رفع الموقع على استضافة هوستينجر (Hostinger)\n"
+            "===========================================================\n"
+            f"المشروع: {brand} (المعرف: #{jid})\n"
+            "التاريخ: 2026\n\n"
+            "خطوات الرفع السريع (في أقل من دقيقة):\n"
+            "1. افتح لوحة تحكم هوستينجر (hPanel).\n"
+            "2. ادخل إلى 'إدارة الملفات' (File Manager) للموقع الخاص بك.\n"
+            "3. افتح المجلد الرئيسي: public_html\n"
+            "4. قم برفع هذا الملف المضغوط وفك الضغط عنه (Extract).\n"
+            "5. تأكد من وجود ملف index.html مباشرة داخل مجلد public_html.\n"
+            "6. موقعك أصبح الآن شغال 100% ومربوط ببوابات الدفع والسلة!\n\n"
+            "لربط دومين مخصص (Custom Domain):\n"
+            "- اذهب إلى إعدادات DNS في هوستينجر أو Cloudflare.\n"
+            "- أضف سجل CNAME يشير إلى: cname.autocorp.io (أو عنوان السيرفر).\n"
+            "===========================================================\n"
+        )
+        zf.writestr("README_DEPLOY_HOSTINGER.txt", readme_txt)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=autocorp_site_{jid}.zip"}
+    )
+
+
+@app.post("/api/discovery/questions")
+def get_discovery_questions(body: dict):
+    category = body.get("category") or "عام"
+    brand_name = body.get("brand_name") or "المشروع"
+    
+    if any(k in category for k in ["خضار", "فواكه", "أغذية", "مزرعة", "عضوي"]):
+        questions = [
+            {"id": "q1", "label": "المنتجات الأكثر طلباً", "question": f"ما هي أهم أصناف الخضار أو الفواكه التي ترغب في تمييزها على واجهة {brand_name}؟", "placeholder": "مثال: طماطم بلدي، بطاطس تحمير، بوكسات التوفير العائلية"},
+            {"id": "q2", "label": "مناطق التوصيل والشحن", "question": "ما هي الأحياء والمناطق التي تغطيها خدمة التوصيل لديكم ومتوسط وقت التسليم؟", "placeholder": "مثال: التجمع، المعادي، الشيخ زايد - التوصيل خلال ساعتين"},
+            {"id": "q3", "label": "العروض الافتتاحية", "question": "هل تود إعلان خصم افتتاحي للعملاء الجدد في أعلى الصفحة الرئيسية؟", "placeholder": "مثال: خصم 15% على أول طلب + شحن مجاني للطلبات فوق 200 ج.م"},
+            {"id": "q4", "label": "بوابات الدفع المفضلة", "question": "ما هي وسيلة الدفع الأساسية التي تفضلها لاستلام التحويلات من عملائك؟", "placeholder": "مثال: فودافون كاش ومحافظ المحمول، إنستاباي، والدفع عند الاستلام"}
+        ]
+    elif any(k in category for k in ["مطعم", "كافيه", "أكل", "مشويات", "وجبات"]):
+        questions = [
+            {"id": "q1", "label": "الوجبات الرئيسية", "question": f"ما هي أشهر الوجبات أو الأطباق الخاصة التي يتميز بها {brand_name}؟", "placeholder": "مثال: مشويات مشكلة على الفحم، طواجن بلدي، حواوشي سوبر، برجر كرانشي"},
+            {"id": "q2", "label": "خيارات الاستلام والتوصيل", "question": "هل تتيح التوصيل للمنازل فقط أم أيضاً الاستلام من الفرع؟", "placeholder": "مثال: توصيل سريع ساخن لجميع المناطق + استلام من الفرع الرئيسي"},
+            {"id": "q3", "label": "العروض العائلية", "question": "ما هي العروض أو وجبات التوفير التي ترغب في إبرازها؟", "placeholder": "مثال: وجبة العائلة السوبر 4 أفراد بسعر خاص"},
+            {"id": "q4", "label": "طرق الدفع والتأكيد", "question": "كيف تفضل استلام مستحقات الأوردرات من الزبائن؟", "placeholder": "مثال: كاش عند الاستلام، وفودافون كاش، وإنستاباي"}
+        ]
+    else:
+        questions = [
+            {"id": "q1", "label": "مجال الخدمة الرئيسي", "question": f"ما هي أبرز الخدمات أو المنتجات التي تقدمها في {brand_name}؟", "placeholder": "مثال: استشارات وحلول تقنية، تدريب وتطوير أعمال، خدمات تسويق"},
+            {"id": "q2", "label": "الجمهور المستهدف", "question": "من هي الفئة الأكثر استفادة من خدماتك (أفراد، شركات، تجار)؟", "placeholder": "مثال: أصحاب الشركات الصغيرة والمتوسطة ورواد الأعمال في مصر"},
+            {"id": "q3", "label": "الميزة التنافسية", "question": "ما الذي يميز خدماتك عن باقي المنافسين في السوق المصري؟", "placeholder": "مثال: سرعة التنفيذ، ضمان الجودة، وأسعار اقتصادية مدروسة"},
+            {"id": "q4", "label": "طرق التعاقد والسداد", "question": "ما هي خطط السداد أو الدفع التي توفرها لعملائك؟", "placeholder": "مثال: تحويل بنكي، إنستاباي، وفودافون كاش"}
+        ]
+    return {"questions": questions}
+
+
 # =========================================================
 # Posts, Proposals & Favicon
 # =========================================================
@@ -572,13 +732,42 @@ async def handle_telegram_update(u: dict):
             desc = await corp.tg_image_to_text(msg["photo"][-1]["file_id"], text)
             text = f"{text}\n\n[تحليل صورة العميل بواسطة Vision Analyst]:\n{desc}".strip()
             
+        niche = builder.detect_niche(text)
+        brand = "متجر الخضار فريش" if niche == "vegetables" else "مطعم الأكيل" if niche == "restaurant" else "متجري الإلكتروني"
+        pal_key = "emerald" if niche == "vegetables" else "sunset" if niche == "restaurant" else "ocean"
+        pal = builder.PALETTES.get(pal_key, builder.PALETTES["emerald"])
+        
         jid = make_job(f"tg:{chat_id}", text, sync=IS_VERCEL)
+        
+        # Save initial site settings
+        db.x("""
+            INSERT OR REPLACE INTO site_settings (
+                job_id, brand_name, category, color_primary, color_secondary,
+                phone, whatsapp, vodafone_cash, instapay, fawry_code, cod_enabled, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            jid, brand, niche, pal["primary"], pal["secondary"],
+            "01000000000", "01000000000", "01000000000", f"{brand.replace(' ','').lower()}@instapay",
+            "88219", 1, time.time()
+        ))
+        
         if IS_VERCEL:
             try:
                 await corp.plan_job(jid)
             except Exception as e:
                 print(f"[TG JOB ERR] {e}")
-        await corp.tg_send(chat_id, f"🚀 استلمنا طلبك بنجاح! تم فتح مشروع برقم #{jid}، والـ CEO يقود الفريق الآن لتنفيذه.")
+                
+        await corp.tg_send(
+            chat_id,
+            f"🚀 استلمنا طلبك بنجاح! تم فتح مشروع برقم #{jid}.\n\n"
+            f"🏷️ البراند المقترح: {brand}\n"
+            f"🛒 نوع النشاط: {niche}\n"
+            f"🎨 الهوية: تم تفعيل باليت ألوان متناسقة وعصرية.\n"
+            f"💳 بوابات الدفع: فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام.\n\n"
+            f"⏳ جاري الآن برمجة الموقع وتجهيز المتجر بالكامل...\n"
+            f"🌐 رابط المعاينة المباشر فور الانتهاء (أقل من دقيقة):\n"
+            f"http://localhost:8000/sites/{jid}/"
+        )
 
 
 @app.post("/telegram")

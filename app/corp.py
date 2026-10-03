@@ -11,7 +11,7 @@ import zipfile
 
 import httpx
 
-from . import db, llm, roles, skills, tools
+from . import builder, db, llm, roles, skills, tools
 
 RATE = float(os.getenv("SALARY_EGP_PER_1K_TOKENS", "0.8"))
 THRESHOLD = float(os.getenv("PLAN_APPROVAL_THRESHOLD_EGP", "2000"))
@@ -353,6 +353,21 @@ async def run_job(job_id):
             outputs.append({"role": ag["name"], "text": text if ag["name"] != "Frontend Developer" else "(website HTML saved)"})
             ctx += f"\n\n### {ag['name']}\n{text[:2500]}"
         site_url = None
+        # Guarantee rich full-stack Arabic SPA website
+        if not html or len(html) < 2500 or "موقع تجريبي" in html:
+            job_row = db.one("select * from jobs where id=?", (job_id,))
+            settings_row = db.one("select * from site_settings where job_id=?", (job_id,)) or {}
+            items_rows = db.q("select * from site_items where job_id=?", (job_id,))
+            html = builder.build_site_html(job_id, job_row.get("client") or "", job_row.get("request") or "", settings=settings_row, items=items_rows)
+            log(job_id, f"AutoCorp Synthesizer built complete full-stack website ({len(html)} chars)")
+            
+            # Populate default site_items in DB if empty
+            if not items_rows:
+                niche = builder.detect_niche((job_row.get("request") or "") + " " + (job_row.get("client") or ""))
+                for it in builder.DEFAULT_CATALOGS.get(niche, builder.DEFAULT_CATALOGS["general"]):
+                    db.x("insert into site_items(job_id, title, price, category, description, badge, created_at) values(?,?,?,?,?,?,?)",
+                         (job_id, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), time.time()))
+
         if html:
             # Store site in DB (works on Vercel) and optionally on filesystem
             db.x("INSERT OR REPLACE INTO site_pages(job_id, html, created_at) VALUES(?,?,?)",
@@ -392,7 +407,20 @@ async def deliver(job_id):
     db.x("update jobs set status='delivered', result=? where id=?", (json.dumps(res, ensure_ascii=False), job_id))
     log(job_id, f"DELIVERED. Revenue +{job['price']:.0f} EGP, agent payroll {job['cost']:.2f} EGP")
     if str(job["client"]).startswith("tg:"):
-        await tg_send(job["client"][3:], f"تم تسليم طلبك ✅\n{job['site_url'] or ''}\n{res['invoice']}")
+        chat_id = job["client"][3:]
+        site_url = job.get("site_url") or f"/sites/{job_id}/"
+        full_url = f"http://localhost:8000{site_url}" if site_url.startswith("/") else site_url
+        msg = (
+            f"🎉 ألف مبروك! تم الانتهاء من برمجة وتصميم وتسليم موقعك الإلكتروني بنجاح! 🚀\n\n"
+            f"🌐 رابط موقعك المباشر:\n{full_url}\n\n"
+            f"✨ المميزات المفعلة في موقعك:\n"
+            f"• سلة مشتريات تفاعلية وطلب بضغطة زر.\n"
+            f"• بوابات الدفع المصرية: فودافون كاش، إنستاباي، فوري، والدفع عند الاستلام.\n"
+            f"• زر تواصل وتأكيد سريع عبر الواتساب.\n"
+            f"• تصميم عصري متجاوب بالكامل مع الموبايل.\n\n"
+            f"🧾 تفاصيل الفاتورة:\n{res.get('invoice', '')}"
+        )
+        await tg_send(chat_id, msg)
     await emit("job_delivered", {"job_id": job_id, "client": job["client"], "price_egp": job["price"], "site_url": job["site_url"]})
     spawn(marketing_post(job_id))
 

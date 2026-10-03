@@ -122,7 +122,25 @@ CREATE TABLE IF NOT EXISTS site_items (
     category TEXT,
     description TEXT,
     badge TEXT,
+    image_url TEXT,
     created_at REAL
+);
+CREATE TABLE IF NOT EXISTS site_settings (
+    job_id INTEGER PRIMARY KEY,
+    brand_name TEXT,
+    category TEXT,
+    custom_domain TEXT,
+    color_primary TEXT,
+    color_secondary TEXT,
+    logo_url TEXT,
+    phone TEXT,
+    whatsapp TEXT,
+    address TEXT,
+    vodafone_cash TEXT,
+    instapay TEXT,
+    fawry_code TEXT,
+    cod_enabled INTEGER DEFAULT 1,
+    updated_at REAL
 );
 """
 
