@@ -158,8 +158,20 @@ TELEGRAM_BOT_USERNAME=your_bot_username
 
 ---
 
+## 👨‍💻 Founder & Project Lead
+
+- **Founder & Lead AI Engineer**: **Alfarouq Ibrahim Farouq** (م. الفاروق إبراهيم فاروق)
+- **LinkedIn**: [https://www.linkedin.com/in/alfarouq-ibrahim](https://www.linkedin.com/in/alfarouq-ibrahim)
+- **GitHub**: [https://github.com/alfarouq637](https://github.com/alfarouq637)
+- **Telegram**: [@AlfarouqIbrahim](https://t.me/AlfarouqIbrahim)
+- **WhatsApp**: [@AlfarouqIbrahim](https://t.me/AlfarouqIbrahim)
+- **Email**: `alfarwqabrahym0@gmail.com`
+
+---
+
 ## 🏆 Submission Deliverables Summary
 
+- **Live Production Platform**: [https://autocorp-ai-websits-builder.vercel.app/](https://autocorp-ai-websits-builder.vercel.app/)
+- **Telegram AI Bot**: [t.me/autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot)
 - **GitHub Repository**: [https://github.com/alfarouq637/-Agents-at-Work-Project.git](https://github.com/alfarouq637/-Agents-at-Work-Project.git)
-- **Hackathon Track**: Agents at Work 1st Edition — BrainsMingle × Wesam.ai
-- **Project Lead**: Alfarouq Ibrahim (م. الفاروق إبراهيم)
+- **Hackathon Track**: Agents at Work 1st Edition — BrainsMingle × Wesam.ai (untap.us)

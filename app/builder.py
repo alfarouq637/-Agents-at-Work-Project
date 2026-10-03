@@ -84,6 +84,14 @@ DEFAULT_CATALOGS = {
         {"title": "نصف دجاجة مشوية على الفحم + أرز مبهر", "price": 130, "category": "مشويات الفحم", "badge": "وجبة التوفير", "desc": "دجاج متبل بخلطة الأعشاب يقدم مع الأرز والبطاطس والتومية."},
         {"title": "سلطة طحينة وسلطة خضراء ومخلل مشكل", "price": 25, "category": "مقبلات وسلطات", "badge": "طازج", "desc": "تشكيلة سلطات شرقية طازجة تكمل وجبتك المفضلة."},
     ],
+    "electronics": [
+        {"title": "سماعة بلوتوث لاسلكية عازلة للضوضاء Pro", "price": 450, "category": "صوتيات وسماعات", "badge": "الأكثر مبيعاً", "desc": "صوت نقي بتقنية Hi-Fi مع مايك مدمج وبطارية تدوم 24 ساعة متواصلة."},
+        {"title": "ساعة ذكية مقاومة للماء مع تتبع نبضات القلب", "price": 680, "category": "إلكترونيات ذكية", "badge": "ضمان سنة", "desc": "شاشة أموليد لمسية، استقبال الإشعارات والمكالمات ومتابعة النشاط الرياضي."},
+        {"title": "باور بانك شحن فائق السرعة 20,000 مللي أمبير", "price": 390, "category": "شواحن وبطاريات", "badge": "شحن سريع 22.5W", "desc": "منافذ Type-C و USB متعددة لشحن 3 أجهزة في وقت واحد بأمان تام."},
+        {"title": "شاحن جداري GaN ثلاثي المنافذ 65W للابتوب والموبايل", "price": 320, "category": "شواحن وبطاريات", "badge": "تقنية GaN", "desc": "شحن فائق السرعة متوافق مع الآيفون والسامسونج واللابتوب بحجم مدمج."},
+        {"title": "حامل موبايل مغناطيسي للسيارة دوران 360 درجة", "price": 120, "category": "إكسسوارات سيارات", "badge": "تثبيت قوي", "desc": "مغناطيس نيوديميوم فائق القوة لتثبيت الهاتف بأمان على فتحات التكييف."},
+        {"title": "إضاءة مكتبية ذكية RGB مع شاحن لاسلكي مدمج", "price": 290, "category": "إضاءة ومنزل ذكي", "badge": "شاحن وايرلس", "desc": "إضاءة ليد متعددة الألوان قابلة للتعتيم مع قاعدة شحن لاسلكي سريع."},
+    ],
     "general": [
         {"title": "الباقة الأساسية المتميزة", "price": 350, "category": "الخدمات الأساسية", "badge": "الأكثر طلباً", "desc": "خدمة متكاملة تشمل الفحص والمتابعة والدعم الفني الكامل."},
         {"title": "الباقة المتقدمة الاحترافية", "price": 750, "category": "باقات احترافية", "badge": "قيمة مضاعفة", "desc": "تشمل كافة المميزات مع أولوية التنفيذ وتوصيل مجاني."},
@@ -99,6 +107,8 @@ def detect_niche(text: str) -> str:
         return "vegetables"
     if any(k in t for k in ["مطعم", "أكل", "كافيه", "برجر", "مشويات", "كباب", "حواوشي", "وجبات", "حلويات", "شاورما", "شيف"]):
         return "restaurant"
+    if any(k in t for k in ["الكترون", "اجهز", "موبايل", "هواتف", "سماعات", "كمبيوتر", "لابتوب", "شواحن", "ساعات ذكية", "تكنو"]):
+        return "electronics"
     return "general"
 
 
@@ -108,12 +118,13 @@ def build_site_html(job_id: int, client: str, request: str, settings: dict = Non
     items = items or []
     
     niche = detect_niche(request + " " + client + " " + (settings.get("category") or ""))
-    brand_name = settings.get("brand_name") or client or ("خضار فريش" if niche == "vegetables" else "المتجر المصري")
+    brand_name = settings.get("brand_name") or client or ("خضار فريش" if niche == "vegetables" else "تكنو ستور" if niche == "electronics" else "المتجر المصري")
     if brand_name.startswith("tg:"):
-        brand_name = "متجر الخضار الطازج" if niche == "vegetables" else "متجري الإلكتروني"
+        brand_name = "متجر الخضار الطازج" if niche == "vegetables" else "تكنو ستور للإلكترونيات" if niche == "electronics" else "متجري الإلكتروني"
         
     slogan = settings.get("slogan") or ("خضارك طازج من المزرعة لباب بيتك بأعلى جودة وأفضل سعر في مصر" if niche == "vegetables" 
                                        else "أشهى المأكولات والمشويات على أصولها بتوصيل سريع وساخن" if niche == "restaurant"
+                                       else "أحدث الأجهزة والإلكترونيات الذكية بأفضل الأسعار وضمان حقيقي مع شحن فوري" if niche == "electronics"
                                        else "خدمات احترافية متكاملة تلبي احتياجاتك بأعلى معايير الجودة")
     
     # Palette

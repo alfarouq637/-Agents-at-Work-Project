@@ -169,6 +169,57 @@ def require_site_access(jid: int, x_user_token: str = "", x_admin_key: str = "",
     return user or {}
 
 
+def make_site_slug(jid: int, brand: str = "") -> str:
+    clean = re.sub(r'[\s_]+', '-', str(brand or "").strip())
+    clean = re.sub(r'[^\w\u0600-\u06FF\-]+', '', clean)
+    clean = clean.strip('-')
+    if clean:
+        return f"{jid}-{clean}"
+    return str(jid)
+
+
+def resolve_job_id(slug_or_id: str) -> int:
+    import urllib.parse
+    s = urllib.parse.unquote(str(slug_or_id or "")).strip()
+    if not s:
+        raise HTTPException(404, "معرف المتجر غير صحيح")
+    if s.isdigit():
+        return int(s)
+    if "-" in s:
+        prefix = s.split("-")[0]
+        if prefix.isdigit():
+            return int(prefix)
+    row = db.one("SELECT id FROM jobs WHERE client = ? OR client LIKE ?", (s, f"%{s}%"))
+    if row and row.get("id"):
+        return int(row["id"])
+    raise HTTPException(404, f"المتجر ({s}) غير موجود")
+
+
+def is_store_creation_intent(text: str) -> bool:
+    t = text.lower().strip()
+    t = re.sub(r'[إأآا]', 'ا', t)
+    t = re.sub(r'[ة]', 'ه', t)
+    t = re.sub(r'[ى]', 'ي', t)
+    
+    creation_verbs = ["انشا", "تنشا", "اعمل", "تعمل", "صمم", "ابني", "تبني", "بناء", "برمج", "تطوير", "اطلق", "سوي", "كريت", "build", "create", "make"]
+    target_nouns = ["موقع", "ويب", "متجر", "ستور", "صفحه", "منيو", "مشروع"]
+    desire_words = ["عايز", "عاوز", "اريد", "حابب", "ودي", "محتاج", "لازم", "نفسي"]
+    
+    has_verb = any(v in t for v in creation_verbs)
+    has_noun = any(n in t for n in target_nouns)
+    has_desire = any(d in t for d in desire_words)
+    
+    if has_verb and has_noun:
+        return True
+    if has_desire and has_noun:
+        return True
+    if has_desire and any(k in t for k in ["بيع", "محل", "مطعم", "كافيه", "سوبرماركت", "صيدليه", "خضار", "اجهز", "الكترون"]):
+        return True
+    if any(k in t for k in ["/build", "ابدأ البناء", "انشاء متجر", "عمل موقع", "بناء متجر"]):
+        return True
+    return False
+
+
 # =========================================================
 # Authentication APIs (Client & Admin)
 # =========================================================
@@ -418,7 +469,9 @@ def get_jobs(
             j["brand_name"] = client
             
         j["events"] = list(reversed(events_by_job.get(j_id, [])))
-        j["frontend_url"] = f"/sites/{j_id}/"
+        slug = make_site_slug(j_id, j.get("client") or bname)
+        j["slug"] = slug
+        j["frontend_url"] = f"/sites/{slug}/"
         j["backend_api_url"] = f"/api/sites/{j_id}/info"
         j["orders_count"] = int(j.get("orders_count") or 0)
         j["is_paid"] = bool(j.get("is_paid", 0))
@@ -439,7 +492,9 @@ def get_job_detail(
         raise HTTPException(404, "المشروع غير موجود")
     j["events"] = db.q("select ts,msg from events where job_id=? order by id", (jid,))
     j["contracts"] = db.q("select from_agent,to_agent,sha256,preview from contracts where job_id=? order by id", (jid,))
-    j["frontend_url"] = f"/sites/{jid}/"
+    slug = make_site_slug(jid, j.get("client") or "")
+    j["slug"] = slug
+    j["frontend_url"] = f"/sites/{slug}/"
     j["backend_api_url"] = f"/api/sites/{jid}/info"
     j["is_paid"] = bool(j.get("is_paid", 0))
     j["can_manage"] = auth.verify_site_ownership(jid, user)
@@ -460,13 +515,14 @@ async def job_decision(jid: int, body: dict, x_admin_key: str = Header(default="
 # =========================================================
 # Full-Stack Site Endpoints: Frontend + Backend APIs
 # =========================================================
-@app.get("/sites/{jid}/")
-@app.get("/sites/{jid}/index.html")
-async def serve_site(jid: int):
+@app.get("/sites/{slug_or_id}/")
+@app.get("/sites/{slug_or_id}")
+@app.get("/sites/{slug_or_id}/index.html")
+async def serve_site(slug_or_id: str):
     """Serves the complete frontend app for this site, injecting SITE_ID."""
+    jid = resolve_job_id(slug_or_id)
     row = db.one("select html from site_pages where job_id=?", (jid,))
     if not row or not row.get("html"):
-        # Check local file fallback
         local_path = os.path.join(corp.SITES, str(jid), "index.html")
         if os.path.exists(local_path):
             with open(local_path, "r", encoding="utf-8") as f:
@@ -476,7 +532,6 @@ async def serve_site(jid: int):
     else:
         html = row["html"]
     
-    # Inject SITE_ID javascript so frontend knows its backend endpoint
     inject_script = f"""
 <script>
   window.SITE_ID = {jid};
@@ -491,22 +546,24 @@ async def serve_site(jid: int):
     return HTMLResponse(html)
 
 
-@app.get("/api/sites/{jid}/info")
-def site_backend_info(jid: int):
+@app.get("/api/sites/{slug_or_id}/info")
+def site_backend_info(slug_or_id: str):
     """Backend API: Returns site metadata, active routes, and gateway status."""
+    jid = resolve_job_id(slug_or_id)
     job = db.one("select * from jobs where id=?", (jid,))
     if not job:
         raise HTTPException(404, "الموقع غير موجود")
     page = db.one("select * from site_pages where job_id=?", (jid,))
     orders_c = (db.one("select count(*) c from site_orders where job_id=?", (jid,)) or {}).get("c", 0)
     items_c = (db.one("select count(*) c from site_items where job_id=?", (jid,)) or {}).get("c", 0)
+    slug = make_site_slug(jid, job.get("client"))
     
     return {
         "site_id": jid,
         "client": job.get("client"),
         "status": job.get("status"),
-        "slug": (page and page.get("slug")) or f"site-{jid}",
-        "frontend_url": f"/sites/{jid}/",
+        "slug": slug,
+        "frontend_url": f"/sites/{slug}/",
         "subdomain_url": f"http://{jid}.localhost:8000/",
         "backend_routes": [
             {"method": "GET", "path": f"/api/sites/{jid}/info", "desc": "معلومات الموقع والباك إند"},
@@ -528,13 +585,13 @@ def site_backend_info(jid: int):
     }
 
 
-@app.get("/api/sites/{jid}/items")
-def site_backend_items(jid: int):
+@app.get("/api/sites/{slug_or_id}/items")
+def site_backend_items(slug_or_id: str):
     """Backend API: Returns menu/services catalog for this site."""
+    jid = resolve_job_id(slug_or_id)
     rows = db.q("select * from site_items where job_id=? order by id", (jid,))
     if rows:
         return rows
-    # Fallback to realistic Egyptian SME items
     return [
         {"id": 1, "job_id": jid, "title": "الطلب الكلاسيكي المميز", "price": 65.0, "category": "الأكثر طلباً", "description": "خلطة طازجة خاصة مع صلصة الدقة الأصلية", "badge": "الأكثر طلباً"},
         {"id": 2, "job_id": jid, "title": "كومبو العائلة الفاخر", "price": 220.0, "category": "العروض", "description": "تكفي 4 إلى 5 أفراد مع المشروبات والإضافات", "badge": "توفير"},
@@ -542,9 +599,10 @@ def site_backend_items(jid: int):
     ]
 
 
-@app.post("/api/sites/{jid}/orders")
-async def site_backend_place_order(jid: int, body: dict):
+@app.post("/api/sites/{slug_or_id}/orders")
+async def site_backend_place_order(slug_or_id: str, body: dict):
     """Backend API: Processes real orders and bookings submitted from the generated frontend."""
+    jid = resolve_job_id(slug_or_id)
     cust_name = str(body.get("customer_name") or "عميل كريم")[:100]
     cust_phone = str(body.get("customer_phone") or "")[:30]
     cust_addr = str(body.get("customer_address") or "استلام من الفرع")[:200]
@@ -552,7 +610,6 @@ async def site_backend_place_order(jid: int, body: dict):
     total_egp = float(body.get("total_egp") or 0.0)
     pay_method = str(body.get("payment_method") or "cash")[:30]
     
-    # Generate authentic Egyptian payment reference
     if pay_method.lower() in ("fawry", "fawry_pay"):
         ref_code = f"FAWRY-{random.randint(10000000, 99999999)}"
         pay_note = f"ادفع برقم فوري {ref_code} خلال 48 ساعة"
@@ -586,36 +643,39 @@ async def site_backend_place_order(jid: int, body: dict):
     }
 
 
-@app.get("/api/sites/{jid}/orders")
+@app.get("/api/sites/{slug_or_id}/orders")
 def site_backend_get_orders(
-    jid: int,
+    slug_or_id: str,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
+    jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
     return db.q("select * from site_orders where job_id=? order by id desc", (jid,))
 
 
-@app.get("/api/sites/{jid}/settings")
+@app.get("/api/sites/{slug_or_id}/settings")
 def get_site_settings(
-    jid: int,
+    slug_or_id: str,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
+    jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
     return db.one("select * from site_settings where job_id=?", (jid,)) or {}
 
 
-@app.post("/api/sites/{jid}/settings")
+@app.post("/api/sites/{slug_or_id}/settings")
 def update_site_settings(
-    jid: int,
+    slug_or_id: str,
     body: dict,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
+    jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
     db.x("""
         INSERT OR REPLACE INTO site_settings (
@@ -630,12 +690,10 @@ def update_site_settings(
         body.get("instapay"), body.get("fawry_code"), 1 if body.get("cod_enabled", True) else 0,
         time.time()
     ))
-    # Rebuild site HTML with updated settings!
     job_row = db.one("select * from jobs where id=?", (jid,)) or {}
     items_rows = db.q("select * from site_items where job_id=?", (jid,))
     new_html = builder.build_site_html(jid, job_row.get("client") or "", job_row.get("request") or "", settings=body, items=items_rows)
     db.x("update site_pages set html=? where job_id=?", (new_html, jid))
-    # Update local sites directory if exists
     d = os.path.join(corp.SITES, str(jid))
     if os.path.exists(d):
         with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
@@ -643,13 +701,14 @@ def update_site_settings(
     return {"ok": True, "message": "تم تحديث إعدادات وهوية المتجر وإعادة بناء الصفحة بنجاح"}
 
 
-@app.get("/api/sites/{jid}/export-zip")
+@app.get("/api/sites/{slug_or_id}/export-zip")
 def export_site_zip(
-    jid: int,
+    slug_or_id: str,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
+    jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
     row = db.one("select * from site_pages where job_id=?", (jid,))
     if not row or not row.get("html"):
@@ -696,14 +755,15 @@ def export_site_zip(
     )
 
 
-@app.post("/api/sites/{jid}/activate-payment")
+@app.post("/api/sites/{slug_or_id}/activate-payment")
 def activate_site_payment(
-    jid: int,
+    slug_or_id: str,
     body: dict,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
+    jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
     method = (body.get("payment_method") or "vodafone_cash").strip()
     ref = (body.get("payment_ref") or "DIRECT_PAY").strip()
@@ -844,6 +904,8 @@ async def trigger_tick(x_cron_key: str = Header(default=""), key: str = ""):
 
 def extract_smart_brand(prompt: str, niche: str) -> str:
     p = prompt.strip()
+    if any(k in p for k in ["اجهز", "الكترون", "موبايل", "هواتف", "سماعات", "شواحن", "لابتوب"]):
+        return "تكنو زون للأجهزة والإلكترونيات"
     if "كبابجي" in p or "مشويات" in p or "حواوشي" in p:
         return "مطعم ومشويات كبابجي الأصيل"
     if "خضار" in p or "فاكه" in p or "فواكه" in p:
@@ -862,6 +924,8 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
         return "مطعم ومأكولات بحرية الصياد"
     if "برجر" in p or "بيتزا" in p or "شاورما" in p:
         return "مطعم برجر وشاورما شيف"
+    if niche == "electronics":
+        return "تكنو زون للأجهزة والإلكترونيات"
     if niche == "restaurant":
         return "مطعم الأكيل للوجبات الشهية"
     if niche == "vegetables":
@@ -902,7 +966,7 @@ async def handle_telegram_update(u: dict):
     text = (msg.get("text") or msg.get("caption") or "").strip()
     
     # Check if this telegram user is linked to an account
-    linked_user = db.one("SELECT id, username, role FROM users WHERE telegram_id = ?", (chat_id,))
+    linked_user = db.one("SELECT id, username, role FROM users WHERE telegram_id = ? ORDER BY id DESC LIMIT 1", (chat_id,))
     user_id = linked_user["id"] if linked_user else None
     user_name = linked_user["username"] if linked_user else f"tg:{chat_id}"
     is_user_admin = (linked_user and linked_user.get("role") == "admin") or (os.getenv("TELEGRAM_OWNER_CHAT_ID") == chat_id) or (user_name.lower() in ("admin", "alfarouq", "alfarouqibrahim", "alfarouq123"))
@@ -947,8 +1011,8 @@ async def handle_telegram_update(u: dict):
         u_name, u_pass = parts[1].strip(), parts[2].strip()
         try:
             res = auth.register_user(u_name, u_pass)
+            db.x("UPDATE users SET telegram_id = NULL WHERE telegram_id = ?", (chat_id,))
             db.x("UPDATE users SET telegram_id = ? WHERE id = ?", (chat_id, res["id"]))
-            # If admin credentials, set as admin immediately
             if u_name.lower() in ("admin", "alfarouq", "alfarouqibrahim", "alfarouq123") or u_pass == os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim"):
                 os.environ["TELEGRAM_OWNER_CHAT_ID"] = chat_id
                 db.x("UPDATE users SET role = 'admin' WHERE id = ?", (res["id"],))
@@ -971,6 +1035,7 @@ async def handle_telegram_update(u: dict):
         try:
             res = auth.login_user(u_name, u_pass)
             if res.get("id"):
+                db.x("UPDATE users SET telegram_id = NULL WHERE telegram_id = ?", (chat_id,))
                 db.x("UPDATE users SET telegram_id = ? WHERE id = ?", (chat_id, res["id"]))
             if res.get("is_admin") or u_name.lower() in ("admin", "alfarouq", "alfarouqibrahim", "alfarouq123") or u_pass == os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim"):
                 os.environ["TELEGRAM_OWNER_CHAT_ID"] = chat_id
@@ -998,10 +1063,11 @@ async def handle_telegram_update(u: dict):
         msg_lines = ["📱 متاجرك الإلكترونية في AutoCorp:\n"]
         for s in sites:
             paid_str = "✅ نشط ومدفوع" if s.get("is_paid") else "⏳ تجريبي / في انتظار التفعيل"
+            slug = make_site_slug(s['id'], s['client'])
             msg_lines.append(
                 f"• متجر #{s['id']} ({s['client']})\n"
                 f"  الحالة: {s['status']} | {paid_str}\n"
-                f"  الرابط: {base_url}/sites/{s['id']}/\n"
+                f"  الرابط: {base_url}/sites/{slug}/\n"
             )
         msg_lines.append("\n💡 يمكنك تحميل حزمة هوستينجر أو ربط دومين خاص بك من لوحة تحكم الويب.")
         await corp.tg_send(chat_id, "\n".join(msg_lines))
@@ -1043,14 +1109,8 @@ async def handle_telegram_update(u: dict):
         )
         return
 
-    # 7.2 Explicit Store Creation Request or Photo
-    store_trigger_keywords = [
-        "عايز اعمل", "عايز متجر", "ابني لي", "صمم لي", "انشئ موقع", "مشروع بيع",
-        "متجر لبيع", "سوبرماركت", "مطعم", "خضار", "كافيه", "ابدأ البناء",
-        "انشاء متجر", "عمل موقع", "بناء متجر", "اريد متجر", "اريد موقع", "/build",
-        "كبابجي", "مشويات"
-    ]
-    is_store_request = bool(msg.get("photo")) or any(k in t_clean for k in store_trigger_keywords)
+    # 7.2 Store Creation Intent Detection
+    is_store_request = bool(msg.get("photo")) or is_store_creation_intent(text)
 
     if is_store_request:
         # Check 2-store limit for non-admin users
@@ -1078,7 +1138,7 @@ async def handle_telegram_update(u: dict):
         pal = builder.PALETTES.get(pal_key, builder.PALETTES["emerald"])
         
         # Always set client as the actual brand name
-        jid = make_job(brand, text, user_id=user_id, sync=IS_VERCEL)
+        jid = make_job(brand, text, user_id=user_id, sync=True)
         
         # Save initial site settings
         db.x("""
@@ -1092,23 +1152,32 @@ async def handle_telegram_update(u: dict):
             "88219", 1, time.time()
         ))
         
-        if IS_VERCEL:
-            try:
-                await corp.plan_job(jid)
-            except Exception as e:
-                print(f"[TG JOB ERR] {e}")
-                
         base_url = "https://autocorp-ai-websits-builder.vercel.app" if IS_VERCEL else "http://localhost:8000"
+        slug = make_site_slug(jid, brand)
+        site_link = f"{base_url}/sites/{slug}/"
+
         await corp.tg_send(
             chat_id,
-            f"🚀 استلمنا طلبك بنجاح! تم فتح مشروع برقم #{jid}.\n\n"
+            f"🚀 استلمنا طلبك بنجاح! بدأنا الآن العمل على مشروع #{jid} ({brand})...\n\n"
+            f"👥 فريق الـ 70 Agent (CEO، مهندس المعمارية، كاتب المحتوى، مطور الواجهات، ومراجع الجودة) يقوم الآن ببناء وبرمجة المتجر بالكامل.\n"
+            f"⏳ انتظر ثوانٍ معدودة وسيصلك الرابط المباشر..."
+        )
+        
+        try:
+            await corp.plan_job(jid)
+            await corp.run_job(jid)
+        except Exception as e:
+            print(f"[TG JOB EXEC ERR] {e}")
+
+        await corp.tg_send(
+            chat_id,
+            f"🎉 تم إطلاق وبرمجة متجرك الإلكتروني بنجاح وهو الآن شغال 100%!\n\n"
             f"🏷️ اسم المتجر: {brand}\n"
             f"🛒 نوع النشاط: {niche}\n"
-            f"🎨 الهوية: تم تفعيل باليت ألوان عصرية ({pal_key}).\n"
-            f"💳 بوابات الدفع: فودافون كاش، إنستاباي، فوري، والدفع عند الاستلام.\n\n"
-            f"⏳ جاري الآن قيادة فريق الـ 70 Agent وبرمجة المتجر بالكامل...\n"
-            f"🌐 رابط موقعك المباشر فور الانتهاء (أقل من دقيقة):\n"
-            f"{base_url}/sites/{jid}/"
+            f"🎨 الهوية: تم تفعيل باليت ألوان عصرية ({pal_key})\n"
+            f"💳 بوابات الدفع المفعلة: فودافون كاش، إنستاباي، فوري، والدفع عند الاستلام\n\n"
+            f"🌐 رابط متجرك المباشر:\n{site_link}\n\n"
+            f"💡 يمكنك فتح المتجر من الرابط، تجربة إضافة المنتجات للسلة، أو تسجيل الدخول على لوحة التحكم وإدارته بحسابك ({user_name})!"
         )
         return
 

@@ -43,8 +43,18 @@ def spawn(coro):
 
 
 def log(job_id, msg):
-    print(f"[job {job_id}] {msg}", flush=True)
-    db.x("insert into events(job_id,ts,msg) values(?,?,?)", (job_id, time.time(), msg))
+    try:
+        print(f"[job {job_id}] {msg}", flush=True)
+    except Exception:
+        try:
+            safe_msg = str(msg).encode("ascii", "replace").decode("ascii")
+            print(f"[job {job_id}] {safe_msg}", flush=True)
+        except Exception:
+            pass
+    try:
+        db.x("insert into events(job_id,ts,msg) values(?,?,?)", (job_id, time.time(), msg))
+    except Exception:
+        pass
 
 
 def parse_json(text):
