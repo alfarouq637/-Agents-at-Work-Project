@@ -342,35 +342,50 @@ async function load(){
       const events=(x.events||[]).map(e=>esc(e.msg));
       const hasSite=x.site_url||x.status==='delivered';
 
-      return`<div class="card">
+      return`<div class="card" style="border:1px solid ${hasSite?'rgba(0,206,201,.25)':'var(--border)'}">
         <div class="card-header">
-          <div><b style="color:var(--accent2);font-size:1.05rem">#${x.id}</b> <span style="font-weight:700">${esc(x.client)}</span> <span class="${tagClass(x.status)}">${x.status}</span></div>
-          <div style="font-size:.78rem;color:var(--fg3)">
-            إيراد العميل: <b style="color:var(--success)">${price} ج</b> · تكلفة الـ Agents: <b>${cost} ج</b> · صافي الربح: <b style="color:var(--gold)">+${profit} ج</b>
+          <div>
+            <b style="color:var(--accent2);font-size:1.15rem">#${x.id}</b> 
+            <span style="font-weight:800;font-size:1.05rem;margin-right:6px">${esc(x.client)}</span> 
+            <span class="${tagClass(x.status)}">${x.status==='delivered'?'جاهز ومنشور':x.status==='running'?'جاري البناء...':x.status}</span>
+          </div>
+          <div style="font-size:.82rem;color:var(--fg3)">
+            إيراد العرض: <b style="color:var(--success)">${price} ج</b> · تكلفة الذكاء: <b>${cost} ج</b> · صافي الربح: <b style="color:var(--gold)">+${profit} ج</b>
           </div>
         </div>
         ${renderPipeline(x.status)}
-        <div class="req-text">📝 <b>الطلب:</b> ${esc(x.request)}</div>
+        <div class="req-text" style="color:var(--fg);font-size:.9rem;background:rgba(255,255,255,.02);padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+          📋 <b>الطلب:</b> ${esc(x.request)}
+        </div>
         
-        <!-- Full-Stack Links (Frontend + Backend) -->
+        <!-- Live Action Buttons -->
         ${hasSite?`
-        <div class="links-box">
-          <a href="/sites/${x.id}/" target="_blank" class="btn btn-primary btn-sm">🌐 استعراض الفرونت إند (الموقع الكامل)</a>
-          <a href="/api/sites/${x.id}/info" target="_blank" class="btn btn-ghost btn-sm">⚡ رابط الباك إند API (Endpoints)</a>
-          <span class="badge" style="background:rgba(243,156,18,.15);color:var(--gold);font-weight:700">📦 ${x.orders_count||0} أوردر وارد</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0;background:rgba(0,206,201,.04);padding:12px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.2)">
+          <a href="/sites/${x.id}/" target="_blank" class="btn btn-success" style="font-size:.92rem;font-weight:800;padding:10px 22px">
+            🌐 فتح وتشغيل الموقع الإلكتروني (Live Website)
+          </a>
+          <a href="/api/sites/${x.id}/info" target="_blank" class="btn btn-ghost btn-sm">⚡ فحص الباك إند والـ Endpoints</a>
+          <span class="badge" style="background:rgba(243,156,18,.15);color:var(--gold);font-weight:700">📦 ${x.orders_count||0} أوردر عملاء</span>
           <span style="color:var(--fg3);font-size:.72rem;margin-right:auto">Subdomain: <code>${x.id}.localhost:8000</code></span>
-        </div>`:''}
+        </div>`: x.status==='running'? `
+        <div style="margin:10px 0;padding:10px;border-radius:var(--radius-sm);background:rgba(116,185,255,.08);color:var(--info);font-size:.82rem;display:flex;align-items:center;gap:8px">
+          <span class="dot" style="background:var(--info)"></span> جاري الآن برمجة الموقع وتصميم الواجهة وتجهيز بوابات الدفع بواسطة فريق الـ Agents...
+        </div>`: ''}
         
-        <!-- Approval Buttons -->
+        <!-- Approval Buttons (Only shown if halted) -->
         ${x.status==='awaiting_plan'||x.status==='awaiting_delivery'?
-          `<div style="display:flex;gap:8px;margin:10px 0;background:rgba(253,121,168,.08);padding:10px;border-radius:var(--radius-sm)">
-            <span style="font-size:.8rem;color:#fd79a8;align-self:center;font-weight:700">⚠️ مطلوب قرار المدير العام:</span>
-            <button class="btn btn-success btn-sm" onclick="dec('/api/jobs/${x.id}/decision','approve')">✅ اعتماد وموافقة</button> 
+          `<div style="display:flex;gap:8px;margin:10px 0;background:rgba(253,121,168,.08);padding:12px;border-radius:var(--radius-sm);border:1px solid rgba(253,121,168,.25)">
+            <span style="font-size:.82rem;color:#fd79a8;align-self:center;font-weight:700">⚠️ مطلوب قرار المشرف:</span>
+            <button class="btn btn-success btn-sm" onclick="dec('/api/jobs/${x.id}/decision','approve')">✅ اعتماد وموافقة فورية</button> 
             <button class="btn btn-danger btn-sm" onclick="dec('/api/jobs/${x.id}/decision','reject')">❌ رفض</button>
           </div>`:''}
         
-        <!-- Events Logs -->
-        ${events.length?`<div class="events">${events.map(e=>`<div class="ev-line">${e}</div>`).join('')}</div>`:''}
+        <!-- Collapsible Events (Clean, hidden by default!) -->
+        ${events.length?`
+        <details style="margin-top:10px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px">
+          <summary style="font-size:.75rem;color:var(--fg3);cursor:pointer;font-weight:600">🔍 عرض سجل التعاقدات والـ QA الداخلي للفريق (${events.length} خطوة)</summary>
+          <div class="events" style="margin-top:8px">${events.map(e=>`<div class="ev-line">${e}</div>`).join('')}</div>
+        </details>`:''}
       </div>`}).join('');
 
     // Render Posts

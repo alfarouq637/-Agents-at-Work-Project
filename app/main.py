@@ -396,6 +396,34 @@ def site_backend_get_orders(jid: int, x_admin_key: str = Header(default="")):
 
 
 # =========================================================
+# Posts, Proposals & Favicon
+# =========================================================
+@app.get("/favicon.ico")
+def favicon():
+    return HTMLResponse("", status_code=204)
+
+@app.get("/api/posts")
+def get_posts():
+    return db.q("select * from posts order by id desc limit 15")
+
+@app.post("/api/posts/{pid}/decision")
+async def post_decision(pid: int, body: dict, x_admin_key: str = Header(default="")):
+    admin(x_admin_key)
+    decision = body.get("decision", "approve")
+    return await corp.decide_post(pid, decision)
+
+@app.get("/api/proposals")
+def get_proposals():
+    return db.q("select id,kind,target,reason,status,substr(content,1,600) content from proposals order by id desc limit 15")
+
+@app.post("/api/proposals/{pid}/decision")
+async def proposal_decision(pid: int, body: dict, x_admin_key: str = Header(default="")):
+    admin(x_admin_key)
+    d = body.get("decision", "approve")
+    return await (corp.rollback_proposal(pid) if d == "rollback" else corp.decide_proposal(pid, d))
+
+
+# =========================================================
 # Company Introspection & Financial Summary
 # =========================================================
 @app.get("/api/summary")

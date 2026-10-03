@@ -237,7 +237,8 @@ async def plan_job(job_id):
         db.x("update jobs set plan=?, price=? where id=?", (json.dumps(plan, ensure_ascii=False), plan["price_egp"], job_id))
         log(job_id, f"CEO plan: {plan['service']} | {len(plan['steps'])} steps | quote {plan['price_egp']:.0f} EGP "
                     f"| new roles: {[n['name'] for n in plan['new_roles']] or 'none'}")
-        if plan["new_roles"] or plan["price_egp"] >= THRESHOLD:
+        auto_approve = os.getenv("AUTO_APPROVE", "1") == "1"
+        if not auto_approve and (plan["new_roles"] or plan["price_egp"] >= THRESHOLD):
             db.x("update jobs set status='awaiting_plan' where id=?", (job_id,))
             why = "new hire(s)" if plan["new_roles"] else "quote above threshold"
             log(job_id, f"HALT: owner decision needed ({why})")
@@ -245,7 +246,7 @@ async def plan_job(job_id):
                            f"Steps: {', '.join(s['role'] for s in plan['steps'])}",
                            [("✅ Approve", f"a:{job_id}"), ("❌ Reject", f"r:{job_id}")])
         else:
-            log(job_id, "Within owner limits: auto-approved")
+            log(job_id, "Within owner limits or auto-approve: approved")
             spawn(run_job(job_id))
     except Exception as e:
         db.x("update jobs set status='failed' where id=?", (job_id,))
@@ -362,12 +363,19 @@ async def run_job(job_id):
                 with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
                     f.write(html)
             site_url = await deploy_netlify(html, job_id) or f"/sites/{job_id}/"
-        db.x("update jobs set status='awaiting_delivery', result=?, site_url=? where id=?",
-             (json.dumps({"outputs": outputs}, ensure_ascii=False), site_url, job_id))
-        job = db.one("select * from jobs where id=?", (job_id,))
-        log(job_id, f"HALT: final delivery needs owner approval (cost {job['cost']:.2f} EGP, quote {job['price']:.0f} EGP)")
-        await tg_owner(f"Job #{job_id} ready for delivery\nCost {job['cost']:.2f} EGP | Quote {job['price']:.0f} EGP\n"
-                       f"{site_url or ''}", [("✅ Deliver", f"a:{job_id}"), ("❌ Reject", f"r:{job_id}")])
+        auto_deliver = os.getenv("AUTO_DELIVER", "1") == "1"
+        if auto_deliver:
+            db.x("update jobs set result=?, site_url=? where id=?",
+                 (json.dumps({"outputs": outputs}, ensure_ascii=False), site_url, job_id))
+            await deliver(job_id)
+            log(job_id, f"Auto-delivered successfully. Site is LIVE at {site_url or f'/sites/{job_id}/'}")
+        else:
+            db.x("update jobs set status='awaiting_delivery', result=?, site_url=? where id=?",
+                 (json.dumps({"outputs": outputs}, ensure_ascii=False), site_url, job_id))
+            job = db.one("select * from jobs where id=?", (job_id,))
+            log(job_id, f"HALT: final delivery needs owner approval (cost {job['cost']:.2f} EGP, quote {job['price']:.0f} EGP)")
+            await tg_owner(f"Job #{job_id} ready for delivery\nCost {job['cost']:.2f} EGP | Quote {job['price']:.0f} EGP\n"
+                           f"{site_url or ''}", [("✅ Deliver", f"a:{job_id}"), ("❌ Reject", f"r:{job_id}")])
     except Exception as e:
         db.x("update jobs set status='failed' where id=?", (job_id,))
         log(job_id, f"FAILED during execution: {e}")

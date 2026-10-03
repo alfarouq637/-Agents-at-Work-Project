@@ -129,18 +129,27 @@ CREATE TABLE IF NOT EXISTS site_items (
 # --------------- Turso HTTP helpers ---------------
 
 def _turso_request(statements: List[dict]) -> list:
-    """Send a pipeline of SQL statements to Turso via /v2/pipeline."""
+    """Send a pipeline of SQL statements to Turso via /v2/pipeline with auto-retry."""
     url = f"{_TURSO_HTTP}/v2/pipeline"
     headers = {
         "Authorization": f"Bearer {TURSO_TOKEN}",
         "Content-Type": "application/json",
     }
     payload = {"requests": statements}
-    with httpx.Client(timeout=30.0) as client:
-        r = client.post(url, json=payload, headers=headers)
-        r.raise_for_status()
-    data = r.json()
-    return data.get("results", [])
+    
+    last_err = None
+    for attempt in range(3):
+        try:
+            with httpx.Client(timeout=20.0) as client:
+                r = client.post(url, json=payload, headers=headers)
+                r.raise_for_status()
+            data = r.json()
+            return data.get("results", [])
+        except Exception as e:
+            last_err = e
+            time.sleep(0.4)
+            
+    raise last_err
 
 
 def _make_stmt(sql: str, params: tuple = ()) -> dict:
