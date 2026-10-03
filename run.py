@@ -21,12 +21,16 @@ import uvicorn
 from app.db import init
 
 if __name__ == "__main__":
+    admin_pwd = os.getenv("ADMIN_PASSWORD", "admin123")
+    tg_bot = os.getenv("TELEGRAM_BOT_USERNAME", "")
+    bot_info = f"t.me/{tg_bot}" if tg_bot else "Configure via TELEGRAM_BOT_TOKEN in .env"
+    
     print("=" * 65)
     print("⚡ AutoCorp — Autonomous AI Agency for Egyptian SMEs")
     print("=" * 65)
     print("🌐 Dashboard URL:    http://localhost:8000")
-    print("👑 Admin Password:   AlfarouqIbrahim")
-    print("🤖 Telegram Bot:     t.me/autocorp_Alfarouq_Ibrahim_bot")
+    print(f"👑 Admin Password:   {admin_pwd}")
+    print(f"🤖 Telegram Bot:     {bot_info}")
     print("📡 Subdomain Mode:   http://{id}.localhost:8000")
     print("=" * 65)
     

@@ -3,9 +3,9 @@
 Features:
 - Subdomain Routing for generated sites (e.g., site-1.localhost or slug.localhost)
 - Full-Stack Site Backend APIs (/api/sites/{id}/info, /items, /orders, /checkout)
-- Admin Login & Supervision Panel with password AlfarouqIbrahim
+- Admin Login & Supervision Panel with configurable password
 - Prompt Injection & Financial Safety Guardrails
-- Telegram Bot (@autocorp_Alfarouq_Ibrahim_bot) with auto-polling & approvals
+- Telegram Bot integration with auto-polling & mobile approvals
 - Multi-tenant SQLite / Turso libSQL cloud support
 """
 import asyncio
@@ -145,7 +145,7 @@ def guard(env_names, key):
         raise HTTPException(401, "Unauthorized: bad key")
 
 def admin(key):
-    admin_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
+    admin_pwd = os.getenv("ADMIN_PASSWORD", "admin123")
     admin_key = os.getenv("ADMIN_KEY", "autocorp-admin-secret-2026")
     if key in (admin_pwd, admin_key):
         return
@@ -157,15 +157,15 @@ def admin(key):
 # =========================================================
 @app.post("/api/admin/login")
 def admin_login(body: dict):
-    """Admin login with password AlfarouqIbrahim."""
+    """Admin login verifying ADMIN_PASSWORD from environment."""
     pwd = (body.get("password") or "").strip()
-    correct_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
+    correct_pwd = os.getenv("ADMIN_PASSWORD", "admin123")
     admin_key = os.getenv("ADMIN_KEY", "autocorp-admin-secret-2026")
     if pwd in (correct_pwd, admin_key):
         return {
             "ok": True,
             "token": admin_key,
-            "username": "الفاروق إبراهيم (المدير العام المشرف)",
+            "username": os.getenv("ADMIN_NAME", "المدير العام المشرف"),
             "role": "Super Admin & Agency Director"
         }
     raise HTTPException(401, "كلمة مرور الأدمن غير صحيحة")
@@ -511,7 +511,7 @@ async def trigger_tick(x_cron_key: str = Header(default=""), key: str = ""):
 async def handle_telegram_update(u: dict):
     """Processes incoming Telegram message or approval callback query."""
     owner_id = os.getenv("TELEGRAM_OWNER_CHAT_ID", "")
-    admin_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
+    admin_pwd = os.getenv("ADMIN_PASSWORD", "admin123")
     
     cb = u.get("callback_query")
     if cb:
@@ -546,7 +546,7 @@ async def handle_telegram_update(u: dict):
             "✨ يمكنك طلب موقع فرونت وباك إند كامل من هنا مباشرة!\n"
             "فقط اكتب طلبك، أو أرسل صورة المنيو/الخدمة وسيبدأ الفريق فوراً.\n\n"
             "🛡️ للدخول كمدير مشرف: اكتب الأمر:\n"
-            "/admin AlfarouqIbrahim"
+            "/admin <كلمة_المرور>"
         )
         return
 
@@ -555,9 +555,10 @@ async def handle_telegram_update(u: dict):
         parts = text.split(maxsplit=1)
         if len(parts) > 1 and parts[1].strip() == admin_pwd:
             os.environ["TELEGRAM_OWNER_CHAT_ID"] = chat_id
+            admin_name = os.getenv("ADMIN_NAME", "المدير المشرف")
             await corp.tg_send(
                 chat_id,
-                "👑 أهلاً بك يا باشمهندس الفاروق! تم تسجيلك كمدير مشرف على AutoCorp بنجاح.\n"
+                f"👑 أهلاً بك ({admin_name})! تم تسجيلك كمدير مشرف على AutoCorp بنجاح.\n"
                 "ستصلك قرارات التسعير واعتمادات التسليم هنا لتوافق عليها بضغطة زر."
             )
         else:

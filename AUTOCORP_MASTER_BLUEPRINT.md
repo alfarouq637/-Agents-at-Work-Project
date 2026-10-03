@@ -15,8 +15,8 @@
 # ==========================================
 # 1. DATABASE (Turso Cloud libSQL)
 # ==========================================
-TURSO_DATABASE_URL="libsql://automation-alfarouqibrahim.aws-eu-west-1.turso.io"
-TURSO_AUTH_TOKEN="eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTEwMzc1NjYsImlkIjoiMDFhMTAyMjgtNDEwMS03NTRmLWJiNTMtOGI4MjczODgzYjUzIiwia2lkIjoiZ2tZdlIwdlR3OWdpX0JMb0JubnRiaTVZTnlNLXFIR0p2TU1PcDZSaUotayIsInJpZCI6IjU5ZjQ1YzNkLWFlNzItNDJlYi04ODgwLWQyNjBiYzgxMmE5ZSJ9.zpkHMA_mkS7zYYR1b-ANw-xTPODVdSBP5UKwnkvGxGMwpFARPDm2HdZYmMjxPwZdABndjLSIhTWQurPf6sJOBg"
+TURSO_DATABASE_URL="libsql://your-database.aws-eu-west-1.turso.io"
+TURSO_AUTH_TOKEN="your-turso-auth-token"
 
 # ==========================================
 # 2. LLM PROVIDERS & KEYS
@@ -25,8 +25,8 @@ TURSO_AUTH_TOKEN="eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3O
 MOCK=0
 MOCK_FALLBACK=1
 
-# NVIDIA NIM (Active Key provided)
-NVIDIA_API_KEY="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"
+# NVIDIA NIM (NVIDIA API Key)
+NVIDIA_API_KEY="nvapi-your-nvidia-key"
 NVIDIA_MODEL="deepseek-ai/deepseek-v4.1-flash"
 NVIDIA_VISION_MODEL="meta/llama-3.2-90b-vision-instruct"
 
@@ -76,7 +76,7 @@ TAVILY_API_KEY=""
 
 1. **Database Persistence (Solved by Turso)**:
    - **Problem**: Vercel serverless functions have a read-only/ephemeral filesystem; SQLite files (`corp.db`) are wiped on cold starts.
-   - **Solution**: We transition `app/db.py` to use `libsql-client` (or HTTP requests to the Turso endpoint `https://automation-alfarouqibrahim.aws-eu-west-1.turso.io`). When `TURSO_DATABASE_URL` is set, queries run against Turso over HTTPS. When not set, it gracefully falls back to local `sqlite3`.
+   - **Solution**: We transition `app/db.py` to use `libsql-client` (or HTTP requests to your Turso endpoint `https://your-db.aws-eu-west-1.turso.io`). When `TURSO_DATABASE_URL` is set, queries run against Turso over HTTPS. When not set, it gracefully falls back to local `sqlite3`.
 
 2. **Background Execution (Solved by Dual-Mode Execution)**:
    - **Problem**: `asyncio.create_task(run_job(...))` in `app/corp.py` gets frozen/killed as soon as Vercel finishes returning the HTTP response.

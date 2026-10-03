@@ -3,7 +3,7 @@
 [![Hackathon](https://img.shields.io/badge/Agents%20at%20Work-BrainsMingle%20%C3%97%20Wesam.ai-blue)](https://ai.untap.us/programs/aaw-1st-edition)
 [![Target](https://img.shields.io/badge/Target-Egyptian%20SMEs-gold)](#-measured-business-impact)
 [![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Turso%20libSQL%20%7C%20Tailwind-teal)](https://github.com/alfarouq637/-Agents-at-Work-Project)
-[![Bot](https://img.shields.io/badge/Telegram%20Bot-@autocorp__Alfarouq__Ibrahim__bot-2CA5E0?logo=telegram)](https://t.me/autocorp_Alfarouq_Ibrahim_bot)
+[![Bot](https://img.shields.io/badge/Telegram%20Bot-Supported-2CA5E0?logo=telegram)](#4--telegram-bot-integration)
 
 > **AutoCorp** is a production-grade, self-operating AI digital agency built specifically for Egyptian SMEs (Small & Medium Enterprises). It takes client briefs, plans multi-step projects, hires from a 70-role specialist roster, writes and enforces cryptographic contracts, runs strict QA inspection with financial penalties, and delivers **complete Full-Stack applications (Frontend + Backend APIs + Egyptian Payment Gateways)**.
 
@@ -21,15 +21,17 @@ cd -Agents-at-Work-Project
 # 2. Install dependencies (FastAPI, Uvicorn, HTTPX)
 pip install -r requirements.txt
 
-# 3. Launch the agency platform
+# 3. Configure environment variables (copy example and add your keys)
+cp .env.example .env
+
+# 4. Launch the agency platform
 python run.py
 ```
 
 ### 🌐 Live Interfaces:
 - **Agency Dashboard & Projects**: [http://localhost:8000](http://localhost:8000)
-- **Super Admin Credentials**:
-  - **Password**: `AlfarouqIbrahim`
-- **Official Telegram Bot**: [@autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot)
+- **Super Admin Credentials**: Configurable via `ADMIN_PASSWORD` in `.env` (default: `admin123`)
+- **Telegram Bot**: Configurable via `TELEGRAM_BOT_TOKEN` in `.env`
 - **Subdomain Routing**: `http://{id}.localhost:8000/` (e.g. `http://3.localhost:8000/`)
 
 ---
@@ -67,14 +69,13 @@ Every generated SME site supports localized payment options:
 - 💵 **الدفع عند الاستلام (Cash on Delivery)**.
 
 ### 3. 👑 Super Admin Supervision Panel
-- Protected by password **`AlfarouqIbrahim`**.
+- Protected by your configurable password in `.env` (`ADMIN_PASSWORD`).
 - Full transparency: Real-time Ledger tracking revenues, agent token salaries, fines, and net profit.
 - Human-in-the-Loop Governance: Quotes > 2,000 EGP, new hires, and deliveries require explicit admin approval.
 
 ### 4. 🤖 Telegram Bot Integration
-- **Bot**: [@autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot)
 - **Client Channel**: Clients send text briefs or photos of their menus/products. The `Vision Analyst` parses the image and triggers project execution.
-- **Admin Channel**: Type `/admin AlfarouqIbrahim` to receive instant approval buttons (`[✅ موافقة] [❌ رفض]`) on your mobile.
+- **Admin Channel**: Type `/admin <YOUR_PASSWORD>` to receive instant approval buttons (`[✅ موافقة] [❌ رفض]`) on your mobile. Configurable via `TELEGRAM_BOT_TOKEN` in `.env`.
 
 ### 5. 🛡️ Security & Financial Guardrails
 - **Prompt Injection Defense**: Multi-pattern regex and semantic sanitization blocking jailbreaks and unauthorized system instructions.
@@ -109,28 +110,32 @@ AutoCorp employs 70 specialized agent roles across 10 departments:
 
 ## 🛠️ Environment Configuration (`.env`)
 
+AutoCorp works out of the box with local SQLite fallback. To connect cloud databases, live LLMs, and Telegram bots, create your `.env` (or copy `.env.example`):
+
 ```env
-# Mode
+# Mode (0 = live LLM providers, 1 = mock simulation)
 MOCK=0
 MOCK_FALLBACK=1
 
-# Database (Turso libSQL Cloud)
-TURSO_DATABASE_URL=libsql://automation-alfarouqibrahim.aws-eu-west-1.turso.io
-TURSO_AUTH_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9...
+# Database (Turso libSQL Cloud or leave empty for local SQLite fallback)
+TURSO_DATABASE_URL=libsql://your-database-name.aws-eu-west-1.turso.io
+TURSO_AUTH_TOKEN=your-turso-jwt-auth-token
+SQLITE_PATH=corp.db
 
-# LLM Providers (NVIDIA NIM, OpenRouter, Groq)
-NVIDIA_API_KEY=nvapi-your-nvidia-key-here
+# LLM Providers (OpenRouter, NVIDIA NIM, Groq, Cerebras, Mistral)
+OPENROUTER_API_KEY=your-openrouter-api-key
+NVIDIA_API_KEY=your-nvidia-api-key
 NVIDIA_MODEL=deepseek-ai/deepseek-v4.1-flash
 NVIDIA_VISION_MODEL=meta/llama-3.2-90b-vision-instruct
-OPENROUTER_API_KEY=sk-or-v1-your-openrouter-key-here
+GROQ_API_KEY=your-groq-api-key
 
 # Admin Credentials
-ADMIN_PASSWORD=AlfarouqIbrahim
-ADMIN_KEY=autocorp-admin-secret-2026
+ADMIN_PASSWORD=your_secure_admin_password
+ADMIN_KEY=your-custom-admin-secret-key
 
-# Telegram Bot
-TELEGRAM_BOT_TOKEN=your-telegram-token-here
-TELEGRAM_BOT_USERNAME=autocorp_Alfarouq_Ibrahim_bot
+# Telegram Bot (Optional - for client intake & mobile approvals)
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+TELEGRAM_BOT_USERNAME=your_bot_username
 ```
 
 ---

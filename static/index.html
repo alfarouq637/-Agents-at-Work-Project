@@ -162,14 +162,13 @@ textarea{resize:vertical;min-height:75px}
 <div id="tab-admin" style="display:none">
   <div class="card" style="border-color:var(--gold);background:rgba(243,156,18,.03)">
     <div class="card-header">
-      <h3 style="color:var(--gold);font-size:1.1rem">👑 إشراف المدير العام: م. الفاروق إبراهيم</h3>
-      <span class="badge badge-admin">كلمة المرور: AlfarouqIbrahim</span>
+      <h3 style="color:var(--gold);font-size:1.1rem">👑 لوحة إشراف المدير العام (Super Admin)</h3>
+      <span class="badge badge-admin">محمي بكلمة مرور</span>
     </div>
     <p style="color:var(--fg2);font-size:.85rem;line-height:1.6;margin-bottom:12px">
       بصفتك المشرف العام على AutoCorp، جميع القرارات الحساسة (تسعير > 2000 ج.م، توظيف كوادر جديدة، واعتماد التسليم النهائي) بيدك، مع تقارير حية للأرباح والمصروفات بالجنيه المصري.
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <a href="https://t.me/autocorp_Alfarouq_Ibrahim_bot" target="_blank" class="btn btn-gold btn-sm">💬 فتح بوت تيليجرام للإشعارات</a>
       <button class="btn btn-ghost btn-sm" onclick="loadLedger()">📑 تحديث سجل اللدجر والرواتب</button>
     </div>
   </div>
@@ -183,20 +182,20 @@ textarea{resize:vertical;min-height:75px}
 <div id="tab-telegram" style="display:none">
   <div class="card">
     <div class="card-header">
-      <h3 style="color:var(--info);font-size:1.1rem">🤖 بوت تيليجرام الرسمي: @autocorp_Alfarouq_Ibrahim_bot</h3>
-      <span class="tag tag-running">متصل وجاهز للعمل</span>
+      <h3 style="color:var(--info);font-size:1.1rem">🤖 ربط وتفعيل بوت تيليجرام (Telegram Bot)</h3>
+      <span class="tag tag-running">تكامل مدمج</span>
     </div>
     <p style="color:var(--fg2);font-size:.85rem;line-height:1.6;margin-bottom:12px">
       يمكن لأي صاحب شركة صغيرة التحدث مع البوت مباشرة وإرسال طلبه أو صورة المنيو/الخدمة، وسيبدأ الـ CEO Agent بتنفيذ المشروع فوراً!
     </p>
     <div class="links-box" style="margin-bottom:12px">
-      <span style="color:var(--fg3);font-size:.78rem">رابط المحادثة المباشر:</span>
-      <a href="https://t.me/autocorp_Alfarouq_Ibrahim_bot" target="_blank" style="font-weight:700">t.me/autocorp_Alfarouq_Ibrahim_bot</a>
+      <span style="color:var(--fg3);font-size:.78rem">طريقة التفعيل:</span>
+      <span style="color:var(--fg2);font-size:.82rem">قم بوضع <code>TELEGRAM_BOT_TOKEN</code> في ملف <code>.env</code> وسيتم تشغيل البوت تلقائياً فور تشغيل السيرفر.</span>
     </div>
     <div style="background:rgba(0,0,0,.25);padding:14px;border-radius:var(--radius-sm);font-size:.8rem;line-height:1.7;color:var(--fg2)">
       <b>الأوامر المتاحة في البوت:</b><br>
       • <code>/start</code>: رسالة الترحيب وتعريف العميل بخدمات الوكالة.<br>
-      • <code>/admin AlfarouqIbrahim</code>: تسجيلك كمدير عام لاستلام أزرار الموافقة والاعتمادات على هاتفك مباشرة.<br>
+      • <code>/admin &lt;كلمة المرور&gt;</code>: تسجيلك كمدير عام لاستلام أزرار الموافقة والاعتمادات على هاتفك مباشرة.<br>
       • <b>إرسال صورة (منيو/منتجات)</b>: يقوم الـ Vision Analyst بتحليلها والبدء في بناء المتجر.<br>
     </div>
   </div>
@@ -214,8 +213,8 @@ textarea{resize:vertical;min-height:75px}
 <div class="modal-overlay" id="admin-modal">
   <div class="modal">
     <h3 style="color:var(--gold);margin-bottom:8px">👑 تسجيل دخول المشرف العام</h3>
-    <p style="color:var(--fg3);font-size:.8rem;margin-bottom:14px">أدخل كلمة المرور الخاصة بالمهندس الفاروق إبراهيم للتحكم في الاعتمادات والماليات.</p>
-    <input type="password" id="admin-pass-input" placeholder="كلمة المرور (AlfarouqIbrahim)" autocomplete="off">
+    <p style="color:var(--fg3);font-size:.8rem;margin-bottom:14px">أدخل كلمة المرور المحددة في ملف البيئة (ADMIN_PASSWORD) للتحكم في الاعتمادات والماليات.</p>
+    <input type="password" id="admin-pass-input" placeholder="أدخل كلمة المرور" autocomplete="off">
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
       <button class="btn btn-ghost btn-sm" onclick="hideAdminModal()">إلغاء</button>
       <button class="btn btn-gold btn-sm" onclick="submitAdminLogin()">تسجيل الدخول</button>
@@ -250,7 +249,7 @@ async function submitAdminLogin(){
       isAdmin=true;
       hideAdminModal();
       updateAdminBadge();
-      alert("✅ أهلاً بك يا م. الفاروق! تم تسجيل دخولك بنجاح كمدير ومشرف عام.");
+      alert("✅ " + (d.username ? `أهلاً بك (${d.username})` : "أهلاً بك") + "! تم تسجيل دخولك بنجاح كمدير ومشرف عام.");
       load();
     }else{
       alert("❌ "+(d.detail||"كلمة المرور غير صحيحة"));
@@ -261,7 +260,7 @@ async function submitAdminLogin(){
 function updateAdminBadge(){
   const c=$("#admin-badge-container");
   if(isAdmin){
-    c.innerHTML=`<div class="badge badge-admin">👑 م. الفاروق إبراهيم (مشرف مسجل) <button onclick="logoutAdmin()" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-right:6px">خروج</button></div>`;
+    c.innerHTML=`<div class="badge badge-admin">👑 المشرف العام (مسجل) <button onclick="logoutAdmin()" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-right:6px">خروج</button></div>`;
   }else{
     c.innerHTML=`<button class="btn btn-ghost btn-sm" onclick="showAdminModal()">👑 دخول المشرف</button>`;
   }
