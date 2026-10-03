@@ -231,13 +231,32 @@ async def hook_job(body: dict, x_hook_key: str = Header(default="")):
 
 @app.get("/api/jobs")
 def get_jobs():
-    rows = db.q("select * from jobs order by id desc limit 25")
+    rows = db.q("""
+        select j.*, (select count(*) from site_orders where job_id = j.id) as orders_count 
+        from jobs j 
+        order by j.id desc limit 20
+    """)
+    if not rows:
+        return []
+        
+    jids = [j["id"] for j in rows]
+    placeholders = ",".join("?" for _ in jids)
+    events_raw = db.q(f"select job_id, msg from events where job_id in ({placeholders}) order by id desc", tuple(jids))
+    
+    events_by_job = {}
+    for ev in events_raw:
+        jid = ev["job_id"]
+        if jid not in events_by_job:
+            events_by_job[jid] = []
+        if len(events_by_job[jid]) < 8:
+            events_by_job[jid].append({"msg": ev["msg"]})
+            
     for j in rows:
         j_id = j["id"]
-        j["events"] = db.q("select msg from events where job_id=? order by id desc limit 8", (j_id,))[::-1]
+        j["events"] = list(reversed(events_by_job.get(j_id, [])))
         j["frontend_url"] = f"/sites/{j_id}/"
         j["backend_api_url"] = f"/api/sites/{j_id}/info"
-        j["orders_count"] = (db.one("select count(*) c from site_orders where job_id=?", (j_id,)) or {}).get("c", 0)
+        j["orders_count"] = int(j.get("orders_count") or 0)
     return rows
 
 
@@ -428,24 +447,29 @@ async def proposal_decision(pid: int, body: dict, x_admin_key: str = Header(defa
 # =========================================================
 @app.get("/api/summary")
 def get_summary():
-    rev = db.one("select coalesce(sum(delta),0) v from ledger where account='client_payment'")
-    pay = db.one("select coalesce(sum(delta),0) v from ledger where account like 'payroll:%'")
-    rev_v = float(rev["v"]) if rev else 0
-    pay_v = -float(pay["v"]) if pay else 0
+    row = db.one("""
+        select 
+            coalesce((select sum(delta) from ledger where account='client_payment'), 0) as rev,
+            coalesce((select sum(delta) from ledger where account like 'payroll:%'), 0) as pay,
+            (select count(*) from site_orders) as total_orders,
+            (select count(*) from site_pages) as total_sites,
+            (select count(*) from agents) as hired_agents,
+            (select count(*) from jobs) as total_jobs
+    """) or {}
     
-    total_orders = (db.one("select count(*) c from site_orders") or {}).get("c", 0)
-    total_sites = (db.one("select count(*) c from site_pages") or {}).get("c", 0)
+    rev_v = float(row.get("rev", 0) or 0)
+    pay_v = -float(row.get("pay", 0) or 0)
     
     return {
         "revenue_egp": round(rev_v, 2),
         "payroll_egp": round(pay_v, 3),
         "profit_egp": round(rev_v - pay_v, 2),
         "margin_percent": round(((rev_v - pay_v) / rev_v * 100), 1) if rev_v > 0 else 0,
-        "hired_agents": (db.one("select count(*) n from agents") or {"n": 0})["n"],
+        "hired_agents": int(row.get("hired_agents", 0) or 0),
         "roster_roles": len(roles.all_names()),
-        "jobs": (db.one("select count(*) n from jobs") or {"n": 0})["n"],
-        "generated_sites": total_sites,
-        "total_store_orders": total_orders
+        "jobs": int(row.get("total_jobs", 0) or 0),
+        "generated_sites": int(row.get("total_sites", 0) or 0),
+        "total_store_orders": int(row.get("total_orders", 0) or 0)
     }
 
 

@@ -128,6 +128,18 @@ CREATE TABLE IF NOT EXISTS site_items (
 
 # --------------- Turso HTTP helpers ---------------
 
+_turso_client = None
+
+def _get_turso_client() -> httpx.Client:
+    global _turso_client
+    if _turso_client is None or _turso_client.is_closed:
+        _turso_client = httpx.Client(
+            timeout=20.0, 
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20, keepalive_expiry=30.0)
+        )
+    return _turso_client
+
+
 def _turso_request(statements: List[dict]) -> list:
     """Send a pipeline of SQL statements to Turso via /v2/pipeline with auto-retry."""
     url = f"{_TURSO_HTTP}/v2/pipeline"
@@ -137,17 +149,24 @@ def _turso_request(statements: List[dict]) -> list:
     }
     payload = {"requests": statements}
     
+    global _turso_client
     last_err = None
     for attempt in range(3):
         try:
-            with httpx.Client(timeout=20.0) as client:
-                r = client.post(url, json=payload, headers=headers)
-                r.raise_for_status()
+            client = _get_turso_client()
+            r = client.post(url, json=payload, headers=headers)
+            r.raise_for_status()
             data = r.json()
             return data.get("results", [])
         except Exception as e:
             last_err = e
-            time.sleep(0.4)
+            try:
+                if _turso_client and not _turso_client.is_closed:
+                    _turso_client.close()
+            except Exception:
+                pass
+            _turso_client = None
+            time.sleep(0.3)
             
     raise last_err
 
