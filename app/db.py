@@ -97,7 +97,31 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 CREATE TABLE IF NOT EXISTS site_pages (
     job_id INTEGER PRIMARY KEY,
+    slug TEXT,
     html TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS site_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER,
+    customer_name TEXT,
+    customer_phone TEXT,
+    customer_address TEXT,
+    items_json TEXT,
+    total_egp REAL,
+    payment_method TEXT,
+    payment_ref TEXT,
+    status TEXT DEFAULT 'confirmed',
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS site_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER,
+    title TEXT,
+    price REAL,
+    category TEXT,
+    description TEXT,
+    badge TEXT,
     created_at REAL
 );
 """
