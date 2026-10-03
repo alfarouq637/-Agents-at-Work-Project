@@ -245,7 +245,31 @@ def make_job(client, request, user_id=None, sync=False):
 
 @app.get("/")
 def home():
-    return FileResponse(os.path.join(BASE, "static", "index.html"))
+    candidates = [
+        os.path.join(BASE, "static", "index.html"),
+        os.path.join(BASE, "api", "static", "index.html"),
+        os.path.join(os.getcwd(), "static", "index.html"),
+        os.path.join(os.getcwd(), "api", "static", "index.html"),
+        os.path.join(os.path.dirname(__file__), "..", "static", "index.html"),
+        os.path.join(os.path.dirname(__file__), "static", "index.html"),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return FileResponse(p, media_type="text/html")
+    return HTMLResponse("<h1>AutoCorp AI Agency</h1><p>Running on Vercel</p>", media_type="text/html")
+
+
+@app.get("/bot_avatar.jpg")
+def bot_avatar():
+    candidates = [
+        os.path.join(BASE, "static", "bot_avatar.jpg"),
+        os.path.join(BASE, "api", "static", "bot_avatar.jpg"),
+        os.path.join(BASE, "bot_avatar.jpg"),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return FileResponse(p, media_type="image/jpeg")
+    return HTMLResponse("", status_code=404)
 
 
 @app.post("/api/jobs")

@@ -3,7 +3,14 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": [
+          "static/**",
+          "api/static/**",
+          "bot_avatar.jpg"
+        ]
+      }
     }
   ],
   "routes": [
@@ -20,12 +27,12 @@
       "dest": "api/index.py"
     },
     {
-      "src": "/(.*\\.(html|css|js|ico|png|jpg|svg|woff2?))",
-      "dest": "static/$1"
+      "src": "/bot_avatar.jpg",
+      "dest": "api/index.py"
     },
     {
       "src": "/(.*)",
-      "dest": "static/index.html"
+      "dest": "api/index.py"
     }
   ]
 }
