@@ -1,15 +1,28 @@
 # ⚡ AutoCorp — Autonomous AI Agency for Egyptian SMEs
 
+[![Live Demo](https://img.shields.io/badge/Live%20Platform-Vercel%20Production-success?style=for-the-badge&logo=vercel)](https://autocorp-ai-websits-builder.vercel.app/)
+[![Telegram Bot](https://img.shields.io/badge/Telegram%20Bot-@autocorp__Alfarouq__Ibrahim__bot-2CA5E0?style=for-the-badge&logo=telegram)](https://t.me/autocorp_Alfarouq_Ibrahim_bot)
 [![Hackathon](https://img.shields.io/badge/Agents%20at%20Work-BrainsMingle%20%C3%97%20Wesam.ai-blue)](https://ai.untap.us/programs/aaw-1st-edition)
 [![Target](https://img.shields.io/badge/Target-Egyptian%20SMEs-gold)](#-measured-business-impact)
 [![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Turso%20libSQL%20%7C%20Tailwind-teal)](https://github.com/alfarouq637/-Agents-at-Work-Project)
-[![Bot](https://img.shields.io/badge/Telegram%20Bot-Supported-2CA5E0?logo=telegram)](#4--telegram-bot-integration)
+
+> 🚀 **Live Production Platform**: **[https://autocorp-ai-websits-builder.vercel.app/](https://autocorp-ai-websits-builder.vercel.app/)**  
+> 🤖 **Direct Telegram Bot**: **[t.me/autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot)**
 
 > **AutoCorp** is a production-grade, self-operating AI digital agency built specifically for Egyptian SMEs (Small & Medium Enterprises). It takes client briefs, plans multi-step projects, hires from a 70-role specialist roster, writes and enforces cryptographic contracts, runs strict QA inspection with financial penalties, and delivers **complete Full-Stack applications (Frontend + Backend APIs + Egyptian Payment Gateways)**.
 
 ---
 
-## ⏱️ 5-Minute Quickstart for Hackathon Judges
+## ⏱️ Quick Access & Live Links
+
+- 🌐 **Live Cloud Deployment (Vercel)**: **[https://autocorp-ai-websits-builder.vercel.app/](https://autocorp-ai-websits-builder.vercel.app/)**
+- 🤖 **Interactive Telegram AI Bot**: **[t.me/autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot)**
+- 👑 **Admin Supervisor Password**: `AlfarouqIbrahim` (Configurable via `ADMIN_PASSWORD` in `.env`)
+- 📡 **Subdomain Simulation**: `http://{id}.localhost:8000/` (e.g. `http://3.localhost:8000/`)
+
+---
+
+## ⏱️ Local 5-Minute Quickstart
 
 Run AutoCorp locally in under 3 minutes with zero extra dependencies:
 
@@ -27,12 +40,6 @@ cp .env.example .env
 # 4. Launch the agency platform
 python run.py
 ```
-
-### 🌐 Live Interfaces:
-- **Agency Dashboard & Projects**: [http://localhost:8000](http://localhost:8000)
-- **Super Admin Credentials**: Configurable via `ADMIN_PASSWORD` in `.env` (default: `admin123`)
-- **Telegram Bot**: Configurable via `TELEGRAM_BOT_TOKEN` in `.env`
-- **Subdomain Routing**: `http://{id}.localhost:8000/` (e.g. `http://3.localhost:8000/`)
 
 ---
 

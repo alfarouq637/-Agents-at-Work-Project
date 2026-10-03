@@ -27,15 +27,33 @@
 /* Light Theme Variables */
 :root[data-theme="light"]{
   --bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;
-  --fg:#0f172a;--fg2:#475569;--fg3:#64748b;
-  --accent:#4f46e5;--accent2:#6366f1;--accent-glow:rgba(79,70,229,.2);
+  --fg:#0f172a;--fg2:#334155;--fg3:#64748b;
+  --accent:#4f46e5;--accent2:#6366f1;--accent-glow:rgba(79,70,229,.15);
   --emerald:#059669;--emerald-light:#10b981;
   --sunset:#d97706;--ocean:#0284c7;--royal:#7c3aed;--crimson:#dc2626;
   --success:#0d9488;--warning:#d97706;--danger:#e11d48;--info:#0284c7;--gold:#d97706;
-  --glass:rgba(255,255,255,.9);--glass2:rgba(241,245,249,.9);
-  --border:rgba(226,232,240,.9);--border2:rgba(203,213,225,.9);
+  --glass:#ffffff;--glass2:#f8fafc;
+  --border:#e2e8f0;--border2:#cbd5e1;
   --radius:18px;--radius-sm:10px;
 }
+
+[data-theme="light"] body{background:#f8fafc;color:#0f172a}
+[data-theme="light"] .card{background:#ffffff!important;border:1px solid #e2e8f0!important;box-shadow:0 4px 20px rgba(0,0,0,.04)}
+[data-theme="light"] .stat-card{background:#ffffff!important;border:1px solid #e2e8f0!important;box-shadow:0 4px 15px rgba(0,0,0,.03)}
+[data-theme="light"] b,[data-theme="light"] strong{color:#0f172a}
+[data-theme="light"] h1,[data-theme="light"] h2,[data-theme="light"] h3,[data-theme="light"] h4{color:#0f172a}
+[data-theme="light"] input,[data-theme="light"] textarea,[data-theme="light"] select{background:#ffffff!important;color:#0f172a!important;border:1px solid #cbd5e1!important}
+[data-theme="light"] .nav-modes{background:#e2e8f0!important;border-color:#cbd5e1!important}
+[data-theme="light"] .mode-btn{color:#475569!important}
+[data-theme="light"] .mode-btn:hover{background:rgba(0,0,0,.05)!important;color:#0f172a!important}
+[data-theme="light"] .mode-btn.active{color:#ffffff!important}
+[data-theme="light"] .ctrl-btn{background:#ffffff!important;border-color:#cbd5e1!important;color:#0f172a!important}
+[data-theme="light"] .ctrl-btn:hover{background:#f1f5f9!important}
+[data-theme="light"] .modal{background:#ffffff!important;border:1px solid #cbd5e1!important;color:#0f172a!important;box-shadow:0 20px 60px rgba(0,0,0,.15)!important}
+[data-theme="light"] .palette-card{background:#ffffff!important;border-color:#e2e8f0!important}
+[data-theme="light"] .btn-ghost{background:#f1f5f9!important;border-color:#cbd5e1!important;color:#0f172a!important}
+[data-theme="light"] .btn-ghost:hover{background:#e2e8f0!important}
+[data-theme="light"] .bg-mesh::before,[data-theme="light"] .bg-mesh::after{opacity:.06}
 
 body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--fg);min-height:100vh;overflow-x:hidden;transition:background-color .3s ease,color .3s ease}
 a{color:var(--accent2);text-decoration:none}
@@ -852,6 +870,27 @@ const I18N = {
   }
 };
 
+function updateThemeButton(){
+  const btn = $('#btn-theme');
+  if(!btn) return;
+  const isDark = (currentTheme === 'dark');
+  const isAr = (currentLang === 'ar');
+  const icon = isDark ? '🌙' : '☀️';
+  const label = isDark ? (isAr ? 'مسائي' : 'Dark') : (isAr ? 'صباحي' : 'Light');
+  btn.innerHTML = `${icon} <span id="theme-text">${label}</span>`;
+  btn.title = isAr ? (isDark ? 'التحويل للوضع الصباحي' : 'التحويل للوضع المسائي') : (isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+}
+
+function getSafeToken(){
+  const t = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
+  if(!t) return '';
+  try {
+    return encodeURIComponent(t.trim());
+  } catch(e) {
+    return '';
+  }
+}
+
 function applyTranslations(){
   const dict = I18N[currentLang] || I18N.ar;
   document.documentElement.lang = currentLang;
@@ -861,6 +900,7 @@ function applyTranslations(){
     if(dict[k]) el.textContent = dict[k];
   });
   $('#lang-text').textContent = (currentLang === 'ar') ? 'English' : 'العربية';
+  updateThemeButton();
 }
 
 function toggleLang(){
@@ -874,8 +914,7 @@ function toggleLang(){
 // =========================================================
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', currentTheme);
-  $('#theme-text').textContent = (currentTheme === 'dark') ? 'مسائي' : 'صباحي';
-  $('#btn-theme').innerHTML = (currentTheme === 'dark') ? '🌙 <span>مسائي</span>' : '☀️ <span>صباحي</span>';
+  updateThemeButton();
 }
 
 function toggleTheme(){
@@ -923,7 +962,7 @@ function updateAdminView(){
 // Authentication Helpers
 // =========================================================
 async function checkAuthSession(){
-  const token = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
+  const token = getSafeToken();
   if(!token){
     renderUserBadge();
     return;
@@ -1174,7 +1213,7 @@ async function handleCreateStore(e){
     ai_answers: aiAnswers
   };
 
-  const userToken = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
+  const userToken = getSafeToken();
 
   try{
     const res = await fetch('/api/jobs', {
@@ -1207,14 +1246,19 @@ async function handleCreateStore(e){
 // Load Jobs: Separate Public Showcase vs My Stores
 // =========================================================
 async function loadJobs(){
-  const userToken = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
   try{
     const res = await fetch('/api/jobs', {
-      headers: {'x-user-token': userToken}
+      headers: {'x-user-token': getSafeToken()}
     });
     const jobs = await res.json();
     allJobs = jobs;
-    $('#stores-count-badge').textContent = jobs.length;
+
+    // Filter user's stores vs public
+    const myStores = (isAdmin) ? jobs : jobs.filter(j => j.can_manage);
+    
+    // Update badge with the user's ACTUAL stores count (or total for admin)
+    const badgeEl = $('#stores-count-badge');
+    if(badgeEl) badgeEl.textContent = myStores.length;
 
     // 1. Render Public Showcase (Live Sites ONLY - NO settings visible publicly)
     renderPublicShowcase(jobs);
@@ -1233,11 +1277,14 @@ function renderPublicShowcase(jobs){
     c.innerHTML = '<div style="color:var(--fg3);padding:14px">لا توجد متاجر معروضة حالياً.</div>';
     return;
   }
-  c.innerHTML = jobs.slice(0, 6).map(j => `
+  c.innerHTML = jobs.slice(0, 6).map(j => {
+    let brandDisplay = j.brand_name || j.client || 'متجر إلكتروني';
+    if(brandDisplay.startsWith('tg:')) brandDisplay = 'متجر الأكيل والتسوق';
+    return `
     <div style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;flex-direction:column;justify-content:space-between">
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <b style="color:#fff;font-size:1rem">${esc(j.client)}</b>
+          <b style="color:var(--fg);font-size:1rem">${esc(brandDisplay)}</b>
           <span class="tag tag-delivered">جاهز ومنشور</span>
         </div>
         <p style="font-size:.78rem;color:var(--fg2);line-height:1.5;margin-bottom:12px;font-family:'Readex Pro',sans-serif">
@@ -1248,7 +1295,8 @@ function renderPublicShowcase(jobs){
         🌐 فتح وتشغيل الموقع الإلكتروني (Live Website)
       </a>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderMyStores(jobs){
@@ -1345,7 +1393,7 @@ async function submitSitePayment(){
   const jid = $('#pay-jid').value;
   const method = document.querySelector('input[name="pay-method"]:checked')?.value || 'vodafone_cash';
   const ref = $('#pay-ref').value.trim() || 'DIRECT_PAY';
-  const token = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
+  const token = getSafeToken();
 
   try{
     const res = await fetch(`/api/sites/${jid}/activate-payment`, {
@@ -1376,7 +1424,7 @@ async function openHostingModal(jid, brand){
   $('#hm-jid').value = jid;
   $('#hm-title').textContent = `⚙️ إعدادات النشر والدومين: #${jid} (${brand})`;
 
-  const token = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
+  const token = getSafeToken();
   try{
     const res = await fetch(`/api/sites/${jid}/settings`, {
       headers: {'x-user-token': token}
@@ -1396,7 +1444,7 @@ function closeHostingModal(){
 
 async function downloadSiteZip(){
   const jid = $('#hm-jid').value;
-  const token = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
+  const token = getSafeToken();
   try{
     const res = await fetch(`/api/sites/${jid}/export-zip`, {
       headers: {'x-user-token': token}
@@ -1422,7 +1470,7 @@ async function downloadSiteZip(){
 async function saveCustomDomain(){
   const jid = $('#hm-jid').value;
   const dom = $('#hm-domain').value.trim();
-  const token = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
+  const token = getSafeToken();
   try{
     const res = await fetch(`/api/sites/${jid}/settings`, {
       method: 'POST',
@@ -1445,7 +1493,7 @@ async function saveCustomDomain(){
 
 async function saveSiteSettingsQuick(){
   const jid = $('#hm-jid').value;
-  const token = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
+  const token = getSafeToken();
   const payload = {
     custom_domain: $('#hm-domain').value.trim(),
     vodafone_cash: $('#hm-vcash').value.trim(),
@@ -1492,7 +1540,7 @@ async function loadAdminLedger(){
   const c = $('#admin-subcontent');
   c.innerHTML = '<div style="color:var(--fg3);padding:10px">جاري تحميل سجل اللدجر...</div>';
   try{
-    const token = localStorage.getItem("autocorp_token") || '';
+    const token = getSafeToken();
     const res = await fetch('/api/ledger', {headers: {'x-admin-key': token}});
     const rows = await res.json();
     c.innerHTML = `
