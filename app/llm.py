@@ -15,9 +15,9 @@ BUILTIN = {  # name: (chat url, key env, default model, default vision model)
     "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "GEMINI_API_KEY", "gemini-2.0-flash", "gemini-2.0-flash"),
 }
 DEFAULT_ORDER = {
-    "brain": "wesam,nvidia,mistral,cerebras,openrouter,groq,gemini",
-    "worker": "wesam,groq,cerebras,nvidia,mistral,openrouter,gemini",
-    "vision": "nvidia,mistral,openrouter,gemini",
+    "brain": "openrouter,nvidia,groq,mistral,cerebras,gemini,wesam",
+    "worker": "openrouter,nvidia,groq,mistral,cerebras,gemini,wesam",
+    "vision": "nvidia,openrouter,mistral,gemini",
 }
 _rr, _cool = {}, {}
 
@@ -58,7 +58,7 @@ def _pick_key(name, keys):
     return ok[i % len(ok)]
 
 
-async def _post(cl, p, key, model, messages, max_tokens=3000):
+async def _post(cl, p, key, model, messages, max_tokens=6000):
     r = await cl.post(p["url"], headers={"Authorization": f"Bearer {key}"},
                       json={"model": model, "messages": messages, "temperature": 0.4, "max_tokens": max_tokens})
     r.raise_for_status()
@@ -67,14 +67,14 @@ async def _post(cl, p, key, model, messages, max_tokens=3000):
     return text, int((d.get("usage") or {}).get("total_tokens") or 0)
 
 
-async def call(system, user, tier="worker", mock="", images=None):
+async def call(system, user, tier="worker", mock="", images=None, max_tokens=6000):
     """images: list of data URLs (vision tier)."""
     if os.getenv("MOCK", "0") == "1":
         return {"text": mock or "[MOCK]", "tokens": max(60, len(mock) // 4), "provider": "mock"}
     order = os.getenv(f"ORDER_{tier.upper()}", DEFAULT_ORDER[tier]).split(",")
     P = providers()
     last = None
-    async with httpx.AsyncClient(timeout=90) as cl:
+    async with httpx.AsyncClient(timeout=25) as cl:
         for name in [n.strip() for n in order]:
             p = P.get(name)
             if not p:
@@ -90,7 +90,8 @@ async def call(system, user, tier="worker", mock="", images=None):
                 content = [{"type": "text", "text": user}] + [{"type": "image_url", "image_url": {"url": u}} for u in images]
             try:
                 text, tokens = await _post(cl, p, key, model,
-                                           [{"role": "system", "content": system}, {"role": "user", "content": content}])
+                                           [{"role": "system", "content": system}, {"role": "user", "content": content}],
+                                           max_tokens=max_tokens)
                 return {"text": text, "tokens": tokens or len(system + user + text) // 4, "provider": name}
             except httpx.HTTPStatusError as e:
                 last = e

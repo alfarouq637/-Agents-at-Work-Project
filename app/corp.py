@@ -58,9 +58,21 @@ def parse_json(text):
 
 
 def extract_html(text):
-    m = re.search(r"```html\s*(.*?)```", text, re.S)
-    if m:
-        return m.group(1).strip()
+    if not text:
+        return None
+    # 1. Look for complete <!doctype html ... </html> or <html ... </html>
+    doc = re.search(r"(<!doctype html[\s\S]*?</html>)", text, re.IGNORECASE)
+    if doc:
+        return doc.group(1).strip()
+    html_tag = re.search(r"(<html[\s\S]*?</html>)", text, re.IGNORECASE)
+    if html_tag:
+        return html_tag.group(1).strip()
+    # 2. Look for code fences containing html structure
+    fences = re.findall(r"```(?:html)?\s*([\s\S]*?)```", text, re.IGNORECASE)
+    valid_fences = [f.strip() for f in fences if "<html" in f.lower() or "<body" in f.lower() or "<div" in f.lower()]
+    if valid_fences:
+        return max(valid_fences, key=len)
+    # 3. Fallback to start of <!doctype html or <html
     i = text.lower().find("<!doctype html")
     if i < 0:
         i = text.lower().find("<html")
@@ -241,7 +253,7 @@ async def plan_job(job_id):
 
 
 # ---------- Execution ----------
-WEB_RULES = ("Output ONE complete self-contained HTML document inside a ```html block. Use Tailwind via "
+WEB_RULES = ("Output ONE complete self-contained HTML document starting with <!doctype html> and ending with </html> enclosed in an html code fence. Use Tailwind via "
              "<script src=\"https://cdn.tailwindcss.com\"></script>. Use dir=\"rtl\" lang=\"ar\" if the client is "
              "Arabic. Mobile-first. No external images (use CSS gradients/emoji). Include every section in the brief. "
              "No fake testimonials or invented numbers.")
@@ -317,9 +329,13 @@ async def run_job(job_id):
             if ag["name"] == "Frontend Developer":
                 text = await call_agent(ag, ctx, step["task"] + "\n\n" + WEB_RULES, job_id)
                 html = extract_html(text)
+                if html:
+                    log(job_id, f"Frontend Developer generated complete HTML ({len(html)} chars)")
+                else:
+                    log(job_id, "Frontend Developer generated code (parsing HTML document)")
             elif ag["name"] == "Code Reviewer" and html:
                 text = await call_agent(ag, "", REVIEW_TASK + html[:12000], job_id)
-                if text.strip().upper().startswith("REJECT"):
+                if "REJECT" in text.strip()[:30].upper():
                     fb = text.strip()[:500]
                     db.x("insert into feedback(agent,note,ts) values(?,?,?)", ("Frontend Developer", fb, time.time()))
                     db.x("update agents set balance=balance-2 where name='Frontend Developer'")
