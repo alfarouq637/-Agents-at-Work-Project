@@ -17,13 +17,14 @@ import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional, Dict, Any, List
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import builder, corp, db, llm, roles, skills, tools
+from . import auth, builder, corp, db, llm, roles, skills, tools
 
 IS_VERCEL = os.getenv("VERCEL", "0") == "1"
 BASE = os.path.dirname(os.path.dirname(__file__))
@@ -137,6 +138,7 @@ if not IS_VERCEL:
 
 
 # =========================================================
+# =========================================================
 # Auth & Security Helpers
 # =========================================================
 def guard(env_names, key):
@@ -145,21 +147,75 @@ def guard(env_names, key):
         raise HTTPException(401, "Unauthorized: bad key")
 
 def admin(key):
-    admin_pwd = os.getenv("ADMIN_PASSWORD", "admin123")
+    admin_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
     admin_key = os.getenv("ADMIN_KEY", "autocorp-admin-secret-2026")
     if key in (admin_pwd, admin_key):
         return
     guard(["ADMIN_KEY"], key)
 
+def get_user_from_headers(x_user_token: str = "", x_admin_key: str = "", authorization: str = "") -> Optional[dict]:
+    token = x_user_token or x_admin_key
+    if not token and authorization and authorization.startswith("Bearer "):
+        token = authorization[7:].strip()
+    return auth.decode_token(token)
+
+def require_site_access(jid: int, x_user_token: str = "", x_admin_key: str = "", authorization: str = "") -> dict:
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    if not auth.verify_site_ownership(jid, user):
+        raise HTTPException(403, "غير مصرح لك بالوصول لإعدادات أو تحميل هذا المتجر. يرجى تسجيل الدخول بحساب مالك المتجر أو المشرف العام.")
+    return user or {}
+
 
 # =========================================================
-# Admin Authentication API
+# Authentication APIs (Client & Admin)
 # =========================================================
+@app.post("/api/auth/register")
+def api_register(body: dict):
+    uname = (body.get("username") or "").strip()
+    pwd = (body.get("password") or "").strip()
+    phone = (body.get("phone") or "").strip()
+    try:
+        user = auth.register_user(uname, pwd, phone)
+        return {"ok": True, "user": user}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/auth/login")
+def api_login(body: dict):
+    uname = (body.get("username") or "").strip()
+    pwd = (body.get("password") or "").strip()
+    try:
+        user = auth.login_user(uname, pwd)
+        return {"ok": True, "user": user}
+    except ValueError as e:
+        raise HTTPException(401, str(e))
+
+
+@app.get("/api/auth/me")
+def api_me(
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    if not user:
+        return {"authenticated": False}
+    c_row = db.one("SELECT count(*) as c FROM jobs WHERE user_id = ? OR client = ?", (user["id"], user["username"]))
+    count = c_row.get("c", 0) if c_row else 0
+    return {
+        "authenticated": True,
+        "user": user,
+        "sites_count": count,
+        "max_sites": 999 if user.get("is_admin") else auth.MAX_SITES_PER_CLIENT
+    }
+
+
 @app.post("/api/admin/login")
 def admin_login(body: dict):
     """Admin login verifying ADMIN_PASSWORD from environment."""
     pwd = (body.get("password") or "").strip()
-    correct_pwd = os.getenv("ADMIN_PASSWORD", "admin123")
+    correct_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
     admin_key = os.getenv("ADMIN_KEY", "autocorp-admin-secret-2026")
     if pwd in (correct_pwd, admin_key):
         return {
@@ -168,17 +224,17 @@ def admin_login(body: dict):
             "username": os.getenv("ADMIN_NAME", "المدير العام المشرف"),
             "role": "Super Admin & Agency Director"
         }
-    raise HTTPException(401, "كلمة مرور الأدمن غير صحيحة")
+    raise HTTPException(401, "كلمة مرور المشرف غير صحيحة")
 
 
 # =========================================================
 # Job Creation & Planning
 # =========================================================
-def make_job(client, request, sync=False):
+def make_job(client, request, user_id=None, sync=False):
     check_guardrails(request)
     jid = db.x(
-        "insert into jobs(client,request,status,created_at) values(?,?,?,strftime('%s','now'))",
-        ((client or "web-client")[:80], request[:4000], "created")
+        "insert into jobs(client,request,status,user_id,created_at) values(?,?,?,?,strftime('%s','now'))",
+        ((client or "web-client")[:80], request[:4000], "created", user_id)
     )
     if sync or IS_VERCEL:
         return jid
@@ -193,7 +249,21 @@ def home():
 
 
 @app.post("/api/jobs")
-async def new_job(body: dict, x_admin_key: str = Header(default="")):
+async def new_job(
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    if not user:
+        raise HTTPException(401, "يرجى تسجيل الدخول أو إنشاء حساب أولاً قبل إطلاق وبناء المتجر.")
+        
+    # Check limit of 2 stores for clients
+    try:
+        auth.check_user_limit(user)
+    except ValueError as e:
+        raise HTTPException(403, str(e))
     req = (body.get("request") or "").strip()
     brand_name = (body.get("brand_name") or body.get("client") or "").strip()
     category = (body.get("category") or "").strip()
@@ -222,8 +292,8 @@ async def new_job(body: dict, x_admin_key: str = Header(default="")):
     check_guardrails(full_req)
     
     sync = body.get("sync", False) or IS_VERCEL
-    client_name = brand_name or body.get("client") or "عميل-AutoCorp"
-    jid = make_job(client_name, full_req, sync=sync)
+    client_name = brand_name or body.get("client") or user.get("username") or "عميل-AutoCorp"
+    jid = make_job(client_name, full_req, user_id=user.get("id"), sync=sync)
     
     # Save site settings
     db.x("""
@@ -281,11 +351,16 @@ async def hook_job(body: dict, x_hook_key: str = Header(default="")):
 
 
 @app.get("/api/jobs")
-def get_jobs():
+def get_jobs(
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
     rows = db.q("""
         select j.*, (select count(*) from site_orders where job_id = j.id) as orders_count 
         from jobs j 
-        order by j.id desc limit 20
+        order by j.id desc limit 40
     """)
     if not rows:
         return []
@@ -308,11 +383,19 @@ def get_jobs():
         j["frontend_url"] = f"/sites/{j_id}/"
         j["backend_api_url"] = f"/api/sites/{j_id}/info"
         j["orders_count"] = int(j.get("orders_count") or 0)
+        j["is_paid"] = bool(j.get("is_paid", 0))
+        j["can_manage"] = auth.verify_site_ownership(j_id, user)
     return rows
 
 
 @app.get("/api/jobs/{jid}")
-def get_job_detail(jid: int):
+def get_job_detail(
+    jid: int,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
     j = db.one("select * from jobs where id=?", (jid,))
     if not j:
         raise HTTPException(404, "المشروع غير موجود")
@@ -320,7 +403,12 @@ def get_job_detail(jid: int):
     j["contracts"] = db.q("select from_agent,to_agent,sha256,preview from contracts where job_id=? order by id", (jid,))
     j["frontend_url"] = f"/sites/{jid}/"
     j["backend_api_url"] = f"/api/sites/{jid}/info"
-    j["orders"] = db.q("select * from site_orders where job_id=? order by id desc", (jid,))
+    j["is_paid"] = bool(j.get("is_paid", 0))
+    j["can_manage"] = auth.verify_site_ownership(jid, user)
+    if j["can_manage"]:
+        j["orders"] = db.q("select * from site_orders where job_id=? order by id desc", (jid,))
+    else:
+        j["orders"] = []
     return j
 
 
@@ -461,17 +549,36 @@ async def site_backend_place_order(jid: int, body: dict):
 
 
 @app.get("/api/sites/{jid}/orders")
-def site_backend_get_orders(jid: int, x_admin_key: str = Header(default="")):
+def site_backend_get_orders(
+    jid: int,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
     return db.q("select * from site_orders where job_id=? order by id desc", (jid,))
 
 
 @app.get("/api/sites/{jid}/settings")
-def get_site_settings(jid: int):
+def get_site_settings(
+    jid: int,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
     return db.one("select * from site_settings where job_id=?", (jid,)) or {}
 
 
 @app.post("/api/sites/{jid}/settings")
-def update_site_settings(jid: int, body: dict):
+def update_site_settings(
+    jid: int,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
     db.x("""
         INSERT OR REPLACE INTO site_settings (
             job_id, brand_name, category, custom_domain, color_primary, color_secondary,
@@ -499,7 +606,13 @@ def update_site_settings(jid: int, body: dict):
 
 
 @app.get("/api/sites/{jid}/export-zip")
-def export_site_zip(jid: int):
+def export_site_zip(
+    jid: int,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
     row = db.one("select * from site_pages where job_id=?", (jid,))
     if not row or not row.get("html"):
         raise HTTPException(404, "الموقع غير جاهز للتحميل بعد")
@@ -543,6 +656,32 @@ def export_site_zip(jid: int):
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=autocorp_site_{jid}.zip"}
     )
+
+
+@app.post("/api/sites/{jid}/activate-payment")
+def activate_site_payment(
+    jid: int,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+    method = (body.get("payment_method") or "vodafone_cash").strip()
+    ref = (body.get("payment_ref") or "DIRECT_PAY").strip()
+    amount = float(body.get("amount") or 299.0)
+    
+    db.x("UPDATE jobs SET is_paid=1, subscription_plan='active' WHERE id=?", (jid,))
+    db.x(
+        "INSERT INTO ledger (ts, account, delta, memo, job_id) VALUES (?, 'client_payment', ?, ?, ?)",
+        (time.time(), amount, f"اشتراك تفعيل متجر #{jid} عبر {method} (مرجع: {ref})", jid)
+    )
+    return {
+        "ok": True,
+        "message": f"تم تفعيل اشتراك متجرك بنجاح بمبلغ {amount} ج.م! المتجر الآن نشط ومتاح للعملاء بشكل دائم.",
+        "is_paid": True,
+        "plan": "active"
+    }
 
 
 @app.post("/api/discovery/questions")
@@ -697,22 +836,107 @@ async def handle_telegram_update(u: dict):
     chat_id = str(msg["chat"]["id"])
     text = (msg.get("text") or msg.get("caption") or "").strip()
     
+    # Check if this telegram user is linked to an account
+    linked_user = db.one("SELECT id, username, role FROM users WHERE telegram_id = ?", (chat_id,))
+    user_id = linked_user["id"] if linked_user else None
+    user_name = linked_user["username"] if linked_user else f"tg:{chat_id}"
+    is_user_admin = (linked_user and linked_user.get("role") == "admin") or (os.getenv("TELEGRAM_OWNER_CHAT_ID") == chat_id)
+
     # 1. /start command
     if text.startswith("/start"):
         await corp.tg_send(
             chat_id,
             "مرحباً بك في AutoCorp 🤖🇪🇬\n"
-            "وكالة الذكاء الاصطناعي ذاتية التشغيل للشركات المصرية الناشئة.\n\n"
-            "✨ يمكنك طلب موقع فرونت وباك إند كامل من هنا مباشرة!\n"
-            "فقط اكتب طلبك، أو أرسل صورة المنيو/الخدمة وسيبدأ الفريق فوراً.\n\n"
-            "🛡️ للدخول كمدير مشرف: اكتب الأمر:\n"
-            "/admin <كلمة_المرور>"
+            "وكالة الذكاء الاصطناعي ذاتية التشغيل للمتاجر والشركات المصرية.\n\n"
+            "✨ يسعدني التحدث معك ومساعدتك في إطلاق موقع متكامل بالفرونت والباك إند وبوابات الدفع المصرية في أقل من دقيقتين!\n\n"
+            "📋 الأوامر المتاحة:\n"
+            "• /register <اسم_المستخدم> <كلمة_المرور> — إنشاء حساب جديد\n"
+            "• /login <اسم_المستخدم> <كلمة_المرور> — تسجيل الدخول\n"
+            "• /my_sites — عرض متاجرك الإلكترونية وروابطها\n"
+            "• /build <وصف المتجر> — إطلاق وبرمجة متجر فوراً\n"
+            "• /help — دليل استخدام الوكالة والخدمات المتاحة\n"
+            "• /admin <كلمة_المرور> — تسجيل دخول المدير المشرف\n\n"
+            "💡 أو ببساطة: تحدث معي واشرح لي فكرة متجرك وسأقوم بإرشادك خطوة بخطوة!"
         )
         return
 
-    # 2. /admin login command
+    # 2. /help command
+    if text.startswith("/help"):
+        await corp.tg_send(
+            chat_id,
+            "📖 دليل استخدام مستشار AutoCorp الذكي:\n\n"
+            "1️⃣ بناء المتاجر: فقط اكتب تفاصيل متجرك (مثال: 'عايز متجر خضار وفواكه فريش' أو 'مطعم مشويات') أو أرسل صورة المنيو/البضاعة.\n"
+            "2️⃣ بوابات الدفع: كل متجر يتم تجهيزه تلقائياً بروابط فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام.\n"
+            "3️⃣ باقة البداية المجانية: تتيح لك تجربة بناء حتى (موقعين) مجاناً.\n"
+            "4️⃣ استضافة هوستينجر: يمكنك تحميل كود الإنتاج كاملاً بملف ZIP من لوحة التحكم ورفعه على استضافتك بضغطة زر.\n\n"
+            "لربط حسابك: اكتب /login اسم_المستخدم كلمة_المرور"
+        )
+        return
+
+    # 3. /register command
+    if text.startswith("/register"):
+        parts = text.split(maxsplit=2)
+        if len(parts) < 3:
+            await corp.tg_send(chat_id, "⚠️ الصيغة الصحيحة: /register اسم_المستخدم كلمة_المرور")
+            return
+        u_name, u_pass = parts[1].strip(), parts[2].strip()
+        try:
+            res = auth.register_user(u_name, u_pass)
+            db.x("UPDATE users SET telegram_id = ? WHERE id = ?", (chat_id, res["id"]))
+            await corp.tg_send(
+                chat_id,
+                f"🎉 تم إنشاء حسابك بنجاح ({u_name}) وربطه بـ Telegram!\n"
+                f"تم تفعيل باقة البداية (رصيد حتى موقعين مجاناً). يمكنك الآن طلب متجرك الأول!"
+            )
+        except Exception as e:
+            await corp.tg_send(chat_id, f"❌ تعذر إنشاء الحساب: {e}")
+        return
+
+    # 4. /login command
+    if text.startswith("/login"):
+        parts = text.split(maxsplit=2)
+        if len(parts) < 3:
+            await corp.tg_send(chat_id, "⚠️ الصيغة الصحيحة: /login اسم_المستخدم كلمة_المرور")
+            return
+        u_name, u_pass = parts[1].strip(), parts[2].strip()
+        try:
+            res = auth.login_user(u_name, u_pass)
+            if res.get("id"):
+                db.x("UPDATE users SET telegram_id = ? WHERE id = ?", (chat_id, res["id"]))
+            await corp.tg_send(
+                chat_id,
+                f"✅ تم تسجيل دخولك بنجاح كـ ({u_name})!\n"
+                "أنت الآن جاهز لإدارة متاجرك أو طلب بناء متجر جديد."
+            )
+        except Exception as e:
+            await corp.tg_send(chat_id, f"❌ خطأ في الدخول: {e}")
+        return
+
+    # 5. /my_sites command
+    if text.startswith("/my_sites") or text.startswith("/sites"):
+        sites = db.q(
+            "SELECT id, client, status, is_paid FROM jobs WHERE user_id = ? OR client LIKE ? OR client = ? ORDER BY id DESC LIMIT 10",
+            (user_id or -1, f"tg:{chat_id}%", user_name)
+        )
+        if not sites:
+            await corp.tg_send(chat_id, "🛒 ليس لديك أي متاجر منشورة حتى الآن. لإنشاء متجرك الأول، اكتب وصف نشاطك التجاري أو استخدم /build.")
+            return
+        msg_lines = ["📱 متاجرك الإلكترونية في AutoCorp:\n"]
+        for s in sites:
+            paid_str = "✅ نشط ومدفوع" if s.get("is_paid") else "⏳ تجريبي / في انتظار التفعيل"
+            msg_lines.append(
+                f"• متجر #{s['id']} ({s['client']})\n"
+                f"  الحالة: {s['status']} | {paid_str}\n"
+                f"  الرابط: http://localhost:8000/sites/{s['id']}/\n"
+            )
+        msg_lines.append("\n💡 يمكنك تحميل حزمة هوستينجر أو ربط دومين خاص بك من لوحة تحكم الويب.")
+        await corp.tg_send(chat_id, "\n".join(msg_lines))
+        return
+
+    # 6. /admin login command
     if text.startswith("/admin"):
         parts = text.split(maxsplit=1)
+        admin_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
         if len(parts) > 1 and parts[1].strip() == admin_pwd:
             os.environ["TELEGRAM_OWNER_CHAT_ID"] = chat_id
             admin_name = os.getenv("ADMIN_NAME", "المدير المشرف")
@@ -725,9 +949,50 @@ async def handle_telegram_update(u: dict):
             await corp.tg_send(chat_id, "❌ كلمة المرور غير صحيحة.")
         return
 
-    # 3. Client project request (Text or Photo)
-    if text or msg.get("photo"):
-        check_guardrails(text)
+    # 7. Conversational Handling & Guardrails
+    check_guardrails(text)
+    
+    # 7.1 Greeting Detection
+    greetings = ["اهلا", "أهلا", "مرحبا", "سلام", "السلام عليكم", "ازيك", "صباح الخير", "مساء الخير", "هاي", "الو", "مين انت", "عرفني بيك"]
+    t_clean = text.lower().strip()
+    if any(t_clean == g or t_clean.startswith(g + " ") for g in greetings) and len(t_clean) < 35 and not msg.get("photo"):
+        await corp.tg_send(
+            chat_id,
+            "أهلاً بك يا فندم! 🤖🇪🇬\n"
+            "أنا المستشار الذكي لوكالة AutoCorp لبناء وتطوير المواقع والمتاجر للشركات المصرية.\n\n"
+            "مهمتي أساعدك في إطلاق متجر إلكتروني وتطبيق ويب متكامل لنشاطك التجاري في أقل من دقيقتين، "
+            "مع سلة مشتريات وبوابات الدفع المصرية (فودافون كاش، إنستاباي، فوري) وتصميم متجاوب بالكامل.\n\n"
+            "💡 كيف تحب نبدأ؟\n"
+            "• لبدء بناء متجرك فوراً: اكتب تفاصيل نشاطك (مثال: 'عايز اعمل متجر لبيع الخضار والفواكه' أو 'مطعم مشويات').\n"
+            "• لتسجيل الدخول: اكتب /login اسم_المستخدم كلمة_المرور\n"
+            "• أو اسألني أي سؤال حول الميزات والأسعار وبوابات الدفع!"
+        )
+        return
+
+    # 7.2 Explicit Store Creation Request or Photo
+    store_trigger_keywords = [
+        "عايز اعمل", "عايز متجر", "ابني لي", "صمم لي", "انشئ موقع", "مشروع بيع",
+        "متجر لبيع", "سوبرماركت", "مطعم", "خضار", "كافيه", "ابدأ البناء",
+        "انشاء متجر", "عمل موقع", "بناء متجر", "اريد متجر", "اريد موقع", "/build"
+    ]
+    is_store_request = bool(msg.get("photo")) or any(k in t_clean for k in store_trigger_keywords)
+
+    if is_store_request:
+        # Check 2-store limit for non-admin users
+        if not is_user_admin:
+            c_row = db.one(
+                "SELECT count(*) as c FROM jobs WHERE user_id = ? OR client LIKE ? OR client = ?",
+                (user_id or -1, f"tg:{chat_id}%", user_name)
+            )
+            count_tg = int(c_row.get("c", 0) or 0) if c_row else 0
+            if count_tg >= auth.MAX_SITES_PER_CLIENT:
+                await corp.tg_send(
+                    chat_id,
+                    f"⚠️ عفواً، لقد استنفدت الحد الأقصى المسموح به ({auth.MAX_SITES_PER_CLIENT} مواقع) في باقتك الحالية!\n\n"
+                    "يمكنك استعراض متاجرك السابقة عبر كتابة /my_sites أو الترقية لإنشاء مواقع جديدة."
+                )
+                return
+
         if msg.get("photo"):
             desc = await corp.tg_image_to_text(msg["photo"][-1]["file_id"], text)
             text = f"{text}\n\n[تحليل صورة العميل بواسطة Vision Analyst]:\n{desc}".strip()
@@ -737,7 +1002,8 @@ async def handle_telegram_update(u: dict):
         pal_key = "emerald" if niche == "vegetables" else "sunset" if niche == "restaurant" else "ocean"
         pal = builder.PALETTES.get(pal_key, builder.PALETTES["emerald"])
         
-        jid = make_job(f"tg:{chat_id}", text, sync=IS_VERCEL)
+        client_tag = user_name if user_name != f"tg:{chat_id}" else f"tg:{chat_id}"
+        jid = make_job(client_tag, text, user_id=user_id, sync=IS_VERCEL)
         
         # Save initial site settings
         db.x("""
@@ -762,12 +1028,35 @@ async def handle_telegram_update(u: dict):
             f"🚀 استلمنا طلبك بنجاح! تم فتح مشروع برقم #{jid}.\n\n"
             f"🏷️ البراند المقترح: {brand}\n"
             f"🛒 نوع النشاط: {niche}\n"
-            f"🎨 الهوية: تم تفعيل باليت ألوان متناسقة وعصرية.\n"
-            f"💳 بوابات الدفع: فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام.\n\n"
-            f"⏳ جاري الآن برمجة الموقع وتجهيز المتجر بالكامل...\n"
+            f"🎨 الهوية: تم تفعيل باليت ألوان عصرية ({pal_key}).\n"
+            f"💳 بوابات الدفع: فودافون كاش، إنستاباي، فوري، والدفع عند الاستلام.\n\n"
+            f"⏳ جاري الآن قيادة فريق الـ 70 Agent وبرمجة المتجر بالكامل...\n"
             f"🌐 رابط المعاينة المباشر فور الانتهاء (أقل من دقيقة):\n"
             f"http://localhost:8000/sites/{jid}/"
         )
+        return
+
+    # 7.3 General Consultation Chat with Scope Guardrail
+    sys_prompt = (
+        "You are AutoCorp's friendly, professional Egyptian AI consultant for SMEs. "
+        "AutoCorp is an autonomous digital agency that builds and deploys full-stack e-commerce stores, "
+        "menus, and web apps with Egyptian payment gateways in under 2 minutes. "
+        "STRICT POLICY: If the user asks about unrelated topics (politics, school homework, gaming, religion, gossip, general trivia), "
+        "you MUST politely refuse and clarify that you only assist with building, designing, and launching digital business stores and websites. "
+        "If the user is asking about services, pricing, business categories, or web advice, answer supportively in Egyptian Arabic. "
+        "Always end by inviting them to tell you about their business so you can generate their store."
+    )
+    try:
+        resp = await llm.call(
+            system=sys_prompt,
+            user=text,
+            tier="worker",
+            mock="أهلاً بك! أنا مستشارك الذكي في AutoCorp لتطوير وإطلاق المواقع والمتاجر للشركات المصرية. أخبرني عن نشاطك التجاري لنبدأ فوراً في برمجة متجرك!"
+        )
+        bot_reply = resp.get("text") or "أهلاً بك! أنا في خدمتك لتصميم وإطلاق متجرك الرقمي المتكامل. أخبرني عن نشاطك لنبدأ!"
+        await corp.tg_send(chat_id, bot_reply)
+    except Exception as e:
+        await corp.tg_send(chat_id, "أهلاً بك في AutoCorp! كيف أقدر أساعدك في إطلاق وبرمجة متجرك الإلكتروني اليوم؟")
 
 
 @app.post("/telegram")

@@ -142,6 +142,15 @@ CREATE TABLE IF NOT EXISTS site_settings (
     cod_enabled INTEGER DEFAULT 1,
     updated_at REAL
 );
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password_hash TEXT,
+    role TEXT DEFAULT 'client',
+    phone TEXT,
+    telegram_id TEXT,
+    created_at REAL
+);
 """
 
 # --------------- Turso HTTP helpers ---------------
@@ -242,11 +251,31 @@ def init():
             _turso_request(pipeline)
         except Exception as e:
             print(f"[TURSO INIT] {e}")
+        # Safe column additions
+        for col_sql in [
+            "ALTER TABLE jobs ADD COLUMN user_id INTEGER",
+            "ALTER TABLE jobs ADD COLUMN is_paid INTEGER DEFAULT 0",
+            "ALTER TABLE jobs ADD COLUMN subscription_plan TEXT DEFAULT 'trial'"
+        ]:
+            try:
+                _turso_request([_make_stmt(col_sql)])
+            except Exception:
+                pass
     else:
         c = _sqlite_conn()
         try:
             c.executescript(SCHEMA)
             c.commit()
+            for col_sql in [
+                "ALTER TABLE jobs ADD COLUMN user_id INTEGER",
+                "ALTER TABLE jobs ADD COLUMN is_paid INTEGER DEFAULT 0",
+                "ALTER TABLE jobs ADD COLUMN subscription_plan TEXT DEFAULT 'trial'"
+            ]:
+                try:
+                    c.execute(col_sql)
+                    c.commit()
+                except Exception:
+                    pass
         finally:
             c.close()
 

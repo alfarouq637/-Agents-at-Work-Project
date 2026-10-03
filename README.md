@@ -94,6 +94,7 @@ Every generated SME site supports localized payment options:
 ### 8. ☁️ Serverless & Cloud Ready (Turso libSQL + Vercel)
 - Uses **Turso HTTP API (`/v2/pipeline`)** via `httpx`: Zero native binary dependencies, preventing Vercel build failures.
 - Fallback to local SQLite when offline.
+- Detailed step-by-step 1-click Vercel deployment instructions and environment variables checklist: [DEPLOY_VERCEL.md](file:///e:/alkolya/Internships/مشاريع/autocorp/DEPLOY_VERCEL.md).
 
 ---
 
