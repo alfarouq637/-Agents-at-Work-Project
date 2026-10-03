@@ -1137,6 +1137,15 @@ async def handle_telegram_update(u: dict):
         pal_key = "emerald" if niche == "vegetables" else "sunset" if niche == "restaurant" else "ocean"
         pal = builder.PALETTES.get(pal_key, builder.PALETTES["emerald"])
         
+        # Prevent duplicate job creation from Telegram webhook retries
+        recent = db.one(
+            "SELECT id FROM jobs WHERE client = ? AND request = ? AND created_at > ?",
+            (brand, text, time.time() - 120)
+        )
+        if recent:
+            print(f"[TG DEDUP] Skipping duplicate creation for {brand} (Job #{recent['id']})")
+            return
+
         # Always set client as the actual brand name
         jid = make_job(brand, text, user_id=user_id, sync=True)
         
@@ -1204,11 +1213,31 @@ async def handle_telegram_update(u: dict):
         await corp.tg_send(chat_id, "أهلاً بك في AutoCorp! كيف أقدر أساعدك في إطلاق وبرمجة متجرك الإلكتروني اليوم؟")
 
 
+PROCESSED_TG_UPDATES = set()
+
 @app.post("/telegram")
 async def telegram_webhook(req: Request):
     secret = os.getenv("TELEGRAM_SECRET")
     if secret and req.headers.get("x-telegram-bot-api-secret-token") != secret:
         raise HTTPException(401)
     u = await req.json()
+    
+    # Deduplication by update_id in-memory and in Turso Cloud
+    up_id = str(u.get("update_id") or "").strip()
+    if up_id:
+        if up_id in PROCESSED_TG_UPDATES:
+            return {"ok": True, "duplicate": True}
+        PROCESSED_TG_UPDATES.add(up_id)
+        if len(PROCESSED_TG_UPDATES) > 1000:
+            PROCESSED_TG_UPDATES.clear()
+            
+        try:
+            existing = db.one("SELECT update_id FROM telegram_updates WHERE update_id = ?", (up_id,))
+            if existing:
+                return {"ok": True, "duplicate": True}
+            db.x("INSERT OR REPLACE INTO telegram_updates (update_id, created_at) VALUES (?, ?)", (up_id, time.time()))
+        except Exception as e:
+            print(f"[TG DEDUP DB ERR] {e}")
+
     await handle_telegram_update(u)
     return {"ok": True}
