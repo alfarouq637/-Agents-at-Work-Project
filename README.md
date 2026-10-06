@@ -163,8 +163,6 @@ TELEGRAM_BOT_USERNAME=your_bot_username
 - **Founder & Lead AI Engineer**: **Alfarouq Ibrahim Farouq** (م. الفاروق إبراهيم فاروق)
 - **LinkedIn**: [https://www.linkedin.com/in/alfarouq-ibrahim](https://www.linkedin.com/in/alfarouq-ibrahim)
 - **GitHub**: [https://github.com/alfarouq637](https://github.com/alfarouq637)
-- **Telegram**: [@AlfarouqIbrahim](https://t.me/AlfarouqIbrahim)
-- **WhatsApp**: [@AlfarouqIbrahim](https://t.me/AlfarouqIbrahim)
 - **Email**: `alfarwqabrahym0@gmail.com`
 
 ---

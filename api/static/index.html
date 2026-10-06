@@ -330,38 +330,6 @@ textarea{resize:vertical;min-height:75px}
         </div>
       </div>
     </div>
-
-    <!-- Founder & Lead Developer Section -->
-    <div class="card" style="margin-top:20px;border-color:rgba(0,206,201,.35);background:linear-gradient(135deg,rgba(0,206,201,.06),rgba(108,92,231,.08))">
-      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-        <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;color:#fff;box-shadow:0 8px 24px rgba(108,92,231,.35);flex-shrink:0">
-          AF
-        </div>
-        <div style="flex:1;min-width:240px">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-            <h3 style="font-size:1.25rem;font-weight:900;color:#fff;margin:0">Alfarouq Ibrahim Farouq</h3>
-            <span class="badge" style="background:var(--accent);color:#fff;font-weight:700">Founder & Lead AI Engineer</span>
-          </div>
-          <p style="font-size:.84rem;color:var(--fg2);line-height:1.6;font-family:'Readex Pro',sans-serif;margin:0 0 10px">
-            مطور ومهندس نظم الذكاء الاصطناعي — صانع بنية AutoCorp ونظام الـ 70 Agent ذاتيي التنسيق لإحداث نقلة رقمية نوعية للمشاريع والشركات المصرية الناشئة.
-          </p>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.82rem">
-            <a href="https://www.linkedin.com/in/alfarouq-ibrahim" target="_blank" class="btn btn-ghost btn-sm" style="border-color:rgba(0,119,181,.4);color:#38bdf8">
-              💼 LinkedIn: alfarouq-ibrahim
-            </a>
-            <a href="https://github.com/alfarouq637" target="_blank" class="btn btn-ghost btn-sm" style="border-color:rgba(255,255,255,.2);color:#e2e8f0">
-              🐙 GitHub: @alfarouq637
-            </a>
-            <a href="https://t.me/AlfarouqIbrahim" target="_blank" class="btn btn-ghost btn-sm" style="border-color:rgba(0,136,204,.4);color:#00cec9">
-              💬 Telegram: @AlfarouqIbrahim
-            </a>
-            <a href="https://wa.me/201023456789" target="_blank" class="btn btn-ghost btn-sm" style="border-color:rgba(37,211,102,.4);color:#2ecc71">
-              📱 WhatsApp Contact
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- ========================================================= -->
@@ -633,14 +601,12 @@ textarea{resize:vertical;min-height:75px}
         <span>— Autonomous AI Agency for Egyptian SMEs</span>
       </div>
       <div style="display:flex;gap:14px;align-items:center">
-        <a href="https://www.linkedin.com/in/alfarouq-ibrahim" target="_blank" style="color:var(--fg2);text-decoration:none">LinkedIn</a>
-        <a href="https://github.com/alfarouq637" target="_blank" style="color:var(--fg2);text-decoration:none">GitHub</a>
-        <a href="https://t.me/AlfarouqIbrahim" target="_blank" style="color:var(--fg2);text-decoration:none">Telegram</a>
-        <a href="https://t.me/autocorp_Alfarouq_Ibrahim_bot" target="_blank" style="color:var(--accent2);text-decoration:none">Telegram Bot</a>
+        <a href="https://t.me/autocorp_Alfarouq_Ibrahim_bot" target="_blank" style="color:var(--accent2);text-decoration:none">🤖 Telegram Bot</a>
+        <a href="https://github.com/alfarouq637/-Agents-at-Work-Project" target="_blank" style="color:var(--fg2);text-decoration:none">GitHub</a>
       </div>
     </div>
     <div>
-      Designed & Built with ❤️ by <b>Alfarouq Ibrahim Farouq</b> &copy; 2026 AutoCorp. All rights reserved.
+      AutoCorp &copy; 2026 — Autonomous AI Digital Agency for Egyptian SMEs. All rights reserved.
     </div>
   </footer>
 
@@ -816,6 +782,88 @@ textarea{resize:vertical;min-height:75px}
         <button class="btn btn-ghost btn-sm" onclick="saveSiteSettingsQuick()" style="width:100%;margin-top:6px">
           💾 حفظ التعديلات وإعادة بناء الموقع
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: GITHUB & VERCEL DIRECT DEPLOYMENT                   -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="git-vercel-modal">
+    <div class="modal" style="max-width:580px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2)" id="gvm-title">🚀 النشر المباشر على GitHub & Vercel</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeGitVercelModal()">✕</button>
+      </div>
+
+      <input type="hidden" id="gvm-jid">
+
+      <!-- Tabs: GitHub vs Vercel -->
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button id="tab-deploy-gh" class="btn btn-primary btn-sm" onclick="switchDeployTab('github')">🐙 رفع إلى GitHub Repo</button>
+        <button id="tab-deploy-vc" class="btn btn-ghost btn-sm" onclick="switchDeployTab('vercel')">▲ نشر على Vercel Cloud</button>
+      </div>
+
+      <!-- Tab 1: GitHub -->
+      <div id="deploy-gh-section">
+        <p style="font-size:.8rem;color:var(--fg2);font-family:'Readex Pro',sans-serif;margin-bottom:14px">
+          سيقوم AutoCorp بإنشاء مستودع (Repository) في حسابك ورفع ملفات المشروع كاملة (<code>index.html</code>, <code>server.js</code>, <code>package.json</code>, <code>vercel.json</code>, <code>README.md</code>).
+        </p>
+
+        <div class="form-group">
+          <label>رمز الوصول الشخصي (GitHub Personal Access Token) *</label>
+          <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+          <span style="font-size:.72rem;color:var(--fg3)">يتطلب صلاحية <code>repo</code> لإنشاء ورفع الملفات. <a href="https://github.com/settings/tokens/new" target="_blank" style="color:var(--accent2)">إنشاء توكن</a></span>
+        </div>
+
+        <div class="form-group">
+          <label>اسم المستودع (Repository Name)</label>
+          <input type="text" id="gh-repo-name" placeholder="my-awesome-store">
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label style="display:inline-flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer">
+            <input type="checkbox" id="gh-private" style="width:auto">
+            <span>مستودع خاص (Private Repository)</span>
+          </label>
+        </div>
+
+        <button id="btn-run-gh-deploy" class="btn btn-primary" onclick="submitGitHubDeploy()" style="width:100%;padding:12px;font-weight:900">
+          🚀 رفع كود المشروع إلى GitHub الآن
+        </button>
+
+        <div id="gh-status-output" style="margin-top:14px;display:none"></div>
+      </div>
+
+      <!-- Tab 2: Vercel -->
+      <div id="deploy-vc-section" style="display:none">
+        <p style="font-size:.8rem;color:var(--fg2);font-family:'Readex Pro',sans-serif;margin-bottom:14px">
+          انشر موقعك على سحابة Vercel العالمية فوراً برابط مباشر وسرعة فائقة.
+        </p>
+
+        <div class="form-group">
+          <label>الخيار 1: Vercel Deploy Hook URL (الأسهل)</label>
+          <input type="url" id="vc-hook" placeholder="https://api.vercel.com/v1/integrations/deploy/prj_.../...">
+          <span style="font-size:.72rem;color:var(--fg3)">من لوحة Vercel: Settings -> Git -> Deploy Hooks</span>
+        </div>
+
+        <div style="text-align:center;color:var(--fg3);font-size:.8rem;margin:8px 0">-- أو --</div>
+
+        <div class="form-group">
+          <label>الخيار 2: Vercel Access Token</label>
+          <input type="password" id="vc-token" placeholder="أدخل Vercel API Token">
+        </div>
+
+        <div class="form-group">
+          <label>اسم المشروع على Vercel</label>
+          <input type="text" id="vc-project-name" placeholder="my-store-name">
+        </div>
+
+        <button id="btn-run-vc-deploy" class="btn btn-success" onclick="submitVercelDeploy()" style="width:100%;padding:12px;font-weight:900">
+          ▲ نشر فوري على Vercel Cloud
+        </button>
+
+        <div id="vc-status-output" style="margin-top:14px;display:none"></div>
       </div>
     </div>
   </div>
@@ -1411,6 +1459,10 @@ function renderMyStores(jobs){
             ⚙️ إعدادات النشر والدومين والتحميل
           </button>
 
+          <button class="btn btn-primary btn-sm" onclick="openGitVercelModal(${j.id}, '${esc(j.client)}')">
+            🚀 نشر على GitHub & Vercel
+          </button>
+
           <a href="/api/sites/${j.id}/orders" target="_blank" class="btn btn-ghost btn-sm">
             📦 أوردرات المتجر (<b style="color:var(--gold)">${j.orders_count || 0}</b>)
           </a>
@@ -1571,6 +1623,153 @@ async function saveSiteSettingsQuick(){
     }
   }catch(e){
     alert('خطأ: ' + e.message);
+  }
+}
+
+// =========================================================
+// GitHub & Vercel Direct Deployment Modal Logic
+// =========================================================
+function openGitVercelModal(jid, brand){
+  $('#gvm-jid').value = jid;
+  $('#gvm-title').textContent = `🚀 نشر المشروع على GitHub & Vercel: #${jid} (${brand})`;
+  $('#gh-status-output').style.display = 'none';
+  $('#vc-status-output').style.display = 'none';
+  switchDeployTab('github');
+  $('#git-vercel-modal').classList.add('open');
+}
+
+function closeGitVercelModal(){
+  $('#git-vercel-modal').classList.remove('open');
+}
+
+function switchDeployTab(tab){
+  if(tab === 'github'){
+    $('#tab-deploy-gh').className = 'btn btn-primary btn-sm';
+    $('#tab-deploy-vc').className = 'btn btn-ghost btn-sm';
+    $('#deploy-gh-section').style.display = 'block';
+    $('#deploy-vc-section').style.display = 'none';
+  } else {
+    $('#tab-deploy-gh').className = 'btn btn-ghost btn-sm';
+    $('#tab-deploy-vc').className = 'btn btn-primary btn-sm';
+    $('#deploy-gh-section').style.display = 'none';
+    $('#deploy-vc-section').style.display = 'block';
+  }
+}
+
+async function submitGitHubDeploy(){
+  const jid = $('#gvm-jid').value;
+  const token = $('#gh-token').value.trim();
+  const repoName = $('#gh-repo-name').value.trim();
+  const isPrivate = $('#gh-private').checked;
+  const out = $('#gh-status-output');
+  const btn = $('#btn-run-gh-deploy');
+
+  if(!token){
+    alert('يرجى إدخال GitHub Personal Access Token');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري إنشاء الـ Repo ورفع الأكواد...';
+  out.style.display = 'block';
+  out.innerHTML = '<div style="color:var(--gold);font-size:.82rem">🔄 جاري الاتصال بـ GitHub وإنشاء المستودع ورفع الملفات...</div>';
+
+  try{
+    const userToken = getSafeToken();
+    const res = await fetch(`/api/sites/${jid}/deploy-github`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': userToken
+      },
+      body: JSON.stringify({
+        github_token: token,
+        repo_name: repoName || undefined,
+        is_private: isPrivate
+      })
+    });
+    const d = await res.json();
+    if(res.ok && d.ok){
+      out.innerHTML = `
+        <div style="background:rgba(0,206,201,.1);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;margin-top:10px">
+          <div style="color:var(--accent);font-weight:900;margin-bottom:6px">🎉 تم الرفع إلى GitHub بنجاح!</div>
+          <p style="font-size:.8rem;color:var(--fg);margin-bottom:8px">${esc(d.message)}</p>
+          <a href="${d.repo_url}" target="_blank" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
+            🔗 فتح المستودع على GitHub (${esc(d.repo_url)})
+          </a>
+        </div>
+      `;
+    }else{
+      out.innerHTML = `<div style="color:var(--danger);font-size:.82rem;padding:8px;background:rgba(231,76,60,.1);border-radius:var(--radius-sm)">❌ ${esc(d.detail || 'حدث خطأ أثناء الرفع إلى GitHub')}</div>`;
+    }
+  }catch(e){
+    out.innerHTML = `<div style="color:var(--danger);font-size:.82rem">❌ ${esc(e.message)}</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🚀 رفع كود المشروع إلى GitHub الآن';
+  }
+}
+
+async function submitVercelDeploy(){
+  const jid = $('#gvm-jid').value;
+  const hook = $('#vc-hook').value.trim();
+  const token = $('#vc-token').value.trim();
+  const projectName = $('#vc-project-name').value.trim();
+  const out = $('#vc-status-output');
+  const btn = $('#btn-run-vc-deploy');
+
+  if(!hook && !token){
+    alert('يرجى إدخال Vercel Deploy Hook أو Vercel Access Token');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري النشر على Vercel Cloud...';
+  out.style.display = 'block';
+  out.innerHTML = '<div style="color:var(--gold);font-size:.82rem">🔄 جاري إرسال كود الموقع إلى Vercel وبدء الـ Build...</div>';
+
+  try{
+    const userToken = getSafeToken();
+    const res = await fetch(`/api/sites/${jid}/deploy-vercel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': userToken
+      },
+      body: JSON.stringify({
+        deploy_hook: hook || undefined,
+        vercel_token: token || undefined,
+        project_name: projectName || undefined
+      })
+    });
+    const d = await res.json();
+    if(res.ok && d.ok){
+      if(d.method === 'hook'){
+        out.innerHTML = `
+          <div style="background:rgba(0,206,201,.1);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;margin-top:10px">
+            <div style="color:var(--accent);font-weight:900;margin-bottom:6px">🚀 تم إطلاق الـ Deploy بنجاح!</div>
+            <p style="font-size:.8rem;color:var(--fg)">${esc(d.message)}</p>
+          </div>
+        `;
+      } else {
+        out.innerHTML = `
+          <div style="background:rgba(0,206,201,.1);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;margin-top:10px">
+            <div style="color:var(--accent);font-weight:900;margin-bottom:6px">🎉 تم النشر على Vercel Cloud بنجاح!</div>
+            <p style="font-size:.8rem;color:var(--fg);margin-bottom:8px">الحالة: <b>${esc(d.status || 'READY')}</b></p>
+            <a href="${d.url}" target="_blank" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
+              🌐 فتح موقعك على Vercel (${esc(d.url)})
+            </a>
+          </div>
+        `;
+      }
+    }else{
+      out.innerHTML = `<div style="color:var(--danger);font-size:.82rem;padding:8px;background:rgba(231,76,60,.1);border-radius:var(--radius-sm)">❌ ${esc(d.detail || 'حدث خطأ أثناء النشر على Vercel')}</div>`;
+    }
+  }catch(e){
+    out.innerHTML = `<div style="color:var(--danger);font-size:.82rem">❌ ${esc(e.message)}</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '▲ نشر فوري على Vercel Cloud';
   }
 }
 

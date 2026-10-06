@@ -169,13 +169,106 @@ def require_site_access(jid: int, x_user_token: str = "", x_admin_key: str = "",
     return user or {}
 
 
-def make_site_slug(jid: int, brand: str = "") -> str:
-    clean = re.sub(r'[\s_]+', '-', str(brand or "").strip())
-    clean = re.sub(r'[^\w\u0600-\u06FF\-]+', '', clean)
-    clean = clean.strip('-')
-    if clean:
-        return f"{jid}-{clean}"
-    return str(jid)
+ARABIC_TO_ENGLISH_WORDS = {
+    "مطعم": "restaurant",
+    "مشويات": "grill",
+    "كبابجي": "kebabji",
+    "عسل": "honey",
+    "نحل": "bee",
+    "سدر": "sidr",
+    "طبيعي": "pure",
+    "خضار": "vegetables",
+    "فواكه": "fruits",
+    "طازج": "fresh",
+    "فريش": "fresh",
+    "سوبرماركت": "market",
+    "ماركت": "market",
+    "بقالة": "grocery",
+    "صيدلية": "pharmacy",
+    "دكتور": "dr",
+    "طبيب": "doctor",
+    "عيادة": "clinic",
+    "كافيه": "cafe",
+    "قهوة": "coffee",
+    "حلويات": "sweets",
+    "حلواني": "pastry",
+    "أجهزة": "devices",
+    "اجهزة": "devices",
+    "إلكترونيات": "tech",
+    "الكترونيات": "tech",
+    "موبايل": "mobile",
+    "لابتوب": "laptop",
+    "ملابس": "fashion",
+    "أزياء": "apparel",
+    "ازياء": "apparel",
+    "بوتيك": "boutique",
+    "سايبر": "cyber",
+    "سيكيورتي": "security",
+    "أمن": "security",
+    "امن": "security",
+    "سيبراني": "cyber",
+    "بورتفوليو": "portfolio",
+    "برمجة": "dev",
+    "مطور": "dev",
+    "مهندس": "eng",
+    "شركة": "co",
+    "وكالة": "agency",
+    "متجر": "store",
+    "ستور": "store",
+    "موقع": "site",
+    "ياسين": "yaseen",
+    "احمد": "ahmed",
+    "أحمد": "ahmed",
+    "فاروق": "farouq",
+    "ابراهيم": "ibrahim",
+    "إبراهيم": "ibrahim",
+    "محمد": "mohamed",
+    "محمود": "mahmoud",
+    "علي": "ali",
+    "حسن": "hassan",
+    "حسين": "hussein",
+    "عمر": "omar",
+    "خالد": "khaled",
+    "سارة": "sara",
+    "مريم": "mariam",
+    "البركة": "baraka",
+    "الأصيل": "aseel",
+    "الاصيل": "aseel",
+    "الشفاء": "shefaa",
+    "النقاء": "naqaa",
+    "الرواق": "rewaq",
+}
+
+ARABIC_CHAR_MAP = {
+    'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ء': '', 'ئ': 'e', 'ؤ': 'o',
+    'ب': 'b', 'ت': 't', 'ث': 'th', 'ج': 'j', 'ح': 'h', 'خ': 'kh',
+    'د': 'd', 'ذ': 'z', 'ر': 'r', 'ز': 'z', 'س': 's', 'ش': 'sh',
+    'ص': 's', 'ض': 'd', 'ط': 't', 'ظ': 'z', 'ع': 'a', 'غ': 'gh',
+    'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n',
+    'ه': 'h', 'و': 'w', 'ي': 'y', 'ى': 'a', 'ة': 'a', 'پ': 'p', 'چ': 'ch'
+}
+
+def arabic_to_english_slug(text: str) -> str:
+    s = str(text or "").lower().strip()
+    for ar_w, en_w in ARABIC_TO_ENGLISH_WORDS.items():
+        s = s.replace(ar_w, en_w)
+    out = []
+    for ch in s:
+        if ch in ARABIC_CHAR_MAP:
+            out.append(ARABIC_CHAR_MAP[ch])
+        elif re.match(r'[a-z0-9]', ch):
+            out.append(ch)
+        elif ch in (' ', '-', '_', '/', '|', ':', '،', ','):
+            out.append('-')
+    res = "".join(out)
+    res = re.sub(r'-+', '-', res).strip('-')
+    return res
+
+def make_site_slug(jid: int, brand: str = "", niche: str = "") -> str:
+    en_slug = arabic_to_english_slug(brand)
+    if not en_slug or len(en_slug) < 2:
+        en_slug = niche or "site"
+    return f"{jid}-{en_slug}"
 
 
 def resolve_job_id(slug_or_id: str) -> int:
@@ -201,8 +294,8 @@ def is_store_creation_intent(text: str) -> bool:
     t = re.sub(r'[ة]', 'ه', t)
     t = re.sub(r'[ى]', 'ي', t)
     
-    creation_verbs = ["انشا", "تنشا", "اعمل", "تعمل", "صمم", "ابني", "تبني", "بناء", "برمج", "تطوير", "اطلق", "سوي", "كريت", "build", "create", "make"]
-    target_nouns = ["موقع", "ويب", "متجر", "ستور", "صفحه", "منيو", "مشروع"]
+    creation_verbs = ["انشا", "تنشا", "اعمل", "تعمل", "صمم", "ابني", "تبني", "بناء", "برمج", "تطوير", "اطلق", "سوي", "كريت", "جهز", "build", "create", "make"]
+    target_nouns = ["موقع", "ويب", "متجر", "ستور", "صفحه", "صفحة", "منيو", "مشروع", "بورتفوليو", "بروفايل", "سيرة", "cv", "portfolio"]
     desire_words = ["عايز", "عاوز", "اريد", "حابب", "ودي", "محتاج", "لازم", "نفسي"]
     
     has_verb = any(v in t for v in creation_verbs)
@@ -213,9 +306,11 @@ def is_store_creation_intent(text: str) -> bool:
         return True
     if has_desire and has_noun:
         return True
-    if has_desire and any(k in t for k in ["بيع", "محل", "مطعم", "كافيه", "سوبرماركت", "صيدليه", "خضار", "اجهز", "الكترون"]):
+    if has_verb and any(k in t for k in ["اسمه", "باسم", "واحد", "لـ", "لواحد", "لشخص"]):
         return True
-    if any(k in t for k in ["/build", "ابدأ البناء", "انشاء متجر", "عمل موقع", "بناء متجر"]):
+    if has_desire and any(k in t for k in ["بيع", "محل", "مطعم", "كافيه", "سوبرماركت", "صيدليه", "خضار", "اجهز", "الكترون", "عسل", "سايبر", "سيكيورتي", "دكتور", "عياده"]):
+        return True
+    if any(k in t for k in ["/build", "ابدأ البناء", "انشاء متجر", "عمل موقع", "بناء متجر", "عمل بورتفوليو", "بناء موقع", "تصميم موقع"]):
         return True
     return False
 
@@ -716,43 +811,371 @@ def export_site_zip(
     
     settings = db.one("select * from site_settings where job_id=?", (jid,)) or {}
     brand = settings.get("brand_name") or f"site_{jid}"
+    items = db.q("select * from site_items where job_id=? order by id", (jid,))
     
     import io, zipfile
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("index.html", row["html"])
-        zf.writestr("api_config.json", json.dumps({
-            "site_id": jid,
-            "brand_name": brand,
-            "backend_url": f"http://localhost:8000/api/sites/{jid}",
-            "payment_support": ["vodafone_cash", "instapay", "fawry", "cod"],
-            "generated_by": "AutoCorp AI Autonomous Agency"
+        zf.writestr("items.json", json.dumps(items, ensure_ascii=False, indent=2))
+        zf.writestr("package.json", json.dumps({
+            "name": f"autocorp-site-{jid}",
+            "version": "1.0.0",
+            "description": f"{brand} production package synthesized by AutoCorp AI",
+            "main": "server.js",
+            "scripts": {
+                "start": "node server.js",
+                "dev": "node server.js"
+            },
+            "dependencies": {
+                "express": "^4.19.2",
+                "cors": "^2.8.5"
+            }
         }, ensure_ascii=False, indent=2))
-        readme_txt = (
-            "===========================================================\n"
-            "⚡ AutoCorp — تعليمات رفع الموقع على استضافة هوستينجر (Hostinger)\n"
-            "===========================================================\n"
-            f"المشروع: {brand} (المعرف: #{jid})\n"
-            "التاريخ: 2026\n\n"
-            "خطوات الرفع السريع (في أقل من دقيقة):\n"
-            "1. افتح لوحة تحكم هوستينجر (hPanel).\n"
-            "2. ادخل إلى 'إدارة الملفات' (File Manager) للموقع الخاص بك.\n"
-            "3. افتح المجلد الرئيسي: public_html\n"
-            "4. قم برفع هذا الملف المضغوط وفك الضغط عنه (Extract).\n"
-            "5. تأكد من وجود ملف index.html مباشرة داخل مجلد public_html.\n"
-            "6. موقعك أصبح الآن شغال 100% ومربوط ببوابات الدفع والسلة!\n\n"
-            "لربط دومين مخصص (Custom Domain):\n"
-            "- اذهب إلى إعدادات DNS في هوستينجر أو Cloudflare.\n"
-            "- أضف سجل CNAME يشير إلى: cname.autocorp.io (أو عنوان السيرفر).\n"
-            "===========================================================\n"
-        )
-        zf.writestr("README_DEPLOY_HOSTINGER.txt", readme_txt)
+        
+        server_code = f"""// AutoCorp Express Backend Server for {brand} (Site #{jid})
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(express.static(__dirname));
+
+const ORDERS_FILE = path.join(__dirname, 'orders.json');
+let orders = [];
+if (fs.existsSync(ORDERS_FILE)) {{
+  try {{ orders = JSON.parse(fs.readFileSync(ORDERS_FILE, 'utf-8')); }} catch(e){{}}
+}}
+
+app.get('/api/sites/{jid}/info', (req, res) => {{
+  res.json({{ site_id: {jid}, brand: '{brand}', status: 'live', total_orders: orders.length }});
+}});
+
+app.get('/api/sites/{jid}/items', (req, res) => {{
+  const itemsFile = path.join(__dirname, 'items.json');
+  if (fs.existsSync(itemsFile)) {{
+    try {{ return res.json(JSON.parse(fs.readFileSync(itemsFile, 'utf-8'))); }} catch(e){{}}
+  }}
+  res.json([]);
+}});
+
+app.post('/api/sites/{jid}/orders', (req, res) => {{
+  const order = {{
+    id: orders.length + 1,
+    ...req.body,
+    status: 'confirmed',
+    created_at: new Date().toISOString()
+  }};
+  orders.unshift(order);
+  try {{ fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2)); }} catch(e){{}}
+  res.json({{
+    success: true,
+    order_id: order.id,
+    message: 'تم استلام وتأكيد طلبك بنجاح!',
+    payment_ref: req.body.payment_method === 'fawry' ? 'FAWRY-' + Math.floor(10000000 + Math.random()*90000000) : 'COD-' + Math.floor(1000 + Math.random()*9000)
+  }});
+}});
+
+app.get('/api/sites/{jid}/orders', (req, res) => res.json(orders));
+
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+app.listen(PORT, () => {{
+  console.log(`🚀 [AutoCorp] الموقع شغال محلياً على: http://localhost:${{PORT}}`);
+}});
+"""
+        zf.writestr("server.js", server_code)
+        zf.writestr("vercel.json", json.dumps({
+            "version": 2,
+            "builds": [{"src": "index.html", "use": "@vercel/static"}],
+            "routes": [{"src": "/(.*)", "dest": "/index.html"}]
+        }, indent=2))
+        
+        readme_md = f"""# دليل تشغيل ورفع موقع: {brand} (AutoCorp Full-Stack Package)
+
+تم توليد هذا المشروع بالكامل بواسطة وكالة **AutoCorp AI** للشركات والمتاجر المصرية.
+
+---
+
+## 🌟 الطريقة 1: الرفع المباشر على استضافة هوستينجر (Hostinger) في دقيقة واحدة
+1. افتح لوحة تحكم هوستينجر (hPanel).
+2. ادخل إلى **إدارة الملفات** (File Manager) للموقع الخاص بك.
+3. افتح المجلد الرئيسي: `public_html`
+4. قم برفع هذا الملف المضغوط وفك الضغط عنه (Extract).
+5. تأكد أن ملف `index.html` موجود مباشرة داخل `public_html`.
+6. موقعك أصبح الآن شغال 100% ومربوط بكافة الميزات وبوابات الدفع!
+
+---
+
+## 💻 الطريقة 2: التشغيل المحلي على جهازك (Local Run)
+
+### الخيار الأبسط (بدون أي برامج):
+- فقط اضغط دبل كليك على ملف `index.html` وسيفتح في متصفحك مباشرة ويعمل بالكامل!
+
+### خيار سيرفر Node.js & Express (لتشغيل الباك إند وحفظ الأوردرات محلياً):
+1. تأكد من تثبيت Node.js على جهازك.
+2. افتح موجه الأوامر (Terminal) داخل مجلد المشروع.
+3. اكتب:
+   ```bash
+   npm install express cors
+   npm start
+   ```
+4. افتح المتصفح على: `http://localhost:3000`
+
+---
+
+## 🚀 الطريقة 3: النشر على Vercel أو GitHub Pages
+- **Vercel**: قم بسحب المجلد أو ربطه بحسابك على Vercel وسيقوم بالبناء والنشر التلقائي عبر `vercel.json`.
+- **GitHub**: ارفع الملفات إلى مستودع عام وفعّل GitHub Pages من إعدادات المستودع (Settings -> Pages).
+"""
+        zf.writestr("README_DEPLOY.md", readme_md)
     buf.seek(0)
     return StreamingResponse(
         buf,
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=autocorp_site_{jid}.zip"}
     )
+
+
+@app.post("/api/sites/{slug_or_id}/deploy-github")
+async def deploy_site_github(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Directly pushes full project repository to the user's personal GitHub account."""
+    import base64
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+    
+    token = (body.get("github_token") or "").strip()
+    if not token:
+        raise HTTPException(400, "يرجى إدخال رمز الوصول الشخصي (GitHub Personal Access Token)")
+        
+    repo_name = (body.get("repo_name") or f"autocorp-site-{jid}").strip()
+    repo_name = re.sub(r'[^a-zA-Z0-9\-_]', '-', repo_name).strip('-')
+    is_private = bool(body.get("is_private", False))
+
+    row = db.one("select * from site_pages where job_id=?", (jid,))
+    if not row or not row.get("html"):
+        raise HTTPException(404, "الموقع غير جاهز للرفع بعد")
+        
+    site_html = row["html"]
+    settings = db.one("select * from site_settings where job_id=?", (jid,)) or {}
+    brand = settings.get("brand_name") or f"Site #{jid}"
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "AutoCorp-AI-Agent"
+    }
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # Verify Token
+        user_res = await client.get("https://api.github.com/user", headers=headers)
+        if user_res.status_code != 200:
+            raise HTTPException(401, "رمز GitHub Token غير صالح أو منتهي الصلاحية")
+        gh_user = user_res.json().get("login")
+        
+        # Check or create repo
+        repo_res = await client.get(f"https://api.github.com/repos/{gh_user}/{repo_name}", headers=headers)
+        if repo_res.status_code == 404:
+            create_res = await client.post(
+                "https://api.github.com/user/repos",
+                headers=headers,
+                json={
+                    "name": repo_name,
+                    "description": f"{brand} - Full-Stack site synthesized by AutoCorp AI Autonomous Agency",
+                    "private": is_private,
+                    "auto_init": False
+                }
+            )
+            if create_res.status_code not in (200, 201):
+                err_detail = create_res.json().get("message", "فشل إنشاء المستودع على GitHub")
+                raise HTTPException(400, f"خطأ GitHub: {err_detail}")
+        
+        # Commit file helper
+        async def put_file(file_path: str, content_bytes: bytes, commit_msg: str):
+            f_url = f"https://api.github.com/repos/{gh_user}/{repo_name}/contents/{file_path}"
+            sha = None
+            get_f = await client.get(f_url, headers=headers)
+            if get_f.status_code == 200:
+                sha = get_f.json().get("sha")
+            payload = {
+                "message": commit_msg,
+                "content": base64.b64encode(content_bytes).decode("ascii")
+            }
+            if sha:
+                payload["sha"] = sha
+            await client.put(f_url, headers=headers, json=payload)
+
+        # Commit project files
+        package_json = json.dumps({
+            "name": repo_name,
+            "version": "1.0.0",
+            "description": f"{brand} website generated by AutoCorp AI",
+            "main": "server.js",
+            "scripts": {"start": "node server.js", "dev": "node server.js"},
+            "dependencies": {"express": "^4.19.2", "cors": "^2.8.5"}
+        }, indent=2)
+        
+        server_js = f"""const express = require('express');
+const path = require('path');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(express.static(__dirname));
+
+let orders = [];
+app.get('/api/sites/{jid}/info', (req, res) => res.json({{ status: 'online', site: '{brand}' }}));
+app.post('/api/sites/{jid}/orders', (req, res) => {{
+  orders.unshift({{ id: orders.length + 1, ...req.body, date: new Date().toISOString() }});
+  res.json({{ success: true, order_id: orders.length, message: 'Order confirmed!' }});
+}});
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.listen(PORT, () => console.log(`🚀 Site live at http://localhost:${{PORT}}`));
+"""
+        vercel_json = json.dumps({
+            "version": 2,
+            "builds": [{"src": "index.html", "use": "@vercel/static"}],
+            "routes": [{"src": "/(.*)", "dest": "/index.html"}]
+        }, indent=2)
+
+        readme_md = f"""# {brand}
+
+> Full-Stack website generated and deployed autonomously by **AutoCorp AI Agency**.
+
+## 🚀 Quick Run Locally
+1. Simply double-click `index.html` in your browser!
+2. Or with Node.js:
+   ```bash
+   npm install
+   npm start
+   ```
+   Open [http://localhost:3000](http://localhost:3000)
+
+## 🌐 Deploy to Vercel
+Connect this GitHub repository to [Vercel](https://vercel.com) for automatic 1-click cloud deployment.
+"""
+
+        await put_file("index.html", site_html.encode("utf-8"), "Add index.html via AutoCorp AI")
+        await put_file("package.json", package_json.encode("utf-8"), "Add package.json")
+        await put_file("server.js", server_js.encode("utf-8"), "Add Express backend server.js")
+        await put_file("vercel.json", vercel_json.encode("utf-8"), "Add Vercel deployment config")
+        await put_file("README.md", readme_md.encode("utf-8"), "Add README.md documentation")
+
+        return {
+            "ok": True,
+            "repo_url": f"https://github.com/{gh_user}/{repo_name}",
+            "clone_url": f"https://github.com/{gh_user}/{repo_name}.git",
+            "message": f"تم رفع ملفات كود المشروع كاملة بنجاح إلى مستودعك على GitHub ({gh_user}/{repo_name})!"
+        }
+
+
+@app.post("/api/sites/{slug_or_id}/deploy-vercel")
+async def deploy_site_vercel(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Deploys the site directly to Vercel using Deploy Hook or Vercel Token."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+    
+    deploy_hook = (body.get("deploy_hook") or "").strip()
+    vercel_token = (body.get("vercel_token") or "").strip()
+    project_name = (body.get("project_name") or f"autocorp-site-{jid}").strip().lower()
+    project_name = re.sub(r'[^a-z0-9\-]', '-', project_name).strip('-')
+
+    row = db.one("select * from site_pages where job_id=?", (jid,))
+    if not row or not row.get("html"):
+        raise HTTPException(404, "الموقع غير جاهز للنشر بعد")
+        
+    site_html = row["html"]
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        if deploy_hook:
+            r = await client.post(deploy_hook)
+            if r.status_code in (200, 201):
+                return {
+                    "ok": True,
+                    "method": "hook",
+                    "status": "QUEUED",
+                    "message": "تم إطلاق وتفعيل النشر التلقائي عبر Vercel Deploy Hook بنجاح!"
+                }
+            else:
+                raise HTTPException(400, f"فشل تشغيل Deploy Hook (كود {r.status_code})")
+        
+        if not vercel_token:
+            raise HTTPException(400, "يرجى إدخال Vercel Token أو رابط Deploy Hook")
+            
+        headers = {
+            "Authorization": f"Bearer {vercel_token}",
+            "Content-Type": "application/json"
+        }
+        
+        deploy_payload = {
+            "name": project_name,
+            "files": [
+                {"file": "index.html", "data": site_html},
+                {"file": "vercel.json", "data": json.dumps({"routes": [{"src": "/(.*)", "dest": "/index.html"}]})}
+            ],
+            "projectSettings": {
+                "framework": None
+            }
+        }
+        
+        r = await client.post("https://api.vercel.com/v13/deployments", headers=headers, json=deploy_payload)
+        d = r.json()
+        if r.status_code not in (200, 201):
+            err_msg = d.get("error", {}).get("message") or "تعذر النشر على Vercel"
+            raise HTTPException(400, f"خطأ Vercel: {err_msg}")
+            
+        dep_id = d.get("id")
+        dep_url = "https://" + (d.get("url") or f"{project_name}.vercel.app")
+        status = d.get("readyState") or "READY"
+        
+        return {
+            "ok": True,
+            "method": "api",
+            "deployment_id": dep_id,
+            "url": dep_url,
+            "status": status,
+            "message": f"تم بدء نشر موقعك على Vercel بنجاح وهو متاح على: {dep_url}"
+        }
+
+
+@app.get("/api/sites/{slug_or_id}/deploy-status")
+async def get_vercel_deploy_status(
+    slug_or_id: str,
+    deployment_id: str,
+    vercel_token: str,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+    
+    headers = {"Authorization": f"Bearer {vercel_token}"}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        r = await client.get(f"https://api.vercel.com/v13/deployments/{deployment_id}", headers=headers)
+        if r.status_code == 200:
+            d = r.json()
+            return {
+                "ok": True,
+                "status": d.get("readyState"),
+                "url": "https://" + d.get("url") if d.get("url") else None,
+                "error": d.get("error")
+            }
+        return {"ok": False, "status": "UNKNOWN"}
 
 
 @app.post("/api/sites/{slug_or_id}/activate-payment")
@@ -904,6 +1327,35 @@ async def trigger_tick(x_cron_key: str = Header(default=""), key: str = ""):
 
 def extract_smart_brand(prompt: str, niche: str) -> str:
     p = prompt.strip()
+    
+    # 1. Explicit name patterns:
+    patterns = [
+        r'(?:اسم\s*الموقع|اسم\s*المتجر|اسم\s*البراند|البراند|الماركة|ماركة|براند)\s*(?:هو|يكون|:)?\s*([^\n،,\.؛]+)',
+        r'(?:لواحد\s*اسمه|لشخص\s*اسمه|واحد\s*اسمه|اسمه|باسم)\s+([^\n،,\.؛]+)',
+    ]
+    for pat in patterns:
+        m = re.search(pat, p)
+        if m:
+            extracted = m.group(1).strip()
+            # Clean trailing intent words
+            extracted = re.split(r'\s+(?:شغال|بيشتغل|تخصص|في\s+مجال|بيبيع|عايز|عاوز|يعمل|يقدم)\b', extracted)[0].strip()
+            if len(extracted) >= 2 and extracted not in ("ايه", "اي", "كدا", "كذا", "الموقع", "المتجر"):
+                if niche in ("portfolio", "cybersecurity") and not any(k in extracted for k in ["خبير", "مهندس", "مطور"]):
+                    return f"{extracted} | خبير الأمن السيبراني"
+                return extracted
+
+    # 2. Portfolio personal names heuristics
+    if niche in ("portfolio", "cybersecurity") or any(k in p for k in ["سايبر", "سيكيورتي", "بورتفوليو", "بروفايل", "مبرمج"]):
+        name_m = re.search(r'\b(ياسين|أحمد|احمد|محمد|محمود|علي|عمر|خالد|إبراهيم|ابراهيم|فاروق|كريم|طارق|يوسف|سارة|نور)\s+([^\n،,\.؛\s]+)', p)
+        if name_m:
+            return f"{name_m.group(0)} | خبير الأمن السيبراني"
+        return "بورتفوليو مهندس الأمن السيبراني"
+
+    # 3. Specialty Honey
+    if niche == "honey" or any(k in p for k in ["عسل", "نحل", "سدر", "مناحل"]):
+        return "مناحل الشفاء | متجر العسل الطبيعي الأصلي"
+
+    # 4. Standard business niches
     if any(k in p for k in ["اجهز", "الكترون", "موبايل", "هواتف", "سماعات", "شواحن", "لابتوب"]):
         return "تكنو زون للأجهزة والإلكترونيات"
     if "كبابجي" in p or "مشويات" in p or "حواوشي" in p:
@@ -918,9 +1370,13 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
         return "بوتيك الأناقة للملابس"
     if "صيدلية" in p or "علاج" in p or "دواء" in p:
         return "صيدلية الشفاء والعافية"
-    if "حلويات" in p or "تورتة" in p or "بسبوسة" in p or "شوكولاتة" in p:
+    if "عيادة" in p or "دكتور" in p or "طبيب" in p or "اسنان" in p:
+        return "عيادة النخبة للرعاية الطبية"
+    if "شركة" in p or "وكالة" in p or "تسويق" in p:
+        return "وكالة براند ماسترز للتسويق الرقمي"
+    if "حلويات" in p or "تورتة" in p or "بسبوسة" in p:
         return "حلواني قصر السعادة"
-    if "سمك" in p or "اسماك" in p or "بحريات" in p or "جمبري" in p:
+    if "سمك" in p or "اسماك" in p or "بحريات" in p:
         return "مطعم ومأكولات بحرية الصياد"
     if "برجر" in p or "بيتزا" in p or "شاورما" in p:
         return "مطعم برجر وشاورما شيف"
@@ -963,8 +1419,20 @@ async def handle_telegram_update(u: dict):
         return
         
     chat_id = str(msg["chat"]["id"])
+    msg_id = msg.get("message_id")
     text = (msg.get("text") or msg.get("caption") or "").strip()
     
+    # Message Deduplication: Prevent handling duplicate Telegram deliveries
+    if msg_id:
+        try:
+            seen_msg = db.one("SELECT status FROM telegram_messages WHERE chat_id = ? AND message_id = ?", (chat_id, msg_id))
+            if seen_msg:
+                print(f"[TG DEDUP] Message #{msg_id} in chat {chat_id} already processed. Skipping duplicate.")
+                return
+            db.x("INSERT OR REPLACE INTO telegram_messages (chat_id, message_id, status, created_at) VALUES (?, ?, 'processing', ?)", (chat_id, msg_id, time.time()))
+        except Exception as e:
+            print(f"[TG MSG DEDUP ERR] {e}")
+
     # Check if this telegram user is linked to an account
     linked_user = db.one("SELECT id, username, role FROM users WHERE telegram_id = ? ORDER BY id DESC LIMIT 1", (chat_id,))
     user_id = linked_user["id"] if linked_user else None
@@ -976,16 +1444,16 @@ async def handle_telegram_update(u: dict):
         await corp.tg_send(
             chat_id,
             "مرحباً بك في AutoCorp 🤖🇪🇬\n"
-            "وكالة الذكاء الاصطناعي ذاتية التشغيل للمتاجر والشركات المصرية.\n\n"
-            "✨ يسعدني التحدث معك ومساعدتك في إطلاق موقع متكامل بالفرونت والباك إند وبوابات الدفع المصرية في أقل من دقيقتين!\n\n"
+            "وكالة الذكاء الاصطناعي ذاتية التشغيل للمتاجر والشركات والمحترفين في مصر.\n\n"
+            "✨ يسعدني التحدث معك ومساعدتك في إطلاق موقع متكامل بالفرونت والباك إند وبوابات الدفع المصرية في أقل من دقيقة!\n\n"
             "📋 الأوامر المتاحة:\n"
             "• /register <اسم_المستخدم> <كلمة_المرور> — إنشاء حساب جديد\n"
             "• /login <اسم_المستخدم> <كلمة_المرور> — تسجيل الدخول\n"
-            "• /my_sites — عرض متاجرك الإلكترونية وروابطها\n"
-            "• /build <وصف المتجر> — إطلاق وبرمجة متجر فوراً\n"
+            "• /my_sites — عرض مواقعك ومتاجرك المنشورة وروابطها\n"
+            "• /build <وصف الموقع أو المتجر> — إطلاق وبرمجة موقعك فوراً\n"
             "• /help — دليل استخدام الوكالة والخدمات المتاحة\n"
             "• /admin <كلمة_المرور> — تسجيل دخول المدير المشرف\n\n"
-            "💡 أو ببساطة: تحدث معي واشرح لي فكرة متجرك وسأقوم بإرشادك خطوة بخطوة!"
+            "💡 أو ببساطة: اكتب فكرة موقعك (مثال: 'عايز اعمل بورتفوليو لواحد اسمه ياسين احمد في السايبر سيكيورتي' أو 'متجر بيع عسل') وسأنفذه فوراً!"
         )
         return
 
@@ -994,10 +1462,10 @@ async def handle_telegram_update(u: dict):
         await corp.tg_send(
             chat_id,
             "📖 دليل استخدام مستشار AutoCorp الذكي:\n\n"
-            "1️⃣ بناء المتاجر: فقط اكتب تفاصيل متجرك (مثال: 'عايز متجر خضار وفواكه فريش' أو 'مطعم مشويات') أو أرسل صورة المنيو/البضاعة.\n"
-            "2️⃣ بوابات الدفع: كل متجر يتم تجهيزه تلقائياً بروابط فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام.\n"
+            "1️⃣ بناء المواقع والمتاجر: اكتب تفاصيل نشاطك (مثال: 'بورتفوليو أمن سيبراني لـ ياسين أحمد' أو 'متجر عسل سدر فاخر' أو 'مطعم مشويات') أو أرسل صورة المنيو/البضاعة.\n"
+            "2️⃣ بوابات الدفع والحجز: كل موقع يتم تجهيزه تلقائياً بروابط فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام أو فواتير التعاقد.\n"
             "3️⃣ باقة البداية المجانية: تتيح لك تجربة بناء حتى (موقعين) مجاناً.\n"
-            "4️⃣ استضافة هوستينجر: يمكنك تحميل كود الإنتاج كاملاً بملف ZIP من لوحة التحكم ورفعه على استضافتك بضغطة زر.\n\n"
+            "4️⃣ استضافة هوستينجر وGitHub: يمكنك تحميل كود الإنتاج كاملاً بملف ZIP أو النشر المباشر على GitHub و Vercel.\n\n"
             "لربط حسابك: اكتب /login اسم_المستخدم كلمة_المرور"
         )
         return
@@ -1019,7 +1487,7 @@ async def handle_telegram_update(u: dict):
             await corp.tg_send(
                 chat_id,
                 f"🎉 تم إنشاء حسابك بنجاح ({u_name}) وربطه بـ Telegram!\n"
-                f"تم تفعيل باقة البداية (رصيد حتى موقعين مجاناً). يمكنك الآن طلب متجرك الأول!"
+                f"تم تفعيل باقة البداية (رصيد حتى موقعين مجاناً). يمكنك الآن طلب موقعك الأول!"
             )
         except Exception as e:
             await corp.tg_send(chat_id, f"❌ تعذر إنشاء الحساب: {e}")
@@ -1044,7 +1512,7 @@ async def handle_telegram_update(u: dict):
             await corp.tg_send(
                 chat_id,
                 f"✅ تم تسجيل دخولك بنجاح كـ ({u_name})!\n"
-                "أنت الآن جاهز لإدارة متاجرك أو طلب بناء متجر جديد."
+                "أنت الآن جاهز لإدارة متاجرك ومواقعك أو طلب بناء موقع جديد."
             )
         except Exception as e:
             await corp.tg_send(chat_id, f"❌ خطأ في الدخول: {e}")
@@ -1057,15 +1525,15 @@ async def handle_telegram_update(u: dict):
             (user_id or -1, f"tg:{chat_id}%", user_name)
         )
         if not sites:
-            await corp.tg_send(chat_id, "🛒 ليس لديك أي متاجر منشورة حتى الآن. لإنشاء متجرك الأول، اكتب وصف نشاطك التجاري أو استخدم /build.")
+            await corp.tg_send(chat_id, "🛒 ليس لديك أي مواقع منشورة حتى الآن. لإنشاء موقعك الأول، اكتب وصف نشاطك التجاري أو استخدم /build.")
             return
         base_url = "https://autocorp-ai-websits-builder.vercel.app" if IS_VERCEL else "http://localhost:8000"
-        msg_lines = ["📱 متاجرك الإلكترونية في AutoCorp:\n"]
+        msg_lines = ["📱 مواقعك الإلكترونية في AutoCorp:\n"]
         for s in sites:
             paid_str = "✅ نشط ومدفوع" if s.get("is_paid") else "⏳ تجريبي / في انتظار التفعيل"
             slug = make_site_slug(s['id'], s['client'])
             msg_lines.append(
-                f"• متجر #{s['id']} ({s['client']})\n"
+                f"• موقع #{s['id']} ({s['client']})\n"
                 f"  الحالة: {s['status']} | {paid_str}\n"
                 f"  الرابط: {base_url}/sites/{slug}/\n"
             )
@@ -1092,28 +1560,36 @@ async def handle_telegram_update(u: dict):
     # 7. Conversational Handling & Guardrails
     check_guardrails(text)
     
-    # 7.1 Greeting Detection
-    greetings = ["اهلا", "أهلا", "مرحبا", "سلام", "السلام عليكم", "ازيك", "صباح الخير", "مساء الخير", "هاي", "الو", "مين انت", "عرفني بيك"]
-    t_clean = text.lower().strip()
-    if any(t_clean == g or t_clean.startswith(g + " ") for g in greetings) and len(t_clean) < 35 and not msg.get("photo"):
-        await corp.tg_send(
-            chat_id,
-            "أهلاً بك يا فندم! 🤖🇪🇬\n"
-            "أنا المستشار الذكي لوكالة AutoCorp لبناء وتطوير المواقع والمتاجر للشركات المصرية.\n\n"
-            "مهمتي أساعدك في إطلاق متجر إلكتروني وتطبيق ويب متكامل لنشاطك التجاري في أقل من دقيقتين، "
-            "مع سلة مشتريات وبوابات الدفع المصرية (فودافون كاش، إنستاباي، فوري) وتصميم متجاوب بالكامل.\n\n"
-            "💡 كيف تحب نبدأ؟\n"
-            "• لبدء بناء متجرك فوراً: اكتب تفاصيل نشاطك (مثال: 'عايز اعمل متجر لبيع الخضار والفواكه' أو 'مطعم مشويات').\n"
-            "• لتسجيل الدخول: اكتب /login اسم_المستخدم كلمة_المرور\n"
-            "• أو اسألني أي سؤال حول الميزات والأسعار وبوابات الدفع!"
-        )
-        return
+    # 7.1 Multi-Turn Conversation State Check
+    conv = db.one("SELECT * FROM telegram_conversations WHERE chat_id = ?", (chat_id,))
+    if conv and conv.get("stage") == "waiting_niche":
+        # User is answering the follow-up question regarding specialization
+        combined_text = f"{conv.get('last_message') or ''} {text}"
+        pending_brand = conv.get("pending_brand") or ""
+        db.x("DELETE FROM telegram_conversations WHERE chat_id = ?", (chat_id,))
+        text = combined_text
+        is_store_request = True
+    else:
+        # Greeting Detection
+        greetings = ["اهلا", "أهلا", "مرحبا", "سلام", "السلام عليكم", "ازيك", "صباح الخير", "مساء الخير", "هاي", "الو", "مين انت", "عرفني بيك"]
+        t_clean = text.lower().strip()
+        if any(t_clean == g or t_clean.startswith(g + " ") for g in greetings) and len(t_clean) < 35 and not msg.get("photo"):
+            await corp.tg_send(
+                chat_id,
+                "أهلاً بك يا فندم! 🤖🇪🇬\n"
+                "أنا المستشار الذكي لوكالة AutoCorp لبناء وتطوير المواقع والمتاجر للشركات والمحترفين في مصر.\n\n"
+                "مهمتي أساعدك في إطلاق موقع أو متجر إلكتروني متكامل لنشاطك التجاري أو بورتفوليو شخصي في أقل من دقيقة، "
+                "مع بوابات الدفع المصرية (فودافون كاش، إنستاباي، فوري) وتصميم متجاوب بالكامل.\n\n"
+                "💡 كيف تحب نبدأ؟\n"
+                "• لبدء البناء فوراً: اكتب تفاصيل نشاطك (مثال: 'عايز اعمل بورتفوليو لواحد اسمه ياسين احمد في السايبر سيكيورتي' أو 'متجر عسل').\n"
+                "• لتسجيل الدخول: اكتب /login اسم_المستخدم كلمة_المرور\n"
+                "• أو اسألني أي سؤال حول الميزات والأسعار وبوابات الدفع!"
+            )
+            return
+        is_store_request = bool(msg.get("photo")) or is_store_creation_intent(text)
 
-    # 7.2 Store Creation Intent Detection
-    is_store_request = bool(msg.get("photo")) or is_store_creation_intent(text)
-
+    # 7.2 Store / Website Creation
     if is_store_request:
-        # Check 2-store limit for non-admin users
         if not is_user_admin:
             if user_id:
                 c_row = db.one("SELECT count(*) as c FROM jobs WHERE user_id = ?", (user_id,))
@@ -1124,7 +1600,7 @@ async def handle_telegram_update(u: dict):
                 await corp.tg_send(
                     chat_id,
                     f"⚠️ عفواً، لقد استنفدت الحد الأقصى المسموح به ({auth.MAX_SITES_PER_CLIENT} مواقع) في باقتك الحالية!\n\n"
-                    "يمكنك استعراض متاجرك السابقة عبر كتابة /my_sites أو الترقية لإنشاء مواقع جديدة."
+                    "يمكنك استعراض مواقعك السابقة عبر كتابة /my_sites أو الترقية لإنشاء مواقع جديدة."
                 )
                 return
 
@@ -1134,22 +1610,55 @@ async def handle_telegram_update(u: dict):
             
         niche = builder.detect_niche(text)
         brand = extract_smart_brand(text, niche)
-        pal_key = "emerald" if niche == "vegetables" else "sunset" if niche == "restaurant" else "ocean"
+
+        # Check if user only specified a person's name without any niche or activity
+        has_niche_clue = any(k in text.lower() for k in [
+            "سايبر", "سيكيورتي", "أمن", "امن", "برمج", "مطور", "عسل", "مطعم", "خضار", "اجهز",
+            "ملابس", "عياد", "دكتور", "شركة", "وكالة", "بورتفوليو", "متجر", "محل", "كافيه"
+        ])
+        if not has_niche_clue and any(k in text for k in ["لواحد اسمه", "واحد اسمه", "اسمه"]) and len(text.split()) <= 6:
+            # Save multi-turn state and ask for specialization!
+            db.x("INSERT OR REPLACE INTO telegram_conversations (chat_id, stage, pending_brand, pending_niche, last_message, updated_at) VALUES (?, 'waiting_niche', ?, ?, ?, ?)",
+                 (chat_id, brand, "", text, time.time()))
+            await corp.tg_send(
+                chat_id,
+                f"أهلاً بك! تم تسجيل الاسم: ({brand}) 🚀\n\n"
+                "ما هو مجال العمل أو التخصص لنقوم بتجهيز الموقع المناسب فوراً؟\n"
+                "(مثال: أمن سيبراني / سايبر سيكيورتي، برمجة وتطوير ويب، متجر عسل طبيعي، مطعم ومشويات، عيادة، شركة تسويق)"
+            )
+            return
+
+        pal_key = "cyber" if niche == "portfolio" else "amber" if niche == "honey" else "sunset" if niche == "restaurant" else "emerald" if niche == "vegetables" else "teal" if niche == "clinic" else "indigo" if niche == "agency" else "ocean"
         pal = builder.PALETTES.get(pal_key, builder.PALETTES["emerald"])
         
-        # Prevent duplicate job creation from Telegram webhook retries
+        # Prevent rapid duplicates
         recent = db.one(
             "SELECT id FROM jobs WHERE client = ? AND request = ? AND created_at > ?",
-            (brand, text, time.time() - 120)
+            (brand, text, time.time() - 60)
         )
         if recent:
             print(f"[TG DEDUP] Skipping duplicate creation for {brand} (Job #{recent['id']})")
             return
 
-        # Always set client as the actual brand name
-        jid = make_job(brand, text, user_id=user_id, sync=True)
+        # Create job in DB with delivered status
+        jid = db.x(
+            "INSERT INTO jobs(client, request, status, user_id, price, cost, created_at) VALUES(?, ?, 'delivered', ?, 299.0, 0.0, ?)",
+            (brand[:80], text[:4000], user_id, time.time())
+        )
         
-        # Save initial site settings
+        # Save initial settings
+        settings = {
+            "brand_name": brand,
+            "category": niche,
+            "color_primary": pal["primary"],
+            "color_secondary": pal["secondary"],
+            "phone": "01000000000",
+            "whatsapp": "01000000000",
+            "vodafone_cash": "01000000000",
+            "instapay": f"{arabic_to_english_slug(brand)[:15]}@instapay",
+            "fawry_code": "88219",
+            "cod_enabled": 1
+        }
         db.x("""
             INSERT OR REPLACE INTO site_settings (
                 job_id, brand_name, category, color_primary, color_secondary,
@@ -1157,60 +1666,84 @@ async def handle_telegram_update(u: dict):
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             jid, brand, niche, pal["primary"], pal["secondary"],
-            "01000000000", "01000000000", "01000000000", f"{brand.replace(' ','').lower()}@instapay",
-            "88219", 1, time.time()
+            settings["phone"], settings["whatsapp"], settings["vodafone_cash"], settings["instapay"],
+            settings["fawry_code"], 1, time.time()
         ))
         
-        base_url = "https://autocorp-ai-websits-builder.vercel.app" if IS_VERCEL else "http://localhost:8000"
-        slug = make_site_slug(jid, brand)
-        site_link = f"{base_url}/sites/{slug}/"
-
-        await corp.tg_send(
-            chat_id,
-            f"🚀 استلمنا طلبك بنجاح! بدأنا الآن العمل على مشروع #{jid} ({brand})...\n\n"
-            f"👥 فريق الـ 70 Agent (CEO، مهندس المعمارية، كاتب المحتوى، مطور الواجهات، ومراجع الجودة) يقوم الآن ببناء وبرمجة المتجر بالكامل.\n"
-            f"⏳ انتظر ثوانٍ معدودة وسيصلك الرابط المباشر..."
-        )
+        # Insert default catalog items
+        default_items = builder.DEFAULT_CATALOGS.get(niche, builder.DEFAULT_CATALOGS["general"])
+        for it in default_items:
+            db.x("INSERT INTO site_items(job_id, title, price, category, description, badge, created_at) VALUES(?,?,?,?,?,?,?)",
+                 (jid, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), time.time()))
+                 
+        db_items = db.q("SELECT * FROM site_items WHERE job_id = ? ORDER BY id", (jid,))
         
-        try:
-            await corp.plan_job(jid)
-            await corp.run_job(jid)
-        except Exception as e:
-            print(f"[TG JOB EXEC ERR] {e}")
+        # Synthesize HTML immediately (< 5ms execution!)
+        html_code = builder.build_site_html(jid, brand, text, settings=settings, items=db_items)
+        db.x("INSERT OR REPLACE INTO site_pages(job_id, html, created_at) VALUES(?, ?, ?)", (jid, html_code, time.time()))
+        
+        if not IS_VERCEL:
+            d = os.path.join(corp.SITES, str(jid))
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
+                f.write(html_code)
+                
+        slug = make_site_slug(jid, brand, niche)
+        base_url = "https://autocorp-ai-websits-builder.vercel.app" if IS_VERCEL else "http://localhost:8000"
+        site_link = f"{base_url}/sites/{slug}/"
+        db.x("UPDATE jobs SET site_url = ? WHERE id = ?", (f"/sites/{slug}/", jid))
 
-        await corp.tg_send(
-            chat_id,
-            f"🎉 تم إطلاق وبرمجة متجرك الإلكتروني بنجاح وهو الآن شغال 100%!\n\n"
-            f"🏷️ اسم المتجر: {brand}\n"
-            f"🛒 نوع النشاط: {niche}\n"
-            f"🎨 الهوية: تم تفعيل باليت ألوان عصرية ({pal_key})\n"
-            f"💳 بوابات الدفع المفعلة: فودافون كاش، إنستاباي، فوري، والدفع عند الاستلام\n\n"
-            f"🌐 رابط متجرك المباشر:\n{site_link}\n\n"
-            f"💡 يمكنك فتح المتجر من الرابط، تجربة إضافة المنتجات للسلة، أو تسجيل الدخول على لوحة التحكم وإدارته بحسابك ({user_name})!"
-        )
+        if niche == "portfolio":
+            congrats_msg = (
+                f"🎉 تم إطلاق وبرمجة موقعك الشخصي (Portfolio) بنجاح وهو الآن شغال 100%! 🚀\n\n"
+                f"👤 الاسم والمهنة: {brand}\n"
+                f"🛡️ التخصص: أمن سيبراني واختبار اختراق متقدم\n"
+                f"🎨 الهوية: ثيم تقني داكن عالي الاحترافية (Cyber Dark Mode)\n"
+                f"💼 المميزات: معرض أعمال، مصفوفة مهارات وشهادات معتمدة، ونظام حجز واستشارة فوري!\n\n"
+                f"🌐 رابط موقعك المباشر:\n{site_link}\n\n"
+                f"💡 يمكنك فتح الرابط ومشاركته فوراً، أو تحميل حزمة هوستينجر / ربط دومين خاص من لوحة تحكم الويب."
+            )
+        else:
+            congrats_msg = (
+                f"🎉 تم إطلاق وبرمجة متجرك الإلكتروني بنجاح وهو الآن شغال 100%! 🚀\n\n"
+                f"🏷️ اسم المتجر: {brand}\n"
+                f"🛒 نوع النشاط: {niche}\n"
+                f"🎨 الهوية: تم تفعيل باليت ألوان عصرية متناسقة ({pal_key})\n"
+                f"💳 بوابات الدفع المفعلة: فودافون كاش، إنستاباي، فوري، والدفع عند الاستلام\n\n"
+                f"🌐 رابط متجرك المباشر:\n{site_link}\n\n"
+                f"💡 يمكنك فتح المتجر، تجربة إضافة المنتجات للسلة، أو تسجيل الدخول على لوحة التحكم وإدارته بحسابك ({user_name})!"
+            )
+            
+        await corp.tg_send(chat_id, congrats_msg)
+        if msg_id:
+            db.x("UPDATE telegram_messages SET status = 'done' WHERE chat_id = ? AND message_id = ?", (chat_id, msg_id))
         return
 
     # 7.3 General Consultation Chat with Scope Guardrail
     sys_prompt = (
-        "You are AutoCorp's friendly, professional Egyptian AI consultant for SMEs. "
-        "AutoCorp is an autonomous digital agency that builds and deploys full-stack e-commerce stores, "
-        "menus, and web apps with Egyptian payment gateways in under 2 minutes. "
-        "STRICT POLICY: If the user asks about unrelated topics (politics, school homework, gaming, religion, gossip, general trivia), "
-        "you MUST politely refuse and clarify that you only assist with building, designing, and launching digital business stores and websites. "
-        "If the user is asking about services, pricing, business categories, or web advice, answer supportively in Egyptian Arabic. "
-        "Always end by inviting them to tell you about their business so you can generate their store."
+        "You are AutoCorp's friendly, highly knowledgeable Egyptian AI consultant for businesses, professionals, and freelancers. "
+        "AutoCorp is an autonomous digital agency that builds and deploys full-stack e-commerce stores, menus, "
+        "cybersecurity and developer portfolios, medical clinics, and corporate websites with Egyptian payment gateways in seconds. "
+        "STRICT POLICY: If the user asks about harmful, illegal, or completely unrelated political/gaming trivia, "
+        "politely guide them back to website and business development. "
+        "If the user asks about professional fields (cybersecurity, software, engineering, medicine, consulting, retail, restaurants), "
+        "answer enthusiastically and supportively in professional Egyptian Arabic! "
+        "Always invite them to share their name or business concept so you can build their site immediately."
     )
     try:
         resp = await llm.call(
             system=sys_prompt,
             user=text,
             tier="worker",
-            mock="أهلاً بك! أنا مستشارك الذكي في AutoCorp لتطوير وإطلاق المواقع والمتاجر للشركات المصرية. أخبرني عن نشاطك التجاري لنبدأ فوراً في برمجة متجرك!"
+            mock="أهلاً بك! أنا مستشارك الذكي في AutoCorp لتطوير وإطلاق المواقع والمتاجر للشركات والمحترفين في مصر. أخبرني عن اسمك أو نشاطك التجاري لنبدأ فوراً في برمجة موقعك!"
         )
-        bot_reply = resp.get("text") or "أهلاً بك! أنا في خدمتك لتصميم وإطلاق متجرك الرقمي المتكامل. أخبرني عن نشاطك لنبدأ!"
+        bot_reply = resp.get("text") or "أهلاً بك! أنا في خدمتك لتصميم وإطلاق موقعك أو متجرك الرقمي المتكامل. أخبرني عن نشاطك لنبدأ!"
         await corp.tg_send(chat_id, bot_reply)
     except Exception as e:
-        await corp.tg_send(chat_id, "أهلاً بك في AutoCorp! كيف أقدر أساعدك في إطلاق وبرمجة متجرك الإلكتروني اليوم؟")
+        await corp.tg_send(chat_id, "أهلاً بك في AutoCorp! كيف أقدر أساعدك في إطلاق وبرمجة موقعك أو متجرك الإلكتروني اليوم؟")
+    finally:
+        if msg_id:
+            db.x("UPDATE telegram_messages SET status = 'done' WHERE chat_id = ? AND message_id = ?", (chat_id, msg_id))
 
 
 PROCESSED_TG_UPDATES = set()

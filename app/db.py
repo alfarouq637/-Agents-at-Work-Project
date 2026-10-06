@@ -151,6 +151,25 @@ CREATE TABLE IF NOT EXISTS users (
     telegram_id TEXT,
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS telegram_updates (
+    update_id TEXT PRIMARY KEY,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS telegram_messages (
+    chat_id TEXT,
+    message_id INTEGER,
+    status TEXT,
+    created_at REAL,
+    PRIMARY KEY (chat_id, message_id)
+);
+CREATE TABLE IF NOT EXISTS telegram_conversations (
+    chat_id TEXT PRIMARY KEY,
+    stage TEXT,
+    pending_brand TEXT,
+    pending_niche TEXT,
+    last_message TEXT,
+    updated_at REAL
+);
 """
 
 # --------------- Turso HTTP helpers ---------------
