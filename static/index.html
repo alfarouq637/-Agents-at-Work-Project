@@ -497,6 +497,82 @@ textarea{resize:vertical;min-height:75px}
           </div>
         </div>
 
+        <!-- Step 6: تخصيص ميزات المشروع البرمجية (Enterprise Modular Features Checklist) -->
+        <div style="margin-bottom:22px;background:rgba(0,206,201,.04);padding:16px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.25)">
+          <div style="font-weight:900;font-size:.95rem;color:var(--accent2);margin-bottom:6px">
+            <span>6️⃣ تخصيص ميزات المشروع البرمجية وهيكل الباك إند (Enterprise Features Selection)</span>
+          </div>
+          <p style="font-size:.78rem;color:var(--fg2);font-family:'Readex Pro',sans-serif;margin-bottom:12px">
+            حدد الوحدات والميزات التي تود أن يقوم كادر AutoCorp ببنائها وتضمينها في كود الباك إند والفرونت إند:
+          </p>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:10px">
+            <label style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="feat-auth" checked style="width:auto">
+              <div>
+                <b style="font-size:.82rem;color:#fff;display:block">🔐 حسابات العملاء وتوثيق JWT</b>
+                <span style="font-size:.7rem;color:var(--fg3)">Register, Login & Role Guards</span>
+              </div>
+            </label>
+
+            <label style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="feat-bilingual" checked style="width:auto">
+              <div>
+                <b style="font-size:.82rem;color:#fff;display:block">🌐 دعم ثنائي اللغة (AR / EN)</b>
+                <span style="font-size:.7rem;color:var(--fg3)">تبديل لحظي عربي/إنجليزي RTL & LTR</span>
+              </div>
+            </label>
+
+            <label style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="feat-darklight" checked style="width:auto">
+              <div>
+                <b style="font-size:.82rem;color:#fff;display:block">🌓 الوضع الليلي والصباحي</b>
+                <span style="font-size:.7rem;color:var(--fg3)">Dark & Light theme switcher</span>
+              </div>
+            </label>
+
+            <label style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="feat-reviews" checked style="width:auto">
+              <div>
+                <b style="font-size:.82rem;color:#fff;display:block">⭐ نظام تقييمات وآراء العملاء</b>
+                <span style="font-size:.7rem;color:var(--fg3)">Customer Star Reviews & Feedback</span>
+              </div>
+            </label>
+
+            <label style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="feat-promos" checked style="width:auto">
+              <div>
+                <b style="font-size:.82rem;color:#fff;display:block">🎟️ محرك كوبونات الخصم</b>
+                <span style="font-size:.7rem;color:var(--fg3)">Promo Codes & Discount Engine</span>
+              </div>
+            </label>
+
+            <label style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="feat-admin" checked style="width:auto">
+              <div>
+                <b style="font-size:.82rem;color:#fff;display:block">📊 لوحة تحكم وإحصائيات المشرف</b>
+                <span style="font-size:.7rem;color:var(--fg3)">Executive Operations Dashboard</span>
+              </div>
+            </label>
+
+            <label style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="feat-docker" checked style="width:auto">
+              <div>
+                <b style="font-size:.82rem;color:#fff;display:block">🐳 حاويات Docker & Compose</b>
+                <span style="font-size:.7rem;color:var(--fg3)">جاهز للإنتاج السحابي والتشغيل</span>
+              </div>
+            </label>
+
+            <label style="background:rgba(0,0,0,.25);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="feat-hostinger" checked style="width:auto">
+              <div>
+                <b style="font-size:.82rem;color:#fff;display:block">📦 حزمة هوستينجر وسيرفر Express</b>
+                <span style="font-size:.7rem;color:var(--fg3)">تصدير ZIP متكامل مع دليل التشغيل</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
         <!-- Submit Button -->
         <button type="submit" id="btn-submit-store" class="btn btn-primary" style="width:100%;padding:14px;font-size:1.05rem;font-weight:900">
           🚀 إطلاق وبرمجة المتجر المتكامل بواسطة فريق AutoCorp
@@ -1309,7 +1385,17 @@ async function handleCreateStore(e){
     whatsapp: $('#b-whatsapp').value.trim(),
     address: $('#b-address').value.trim(),
     items: items,
-    ai_answers: aiAnswers
+    ai_answers: aiAnswers,
+    features: {
+      auth: $('#feat-auth')?.checked ?? true,
+      bilingual: $('#feat-bilingual')?.checked ?? true,
+      darklight: $('#feat-darklight')?.checked ?? true,
+      reviews: $('#feat-reviews')?.checked ?? true,
+      promos: $('#feat-promos')?.checked ?? true,
+      admin: $('#feat-admin')?.checked ?? true,
+      docker: $('#feat-docker')?.checked ?? true,
+      hostinger: $('#feat-hostinger')?.checked ?? true
+    }
   };
 
   const userToken = getSafeToken();

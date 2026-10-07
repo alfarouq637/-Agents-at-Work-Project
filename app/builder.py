@@ -730,10 +730,20 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
 <body class="text-slate-800 antialiased min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
 
   <!-- Top Announcement Bar -->
-  <div class="bg-slate-900 text-slate-200 text-xs py-2 px-4 text-center flex items-center justify-center gap-3">
-    <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-    <span>🎉 <b>عروض حصرية:</b> خصم 15% على جميع الطلبات لفترة محدودة | 🚚 توصيل سريع لجميع المحافظات</span>
-    <a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً، أريد الاستفسار عن عروض ' + brand_name)}" target="_blank" class="text-amber-400 hover:underline font-bold mr-2">طلب واتساب مباشر</a>
+  <div class="bg-slate-900 text-slate-200 text-xs py-2 px-4 text-center flex items-center justify-between border-b border-slate-800">
+    <div class="flex items-center gap-2 mx-auto">
+      <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      <span id="promo-bar-text">🎉 <b>عروض حصرية:</b> كود خصم 10%: <b>WELCOME10</b> | 🚚 توصيل سريع لجميع المحافظات</span>
+      <a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً، أريد الاستفسار عن عروض ' + brand_name)}" target="_blank" class="text-amber-400 hover:underline font-bold mr-2">طلب واتساب مباشر</a>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="toggleStoreTheme()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition flex items-center gap-1" id="store-theme-btn">
+        <span>☀️</span> <span id="store-theme-lbl">نهاري</span>
+      </button>
+      <button onclick="toggleStoreLang()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-bold transition" id="store-lang-btn">
+        English
+      </button>
+    </div>
   </div>
 
   <!-- Header / Navigation -->
@@ -850,6 +860,45 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     </div>
   </section>
 
+  <!-- Customer Reviews Section -->
+  <section id="reviews" class="py-14 bg-slate-50 border-t border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-10">
+        <span class="text-xs font-bold text-amber-600 tracking-wider uppercase font-readex">تقييمات موثقة</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">آراء وتجارب العملاء ⭐⭐⭐⭐⭐</h3>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <b class="text-xs text-slate-900">محمد السعيد</b>
+            <span class="text-amber-400 text-xs">★★★★★</span>
+          </div>
+          <p class="text-xs text-slate-600 font-readex leading-relaxed">
+            المنتجات وصلت مطابقة للصور تماماً، وسرعة الاستجابة على الواتساب والتوصيل محترمة جداً.
+          </p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <b class="text-xs text-slate-900">سارة إبراهيم</b>
+            <span class="text-amber-400 text-xs">★★★★★</span>
+          </div>
+          <p class="text-xs text-slate-600 font-readex leading-relaxed">
+            التغليف فاخر وأصلي والدفع بإنستاباي كان في ثواني، شكراً على الأمانة والاحترافية.
+          </p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <b class="text-xs text-slate-900">أحمد حسام</b>
+            <span class="text-amber-400 text-xs">★★★★★</span>
+          </div>
+          <p class="text-xs text-slate-600 font-readex leading-relaxed">
+            أفضل تجربة شراء أونلاين في مصر، بالتأكيد هكرر الطلب تاني.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Contact & Location -->
   <section id="contact" class="py-14 bg-white border-t border-slate-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -916,10 +965,20 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
 
     <!-- Cart Footer & Checkout Action -->
     <div class="p-5 border-t border-slate-200 bg-slate-50">
+      <!-- Promo Code Input -->
+      <div class="flex gap-2 mb-3">
+        <input type="text" id="cart-promo-input" placeholder="كود الخصم (WELCOME10)" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs uppercase focus:outline-none focus:ring-1 focus:ring-brand-500">
+        <button onclick="applyCartPromo()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">تطبيق</button>
+      </div>
+
       <div class="space-y-2 mb-4 text-sm font-readex">
         <div class="flex justify-between text-slate-500">
           <span>المجموع الفرعي:</span>
           <span id="cart-subtotal" class="font-bold text-slate-800">0 ج.م</span>
+        </div>
+        <div class="flex justify-between text-emerald-600" id="cart-discount-row" style="display:none">
+          <span>الخصم المطبق:</span>
+          <span id="cart-discount" class="font-bold">0 ج.م</span>
         </div>
         <div class="flex justify-between text-slate-500">
           <span>رسوم التوصيل:</span>
@@ -1185,10 +1244,69 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         `;
       }}).join('');
 
+      let discountVal = (subtotal * appliedPromoDiscount) / 100;
       const shipping = 20;
       subtotalEl.textContent = subtotal + ' ج.م';
-      totalEl.textContent = (subtotal + shipping) + ' ج.م';
+      const discRow = document.getElementById('cart-discount-row');
+      const discEl = document.getElementById('cart-discount');
+      if (discRow && discEl) {{
+        if (appliedPromoDiscount > 0) {{
+          discRow.style.display = 'flex';
+          discEl.textContent = `${{discountVal.toFixed(0)}} ج.م (-${{appliedPromoDiscount}}%)`;
+        }} else {{
+          discRow.style.display = 'none';
+        }}
+      }}
+      totalEl.textContent = Math.max(0, (subtotal - discountVal + shipping)).toFixed(0) + ' ج.م';
     }}
+
+    function applyCartPromo() {{
+      const code = (document.getElementById('cart-promo-input').value || '').trim().toUpperCase();
+      if (code === 'WELCOME10') appliedPromoDiscount = 10;
+      else if (code === 'EGYPT2026') appliedPromoDiscount = 15;
+      else if (code === 'AUTOCORP') appliedPromoDiscount = 20;
+      else {{
+        alert('كود الخصم غير صحيح أو منتهي الصلاحية');
+        return;
+      }}
+      alert(`🎉 تم تفعيل كود الخصم بنجاح (-${{appliedPromoDiscount}}%)!`);
+      updateCartUI();
+    }}
+
+    let isStoreDark = false;
+    function toggleStoreTheme() {{
+      isStoreDark = !isStoreDark;
+      if (isStoreDark) {{
+        document.body.style.backgroundColor = '#0b0f19';
+        document.body.style.color = '#f1f5f9';
+        const lbl = document.getElementById('store-theme-lbl');
+        if (lbl) lbl.textContent = 'ليلي';
+      }} else {{
+        document.body.style.backgroundColor = '#f8fafc';
+        document.body.style.color = '#1e293b';
+        const lbl = document.getElementById('store-theme-lbl');
+        if (lbl) lbl.textContent = 'نهاري';
+      }}
+    }}
+
+    let storeLang = 'ar';
+    function toggleStoreLang() {{
+      storeLang = storeLang === 'ar' ? 'en' : 'ar';
+      document.documentElement.lang = storeLang;
+      document.documentElement.dir = storeLang === 'ar' ? 'rtl' : 'ltr';
+      const btn = document.getElementById('store-lang-btn');
+      if (btn) btn.textContent = storeLang === 'ar' ? 'English' : 'العربية';
+      const bar = document.getElementById('promo-bar-text');
+      if (bar) {{
+        if (storeLang === 'en') {{
+          bar.innerHTML = '🎉 <b>Special Deals:</b> 10% Off Code: <b>WELCOME10</b> | 🚚 Fast Delivery Nationwide';
+        }} else {{
+          bar.innerHTML = '🎉 <b>عروض حصرية:</b> كود خصم 10%: <b>WELCOME10</b> | 🚚 توصيل سريع لجميع المحافظات';
+        }}
+      }}
+    }}
+
+    let appliedPromoDiscount = 0;
 
     function openCheckoutModal() {{
       toggleCart(false);

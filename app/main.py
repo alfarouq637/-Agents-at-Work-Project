@@ -813,129 +813,31 @@ def export_site_zip(
     brand = settings.get("brand_name") or f"site_{jid}"
     items = db.q("select * from site_items where job_id=? order by id", (jid,))
     
+    from app.enterprise_generator import generate_enterprise_project
+    enterprise_files = generate_enterprise_project(
+        job_id=jid,
+        brand_name=brand,
+        niche=settings.get("category", "general"),
+        slogan=settings.get("slogan", ""),
+        primary_color=settings.get("color_primary", ""),
+        secondary_color=settings.get("color_secondary", ""),
+        items=items,
+        settings=settings
+    )
+
     import io, zipfile
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Root index.html for direct browser double-click
         zf.writestr("index.html", row["html"])
-        zf.writestr("items.json", json.dumps(items, ensure_ascii=False, indent=2))
-        zf.writestr("package.json", json.dumps({
-            "name": f"autocorp-site-{jid}",
-            "version": "1.0.0",
-            "description": f"{brand} production package synthesized by AutoCorp AI",
-            "main": "server.js",
-            "scripts": {
-                "start": "node server.js",
-                "dev": "node server.js"
-            },
-            "dependencies": {
-                "express": "^4.19.2",
-                "cors": "^2.8.5"
-            }
-        }, ensure_ascii=False, indent=2))
-        
-        server_code = f"""// AutoCorp Express Backend Server for {brand} (Site #{jid})
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(express.json());
-app.use(express.static(__dirname));
-
-const ORDERS_FILE = path.join(__dirname, 'orders.json');
-let orders = [];
-if (fs.existsSync(ORDERS_FILE)) {{
-  try {{ orders = JSON.parse(fs.readFileSync(ORDERS_FILE, 'utf-8')); }} catch(e){{}}
-}}
-
-app.get('/api/sites/{jid}/info', (req, res) => {{
-  res.json({{ site_id: {jid}, brand: '{brand}', status: 'live', total_orders: orders.length }});
-}});
-
-app.get('/api/sites/{jid}/items', (req, res) => {{
-  const itemsFile = path.join(__dirname, 'items.json');
-  if (fs.existsSync(itemsFile)) {{
-    try {{ return res.json(JSON.parse(fs.readFileSync(itemsFile, 'utf-8'))); }} catch(e){{}}
-  }}
-  res.json([]);
-}});
-
-app.post('/api/sites/{jid}/orders', (req, res) => {{
-  const order = {{
-    id: orders.length + 1,
-    ...req.body,
-    status: 'confirmed',
-    created_at: new Date().toISOString()
-  }};
-  orders.unshift(order);
-  try {{ fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2)); }} catch(e){{}}
-  res.json({{
-    success: true,
-    order_id: order.id,
-    message: 'تم استلام وتأكيد طلبك بنجاح!',
-    payment_ref: req.body.payment_method === 'fawry' ? 'FAWRY-' + Math.floor(10000000 + Math.random()*90000000) : 'COD-' + Math.floor(1000 + Math.random()*9000)
-  }});
-}});
-
-app.get('/api/sites/{jid}/orders', (req, res) => res.json(orders));
-
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
-app.listen(PORT, () => {{
-  console.log(`🚀 [AutoCorp] الموقع شغال محلياً على: http://localhost:${{PORT}}`);
-}});
-"""
-        zf.writestr("server.js", server_code)
-        zf.writestr("vercel.json", json.dumps({
-            "version": 2,
-            "builds": [{"src": "index.html", "use": "@vercel/static"}],
-            "routes": [{"src": "/(.*)", "dest": "/index.html"}]
-        }, indent=2))
-        
-        readme_md = f"""# دليل تشغيل ورفع موقع: {brand} (AutoCorp Full-Stack Package)
-
-تم توليد هذا المشروع بالكامل بواسطة وكالة **AutoCorp AI** للشركات والمتاجر المصرية.
-
----
-
-## 🌟 الطريقة 1: الرفع المباشر على استضافة هوستينجر (Hostinger) في دقيقة واحدة
-1. افتح لوحة تحكم هوستينجر (hPanel).
-2. ادخل إلى **إدارة الملفات** (File Manager) للموقع الخاص بك.
-3. افتح المجلد الرئيسي: `public_html`
-4. قم برفع هذا الملف المضغوط وفك الضغط عنه (Extract).
-5. تأكد أن ملف `index.html` موجود مباشرة داخل `public_html`.
-6. موقعك أصبح الآن شغال 100% ومربوط بكافة الميزات وبوابات الدفع!
-
----
-
-## 💻 الطريقة 2: التشغيل المحلي على جهازك (Local Run)
-
-### الخيار الأبسط (بدون أي برامج):
-- فقط اضغط دبل كليك على ملف `index.html` وسيفتح في متصفحك مباشرة ويعمل بالكامل!
-
-### خيار سيرفر Node.js & Express (لتشغيل الباك إند وحفظ الأوردرات محلياً):
-1. تأكد من تثبيت Node.js على جهازك.
-2. افتح موجه الأوامر (Terminal) داخل مجلد المشروع.
-3. اكتب:
-   ```bash
-   npm install express cors
-   npm start
-   ```
-4. افتح المتصفح على: `http://localhost:3000`
-
----
-
-## 🚀 الطريقة 3: النشر على Vercel أو GitHub Pages
-- **Vercel**: قم بسحب المجلد أو ربطه بحسابك على Vercel وسيقوم بالبناء والنشر التلقائي عبر `vercel.json`.
-- **GitHub**: ارفع الملفات إلى مستودع عام وفعّل GitHub Pages من إعدادات المستودع (Settings -> Pages).
-"""
-        zf.writestr("README_DEPLOY.md", readme_md)
+        # All modular enterprise files (src/config, src/models, src/modules, src/middlewares, public, docker, etc.)
+        for rel_path, content in enterprise_files.items():
+            zf.writestr(rel_path, content)
     buf.seek(0)
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename=autocorp_site_{jid}.zip"}
+        headers={"Content-Disposition": f"attachment; filename=autocorp_enterprise_site_{jid}.zip"}
     )
 
 
@@ -1014,66 +916,32 @@ async def deploy_site_github(
             await client.put(f_url, headers=headers, json=payload)
 
         # Commit project files
-        package_json = json.dumps({
-            "name": repo_name,
-            "version": "1.0.0",
-            "description": f"{brand} website generated by AutoCorp AI",
-            "main": "server.js",
-            "scripts": {"start": "node server.js", "dev": "node server.js"},
-            "dependencies": {"express": "^4.19.2", "cors": "^2.8.5"}
-        }, indent=2)
-        
-        server_js = f"""const express = require('express');
-const path = require('path');
-const app = express();
-const PORT = process.env.PORT || 3000;
+        from app.enterprise_generator import generate_enterprise_project
+        items = db.q("select * from site_items where job_id=? order by id", (jid,))
+        enterprise_files = generate_enterprise_project(
+            job_id=jid,
+            brand_name=brand,
+            niche=settings.get("category", "general"),
+            slogan=settings.get("slogan", ""),
+            primary_color=settings.get("color_primary", ""),
+            secondary_color=settings.get("color_secondary", ""),
+            items=items,
+            settings=settings
+        )
 
-app.use(express.json());
-app.use(express.static(__dirname));
-
-let orders = [];
-app.get('/api/sites/{jid}/info', (req, res) => res.json({{ status: 'online', site: '{brand}' }}));
-app.post('/api/sites/{jid}/orders', (req, res) => {{
-  orders.unshift({{ id: orders.length + 1, ...req.body, date: new Date().toISOString() }});
-  res.json({{ success: true, order_id: orders.length, message: 'Order confirmed!' }});
-}});
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.listen(PORT, () => console.log(`🚀 Site live at http://localhost:${{PORT}}`));
-"""
-        vercel_json = json.dumps({
-            "version": 2,
-            "builds": [{"src": "index.html", "use": "@vercel/static"}],
-            "routes": [{"src": "/(.*)", "dest": "/index.html"}]
-        }, indent=2)
-
-        readme_md = f"""# {brand}
-
-> Full-Stack website generated and deployed autonomously by **AutoCorp AI Agency**.
-
-## 🚀 Quick Run Locally
-1. Simply double-click `index.html` in your browser!
-2. Or with Node.js:
-   ```bash
-   npm install
-   npm start
-   ```
-   Open [http://localhost:3000](http://localhost:3000)
-
-## 🌐 Deploy to Vercel
-Connect this GitHub repository to [Vercel](https://vercel.com) for automatic 1-click cloud deployment.
-"""
-
+        # 1. Root index.html for direct preview
         await put_file("index.html", site_html.encode("utf-8"), "Add index.html via AutoCorp AI")
-        await put_file("package.json", package_json.encode("utf-8"), "Add package.json")
-        await put_file("server.js", server_js.encode("utf-8"), "Add Express backend server.js")
-        await put_file("vercel.json", vercel_json.encode("utf-8"), "Add Vercel deployment config")
-        await put_file("README.md", readme_md.encode("utf-8"), "Add README.md documentation")
+
+        # 2. Upload modular enterprise backend & frontend architecture files
+        for rel_path, content in enterprise_files.items():
+            await put_file(rel_path, content.encode("utf-8"), f"Add {rel_path} via AutoCorp AI")
 
         return {
             "ok": True,
             "repo_url": f"https://github.com/{gh_user}/{repo_name}",
             "clone_url": f"https://github.com/{gh_user}/{repo_name}.git",
-            "message": f"تم رفع ملفات كود المشروع كاملة بنجاح إلى مستودعك على GitHub ({gh_user}/{repo_name})!"
+            "files_count": len(enterprise_files) + 1,
+            "message": f"تم رفع ملفات كود المشروع وهيكل الـ Full-Stack كاملة بنجاح إلى مستودعك على GitHub ({gh_user}/{repo_name})!"
         }
 
 
