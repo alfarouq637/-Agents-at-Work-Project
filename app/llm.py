@@ -17,6 +17,8 @@ BUILTIN = {  # name: (chat url, key env, default model, default vision model)
 DEFAULT_ORDER = {
     "brain": "openrouter,nvidia,groq,mistral,cerebras,gemini,wesam",
     "worker": "openrouter,nvidia,groq,mistral,cerebras,gemini,wesam",
+    "writer": "openrouter,nvidia,groq,mistral,cerebras,gemini,wesam",
+    "builder": "openrouter,nvidia,groq,mistral,cerebras,gemini,wesam",
     "vision": "nvidia,openrouter,mistral,gemini",
 }
 _rr, _cool = {}, {}
@@ -71,7 +73,7 @@ async def call(system, user, tier="worker", mock="", images=None, max_tokens=600
     """images: list of data URLs (vision tier)."""
     if os.getenv("MOCK", "0") == "1":
         return {"text": mock or "[MOCK]", "tokens": max(60, len(mock) // 4), "provider": "mock"}
-    order = os.getenv(f"ORDER_{tier.upper()}", DEFAULT_ORDER[tier]).split(",")
+    order = os.getenv(f"ORDER_{tier.upper()}", DEFAULT_ORDER.get(tier, DEFAULT_ORDER["worker"])).split(",")
     P = providers()
     last = None
     async with httpx.AsyncClient(timeout=25) as cl:

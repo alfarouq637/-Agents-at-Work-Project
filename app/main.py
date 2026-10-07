@@ -17,10 +17,11 @@ import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+import shutil
 from typing import Optional, Dict, Any, List
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -135,6 +136,98 @@ async def subdomain_middleware(request: Request, call_next):
 if not IS_VERCEL:
     os.makedirs(corp.SITES, exist_ok=True)
     app.mount("/sites-static", StaticFiles(directory=corp.SITES, html=True), name="sites-static")
+
+
+# =========================================================
+# Multimodal Uploads & Document Processing (Images & PDFs)
+# =========================================================
+@app.post("/api/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    job_id: Optional[int] = Form(None),
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Uploads logos, images, or PDF documents with PyMuPDF text extraction."""
+    upload_dir = os.path.join(BASE, "static", "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    api_upload_dir = os.path.join(BASE, "api", "static", "uploads")
+    if os.path.exists(os.path.join(BASE, "api")):
+        os.makedirs(api_upload_dir, exist_ok=True)
+
+    raw_filename = file.filename or "upload"
+    ext = os.path.splitext(raw_filename)[1].lower()
+    clean_base = re.sub(r'[^a-zA-Z0-9_\-]', '_', os.path.splitext(raw_filename)[0])
+    safe_filename = f"{int(time.time())}_{clean_base[:30]}{ext}"
+    target_path = os.path.join(upload_dir, safe_filename)
+
+    content_bytes = await file.read()
+    with open(target_path, "wb") as f:
+        f.write(content_bytes)
+
+    if os.path.exists(api_upload_dir):
+        try:
+            with open(os.path.join(api_upload_dir, safe_filename), "wb") as f:
+                f.write(content_bytes)
+        except Exception:
+            pass
+
+    extracted_text = ""
+    file_type = "image" if ext in (".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif") else "pdf" if ext == ".pdf" else "document"
+
+    if ext == ".pdf":
+        try:
+            import fitz
+            doc = fitz.open(stream=content_bytes, filetype="pdf")
+            pages_text = []
+            for page in doc:
+                t = page.get_text()
+                if t:
+                    pages_text.append(t)
+            extracted_text = "\n".join(pages_text).strip()
+        except Exception as e:
+            extracted_text = f"(تعذر استخراج النص من PDF: {e})"
+    elif ext in (".txt", ".md", ".json", ".csv"):
+        try:
+            extracted_text = content_bytes.decode("utf-8", errors="ignore")[:10000]
+        except Exception:
+            pass
+
+    file_url = f"/static/uploads/{safe_filename}"
+    if job_id:
+        try:
+            db.x(
+                "INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (job_id, safe_filename, file_type, extracted_text[:4000] if extracted_text else "", file_url, time.time())
+            )
+        except Exception as e:
+            print(f"[SITE_FILES INSERT ERR] {e}")
+
+    return {
+        "success": True,
+        "filename": safe_filename,
+        "original_name": raw_filename,
+        "file_type": file_type,
+        "url": file_url,
+        "extracted_text": extracted_text,
+        "text_preview": extracted_text[:600] if extracted_text else ""
+    }
+
+
+@app.get("/static/uploads/{filename}")
+@app.get("/uploads/{filename}")
+async def serve_uploaded_file(filename: str):
+    """Serves uploaded media and PDF documents."""
+    fn = os.path.basename(filename)
+    p = os.path.join(BASE, "static", "uploads", fn)
+    if os.path.exists(p):
+        return FileResponse(p)
+    p2 = os.path.join(BASE, "api", "static", "uploads", fn)
+    if os.path.exists(p2):
+        return FileResponse(p2)
+    raise HTTPException(404, "الملف غير موجود")
+
 
 
 # =========================================================
@@ -452,6 +545,8 @@ async def new_job(
             parts.append(f"الشعار التسويقي: {slogan}")
         if req:
             parts.append(f"تفاصيل الطلب: {req}")
+        if body.get("extracted_text"):
+            parts.append(f"\n[مستند/كتالوج/منيو مرفق من العميل]:\n{body.get('extracted_text')[:3500]}")
         
         # AI answers
         ai_answers = body.get("ai_answers") or []
@@ -483,6 +578,20 @@ async def new_job(
         body.get("fawry_code") or "", 1 if body.get("cod_enabled", True) else 0,
         time.time()
     ))
+
+    # Record uploaded logo and document into site_files
+    if body.get("logo_url"):
+        try:
+            db.x("INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, ?, 'image', 'شعار المتجر', ?, ?)",
+                 (jid, os.path.basename(body.get("logo_url")), body.get("logo_url"), time.time()))
+        except Exception:
+            pass
+    if body.get("extracted_text"):
+        try:
+            db.x("INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, 'document.pdf', 'pdf', ?, '', ?)",
+                 (jid, body.get("extracted_text")[:4000], time.time()))
+        except Exception:
+            pass
     
     # Save manual items if provided
     items = body.get("items") or []
@@ -1073,6 +1182,650 @@ def activate_site_payment(
     }
 
 
+# =========================================================
+# Project Lifecycle: Super Admin Deletion & Cleanup
+# =========================================================
+@app.delete("/api/sites/{slug_or_id}")
+async def delete_site(
+    slug_or_id: str,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Deletes a site completely across all tables and on-disk files."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    # 1. Delete DB records across all tables
+    db.x("DELETE FROM jobs WHERE id=?", (jid,))
+    db.x("DELETE FROM site_pages WHERE job_id=?", (jid,))
+    db.x("DELETE FROM site_items WHERE job_id=?", (jid,))
+    db.x("DELETE FROM site_orders WHERE job_id=?", (jid,))
+    db.x("DELETE FROM site_settings WHERE job_id=?", (jid,))
+    db.x("DELETE FROM site_files WHERE job_id=?", (jid,))
+    db.x("DELETE FROM site_automations WHERE job_id=?", (jid,))
+    db.x("DELETE FROM site_bot_configs WHERE job_id=?", (jid,))
+    db.x("DELETE FROM events WHERE job_id=?", (jid,))
+    db.x("DELETE FROM contracts WHERE job_id=?", (jid,))
+    db.x("DELETE FROM ledger WHERE job_id=?", (jid,))
+
+    # 2. Delete local directory if exists
+    site_dir = os.path.join(corp.SITES, str(jid))
+    if os.path.exists(site_dir):
+        try:
+            shutil.rmtree(site_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "message": f"تم حذف المشروع #{jid} وكافة ملفاته وبياناته نهائياً بنجاح!"
+    }
+
+
+# =========================================================
+# Code & File Explorer / In-Browser Editor
+# =========================================================
+@app.get("/api/sites/{slug_or_id}/files")
+def list_site_files(
+    slug_or_id: str,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Lists all files (index.html, server.js, package.json, Dockerfile, uploaded files) for this site."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    page = db.one("select html from site_pages where job_id=?", (jid,))
+    site_html = (page.get("html") or "") if page else ""
+
+    files = [
+        {"filename": "index.html", "type": "code", "size": len(site_html.encode("utf-8")), "is_entry": True},
+        {"filename": "server.js", "type": "code", "size": 2500, "is_entry": False},
+        {"filename": "package.json", "type": "code", "size": 650, "is_entry": False},
+        {"filename": "README.md", "type": "doc", "size": 1800, "is_entry": False},
+        {"filename": "Dockerfile", "type": "code", "size": 420, "is_entry": False},
+        {"filename": "vercel.json", "type": "code", "size": 120, "is_entry": False}
+    ]
+
+    custom_files = db.q("SELECT filename, file_type, file_url, length(content) as content_len FROM site_files WHERE job_id=? ORDER BY id DESC", (jid,))
+    for cf in custom_files:
+        fn = cf["filename"]
+        if not any(f["filename"] == fn for f in files):
+            files.append({
+                "filename": fn,
+                "type": cf["file_type"] or "file",
+                "size": cf.get("content_len") or 0,
+                "file_url": cf.get("file_url") or "",
+                "is_entry": False
+            })
+
+    return files
+
+
+@app.get("/api/sites/{slug_or_id}/files/{filename:path}")
+def get_site_file_content(
+    slug_or_id: str,
+    filename: str,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Fetches the content of a specific file for editing."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    if filename == "index.html":
+        page = db.one("select html from site_pages where job_id=?", (jid,))
+        content = (page.get("html") or "") if page else ""
+        return {"filename": "index.html", "content": content}
+
+    f_row = db.one("SELECT content, file_url FROM site_files WHERE job_id=? AND filename=?", (jid, filename))
+    if f_row and f_row.get("content"):
+        return {"filename": filename, "content": f_row["content"], "file_url": f_row.get("file_url")}
+
+    settings = db.one("select * from site_settings where job_id=?", (jid,)) or {}
+    items = db.q("select * from site_items where job_id=? order by id", (jid,))
+    from app.enterprise_generator import generate_enterprise_project
+    ent_files = generate_enterprise_project(
+        job_id=jid,
+        brand_name=settings.get("brand_name") or f"site_{jid}",
+        niche=settings.get("category", "general"),
+        slogan=settings.get("slogan", ""),
+        primary_color=settings.get("color_primary", ""),
+        secondary_color=settings.get("color_secondary", ""),
+        items=items,
+        settings=settings
+    )
+    if filename in ent_files:
+        return {"filename": filename, "content": ent_files[filename]}
+
+    local_p = os.path.join(corp.SITES, str(jid), filename)
+    if os.path.exists(local_p):
+        try:
+            with open(local_p, "r", encoding="utf-8") as f:
+                return {"filename": filename, "content": f.read()}
+        except Exception:
+            pass
+
+    raise HTTPException(404, f"الملف {filename} غير موجود")
+
+
+@app.put("/api/sites/{slug_or_id}/files/{filename:path}")
+def save_site_file_content(
+    slug_or_id: str,
+    filename: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Saves updated content of a file."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    content = body.get("content", "")
+    if filename == "index.html":
+        db.x("UPDATE site_pages SET html=? WHERE job_id=?", (content, jid))
+        d = os.path.join(corp.SITES, str(jid))
+        if os.path.exists(d):
+            try:
+                with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
+                    f.write(content)
+            except Exception:
+                pass
+    else:
+        existing = db.one("SELECT id FROM site_files WHERE job_id=? AND filename=?", (jid, filename))
+        if existing:
+            db.x("UPDATE site_files SET content=?, created_at=? WHERE id=?", (content, time.time(), existing["id"]))
+        else:
+            db.x(
+                "INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, ?, 'code', ?, '', ?)",
+                (jid, filename, content, time.time())
+            )
+        d = os.path.join(corp.SITES, str(jid))
+        if os.path.exists(d):
+            try:
+                fp = os.path.join(d, filename)
+                os.makedirs(os.path.dirname(fp), exist_ok=True)
+                with open(fp, "w", encoding="utf-8") as f:
+                    f.write(content)
+            except Exception:
+                pass
+
+    corp.log(jid, f"✏️ تم حفظ تعديلات على الملف: {filename}")
+    return {"success": True, "message": f"تم حفظ التعديلات على {filename} بنجاح!"}
+
+
+# =========================================================
+# Iterative Development: Prompt Refinement with Multimodal Context
+# =========================================================
+@app.post("/api/sites/{slug_or_id}/refine")
+async def refine_site(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Iteratively refines the site via natural language prompt + optional document text."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt:
+        raise HTTPException(400, "يرجى كتابة تعليمات التعديل والتطوير")
+
+    check_guardrails(prompt)
+
+    doc_text = (body.get("extracted_text") or "").strip()
+    file_url = (body.get("file_url") or "").strip()
+
+    page = db.one("SELECT html FROM site_pages WHERE job_id=?", (jid,))
+    current_html = (page.get("html") or "") if page else ""
+    settings = db.one("SELECT * FROM site_settings WHERE job_id=?", (jid,)) or {}
+
+    sys_msg = (
+        "You are AutoCorp's Elite Lead Frontend & Full-Stack Architect. "
+        "The user wants to iteratively refine and upgrade their existing web application. "
+        "Maintain high aesthetic standards, Egyptian cultural resonance, responsive Tailwind/CSS, and all functional elements. "
+        "If they provide document text or logo, integrate it seamlessly into the structure. "
+        "Return ONLY the updated complete HTML code, enclosed in ```html ... ``` or raw HTML."
+    )
+
+    user_msg = (
+        f"Site ID: {jid}\n"
+        f"Brand Name: {settings.get('brand_name', '')}\n"
+        f"Current Niche: {settings.get('category', 'general')}\n"
+        f"User Refinement Prompt: {prompt}\n"
+    )
+    if doc_text:
+        user_msg += f"\nAdditional Extracted Document/Catalog/CV Text:\n{doc_text[:3000]}\n"
+    if file_url:
+        user_msg += f"\nUploaded Asset/Logo URL: {file_url}\n"
+
+    user_msg += f"\nCurrent HTML snippet (first 3000 chars):\n{current_html[:3000]}\n\n"
+    user_msg += "Produce the updated, complete, production-ready HTML code now."
+
+    resp = await llm.call(
+        system=sys_msg,
+        user=user_msg,
+        tier="builder",
+        mock=current_html
+    )
+
+    new_html = resp.get("text") or current_html
+    if "```html" in new_html:
+        new_html = new_html.split("```html")[1].split("```")[0].strip()
+    elif "```" in new_html:
+        new_html = new_html.split("```")[1].split("```")[0].strip()
+
+    if "<!DOCTYPE html>" not in new_html and "<html" not in new_html:
+        new_html = current_html
+
+    db.x("UPDATE site_pages SET html=? WHERE job_id=?", (new_html, jid))
+    d = os.path.join(corp.SITES, str(jid))
+    if os.path.exists(d):
+        try:
+            with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
+                f.write(new_html)
+        except Exception:
+            pass
+
+    corp.log(jid, f"🪄 تم تطوير الموقع بنجاح عبر توجيه ذكي: {prompt[:80]}...")
+    slug = make_site_slug(jid, settings.get("brand_name") or f"site_{jid}")
+
+    return {
+        "success": True,
+        "message": "تم تطوير وتحديث الموقع بنجاح وفقاً لتوجيهاتك!",
+        "slug": slug,
+        "frontend_url": f"/sites/{slug}/"
+    }
+
+
+# =========================================================
+# Visual Component & Content Editor
+# =========================================================
+@app.post("/api/sites/{slug_or_id}/visual-edit")
+async def visual_edit_site(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Visual content editor: edit title, slogan, colors, contact numbers, and toggle sections."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    brand = body.get("brand_name")
+    slogan = body.get("slogan")
+    color_primary = body.get("color_primary")
+    color_secondary = body.get("color_secondary")
+    logo_url = body.get("logo_url")
+    phone = body.get("phone")
+    whatsapp = body.get("whatsapp")
+    vodafone_cash = body.get("vodafone_cash")
+    instapay = body.get("instapay")
+    theme = body.get("theme", "dark")
+
+    # Fetch current settings
+    curr = db.one("select * from site_settings where job_id=?", (jid,)) or {}
+
+    db.x("""
+        INSERT OR REPLACE INTO site_settings (
+            job_id, brand_name, category, custom_domain, color_primary, color_secondary,
+            logo_url, phone, whatsapp, address, vodafone_cash, instapay, fawry_code,
+            cod_enabled, updated_at
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?
+        )
+    """, (
+        jid,
+        brand or curr.get("brand_name") or f"site_{jid}",
+        body.get("category") or curr.get("category") or "general",
+        curr.get("custom_domain"),
+        color_primary or curr.get("color_primary"),
+        color_secondary or curr.get("color_secondary"),
+        logo_url or curr.get("logo_url"),
+        phone or curr.get("phone"),
+        whatsapp or curr.get("whatsapp"),
+        curr.get("address"),
+        vodafone_cash or curr.get("vodafone_cash"),
+        instapay or curr.get("instapay"),
+        curr.get("fawry_code"),
+        time.time()
+    ))
+
+    job_row = db.one("select * from jobs where id=?", (jid,)) or {}
+    items_rows = db.q("select * from site_items where job_id=? order by id", (jid,))
+    active_settings = db.one("select * from site_settings where job_id=?", (jid,)) or {}
+
+    for flag in ["enable_faq", "enable_testimonials", "enable_gallery", "enable_reviews", "enable_promo"]:
+        if flag in body:
+            active_settings[flag] = body[flag]
+    if slogan:
+        active_settings["slogan"] = slogan
+    if theme:
+        active_settings["theme"] = theme
+
+    new_html = builder.build_site_html(
+        jid,
+        brand or job_row.get("client") or "",
+        job_row.get("request") or "",
+        settings=active_settings,
+        items=items_rows
+    )
+
+    db.x("UPDATE site_pages SET html=? WHERE job_id=?", (new_html, jid))
+    d = os.path.join(corp.SITES, str(jid))
+    if os.path.exists(d):
+        try:
+            with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
+                f.write(new_html)
+        except Exception:
+            pass
+
+    corp.log(jid, "🎨 تم تطبيق التعديلات المرئية على واجهة وتنسيق الموقع بنجاح")
+    return {"success": True, "message": "تم حفظ وتطبيق التعديلات المرئية بنجاح!"}
+
+
+# =========================================================
+# Store Products Management (CRUD with Image Support)
+# =========================================================
+@app.post("/api/sites/{slug_or_id}/items")
+def add_site_item(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Adds a new product/service item with price, category, and image URL."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    title = (body.get("title") or "منتج جديد").strip()
+    price = float(body.get("price") or 0.0)
+    category = (body.get("category") or "عام").strip()
+    desc = (body.get("description") or "").strip()
+    badge = (body.get("badge") or "").strip()
+    image_url = (body.get("image_url") or "").strip()
+
+    item_id = db.x(
+        "INSERT INTO site_items (job_id, title, price, category, description, badge, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (jid, title, price, category, desc, badge, time.time())
+    )
+
+    job_row = db.one("select * from jobs where id=?", (jid,)) or {}
+    items_rows = db.q("select * from site_items where job_id=? order by id", (jid,))
+    active_settings = db.one("select * from site_settings where job_id=?", (jid,)) or {}
+    new_html = builder.build_site_html(jid, job_row.get("client") or "", job_row.get("request") or "", settings=active_settings, items=items_rows)
+    db.x("UPDATE site_pages SET html=? WHERE job_id=?", (new_html, jid))
+
+    return {"success": True, "item_id": item_id, "message": f"تمت إضافة ({title}) بنجاح!"}
+
+
+@app.delete("/api/sites/{slug_or_id}/items/{item_id}")
+def delete_site_item(
+    slug_or_id: str,
+    item_id: int,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Deletes an item from site catalog."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    db.x("DELETE FROM site_items WHERE id=? AND job_id=?", (item_id, jid))
+
+    job_row = db.one("select * from jobs where id=?", (jid,)) or {}
+    items_rows = db.q("select * from site_items where job_id=? order by id", (jid,))
+    active_settings = db.one("select * from site_settings where job_id=?", (jid,)) or {}
+    new_html = builder.build_site_html(jid, job_row.get("client") or "", job_row.get("request") or "", settings=active_settings, items=items_rows)
+    db.x("UPDATE site_pages SET html=? WHERE job_id=?", (new_html, jid))
+
+    return {"success": True, "message": "تم حذف الصنف من الكتالوج بنجاح!"}
+
+
+# =========================================================
+# Bot Integrations: Telegram & WhatsApp Setup for Stores
+# =========================================================
+@app.get("/api/sites/{slug_or_id}/integrations")
+def get_site_integrations(
+    slug_or_id: str,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Returns bot integrations config and setup instructions."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    cfg = db.one("SELECT * FROM site_bot_configs WHERE job_id=?", (jid,)) or {}
+    settings = db.one("SELECT * FROM site_settings WHERE job_id=?", (jid,)) or {}
+    brand = settings.get("brand_name") or f"Site #{jid}"
+
+    guide_telegram = [
+        "1. افتح تطبيق تيليجرام وابحث عن @BotFather الرسمي.",
+        "2. أرسل الأمر /newbot وحدد اسماً تجارياً للبوت واسم مستخدم ينتهي بـ bot.",
+        "3. سيعطيك BotFather رمز الوصول البرمجي (API Token) مثل: 123456:ABC-DEF...",
+        "4. الصق التوكن هنا واكتب توجيهات الذكاء الاصطناعي للبوت (كيف يرد على استفسارات العملاء ويعرض المنتجات).",
+        "5. اضغط 'حفظ وتفعيل' ليصبح البوت ممثلاً لمتجرك على مدار الساعة!"
+    ]
+    guide_whatsapp = [
+        "1. ادخل على Meta for Developers وأنشئ تطبيق WhatsApp Business API.",
+        "2. انسخ الـ Permanent Access Token ورقم الهاتف المسجل.",
+        "3. الصق التوكن هنا لتفعيل الرد التلقائي وإشعارات الأوردرات الفورية."
+    ]
+
+    return {
+        "job_id": jid,
+        "brand_name": brand,
+        "config": cfg,
+        "guide_telegram": guide_telegram,
+        "guide_whatsapp": guide_whatsapp,
+        "suggested_prompt": f"أنت المساعد الذكي والممثل الرسمي لمتجر {brand}. مهمتك الترحيب بالزبائن، الإجابة عن مواصفات المنتجات والأسعار، ومساعدتهم في إتمام الطلبات وتأكيد الدفع عبر فودافون كاش وإنستاباي والدفع عند الاستلام بأسلوب مصري راقٍ وودود."
+    }
+
+
+@app.post("/api/sites/{slug_or_id}/integrations/bot")
+def save_site_bot_config(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Saves Telegram / WhatsApp bot credentials and system prompt."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    platform = body.get("bot_platform", "telegram")
+    token = (body.get("bot_token") or "").strip()
+    name = (body.get("bot_name") or "").strip()
+    prompt = (body.get("system_prompt") or "").strip()
+    active = 1 if body.get("is_active", True) else 0
+
+    db.x("""
+        INSERT OR REPLACE INTO site_bot_configs (job_id, bot_platform, bot_token, bot_name, system_prompt, is_active, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (jid, platform, token, name, prompt, active, time.time()))
+
+    corp.log(jid, f"🤖 تم ضبط وربط بوت {platform} لخدمة عملاء الموقع بنجاح ({name})")
+    return {"success": True, "message": f"تم حفظ وربط بوت {platform} بنجاح!"}
+
+
+# =========================================================
+# AI Marketing Automations: Email & Social Campaigns
+# =========================================================
+@app.get("/api/sites/{slug_or_id}/automations")
+def get_site_automations(
+    slug_or_id: str,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Lists drafted and approved marketing campaigns for this site."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+    return db.q("SELECT * FROM site_automations WHERE job_id=? ORDER BY id DESC", (jid,))
+
+
+@app.post("/api/sites/{slug_or_id}/automations/generate-email")
+async def generate_marketing_email(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """AI Marketing Agent: Drafts a targeted promotional email awaiting owner approval."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    goal = body.get("goal") or "عرض ترويجي وتنشيط مبيعات"
+    audience = body.get("target_audience") or "العملاء المسجلين والزبائن الجدد"
+
+    settings = db.one("SELECT * FROM site_settings WHERE job_id=?", (jid,)) or {}
+    items = db.q("SELECT title, price FROM site_items WHERE job_id=? LIMIT 5", (jid,))
+    brand = settings.get("brand_name") or f"متجر #{jid}"
+
+    sys_prompt = (
+        "You are AutoCorp's Elite Direct-Response Copywriter and Email Marketing Strategist for Egyptian SMEs. "
+        "Draft a compelling, high-converting promotional email in polished, friendly Egyptian Arabic. "
+        "Include: 1) Catchy Subject Line, 2) Preview Header, 3) Engaging Story/Hook, 4) Special Offer & Product Highlights, 5) Urgent Call to Action button. "
+        "Do NOT invent false guarantees. Make it feel authentic, professional, and exciting."
+    )
+    prod_strs = [f"{it.get('title', '')} ({it.get('price', 0)} ج.م)" for it in items]
+    top_prods_text = ", ".join(prod_strs)
+    user_prompt = (
+        f"Brand: {brand}\n"
+        f"Activity: {settings.get('category', 'general')}\n"
+        f"Goal: {goal}\n"
+        f"Audience: {audience}\n"
+        f"Top Products: {top_prods_text}\n"
+    )
+
+    resp = await llm.call(
+        system=sys_prompt,
+        user=user_prompt,
+        tier="writer",
+        mock=f"Subject: عروض خاصة من {brand}!\n\nأهلاً بك عميلنا العزيز،\nيسعدنا تقديم أقوى العروض الحصرية بمناسبة التوسعات الجديدة..."
+    )
+
+    content = resp.get("text") or "إيميل ترويجي جاهز للاعتماد"
+    title = f"حملة إيميل: {goal[:40]}"
+
+    auto_id = db.x(
+        "INSERT INTO site_automations (job_id, type, title, content, target_platform, status, created_at) VALUES (?, 'email', ?, ?, 'email', 'pending_approval', ?)",
+        (jid, title, content, time.time())
+    )
+
+    owner_chat = os.getenv("TELEGRAM_OWNER_CHAT_ID")
+    if owner_chat:
+        try:
+            tg_notice = (
+                f"📧 [مسودة إيميل تسويقي جديدة بانتظار موافقتك]\n"
+                f"المتجر: {brand} (#{jid})\n"
+                f"الهدف: {goal}\n\n"
+                f"{content[:500]}...\n\n"
+                f"💡 يمكنك مراجعة واعتماد الإرسال من لوحة التحكم."
+            )
+            await corp.tg_send(owner_chat, tg_notice)
+        except Exception:
+            pass
+
+    corp.log(jid, f"📢 تم تجهيز مسودة إيميل تسويقي #{auto_id} بانتظار اعتماد المشرف")
+    return {
+        "success": True,
+        "automation_id": auto_id,
+        "title": title,
+        "status": "pending_approval",
+        "content": content,
+        "message": "تم إنشاء مسودة الإيميل بنجاح وهي الآن في انتظار اعتمادك (Pending Approval) قبل الإرسال!"
+    }
+
+
+@app.post("/api/sites/{slug_or_id}/automations/approve-email")
+async def approve_marketing_email(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Owner Approval step: Approves and marks campaign for dispatch."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    auto_id = int(body.get("automation_id") or 0)
+    decision = body.get("decision", "approve")
+
+    status = "approved" if decision == "approve" else "rejected"
+    db.x("UPDATE site_automations SET status=? WHERE id=? AND job_id=?", (status, auto_id, jid))
+
+    corp.log(jid, f"✅ تم اعتماد ونشر الحملة التسويقية #{auto_id} ({status})")
+    return {
+        "success": True,
+        "automation_id": auto_id,
+        "status": status,
+        "message": f"تم {'اعتماد وبدء جدولة إرسال الإيميل' if status == 'approved' else 'رفض المسودة'} بنجاح!"
+    }
+
+
+@app.post("/api/sites/{slug_or_id}/automations/generate-social")
+async def generate_social_post(
+    slug_or_id: str,
+    body: dict,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Generates social media content (Facebook, Instagram, TikTok, LinkedIn, X)."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    platform = body.get("platform") or "facebook"
+    theme = body.get("theme") or "تخفيضات وبوست تفاعلي"
+
+    settings = db.one("SELECT * FROM site_settings WHERE job_id=?", (jid,)) or {}
+    brand = settings.get("brand_name") or f"متجر #{jid}"
+
+    sys_prompt = (
+        f"You are AutoCorp's Viral Social Media Expert specializing in Egyptian market campaigns for {platform.upper()}. "
+        "Write a highly engaging post with emojis, engaging hook, product benefits, Egyptian colloquial flavor, hashtags, and a clear Call To Action link."
+    )
+    user_prompt = f"Brand: {brand}\nNiche: {settings.get('category', 'general')}\nTheme: {theme}\nPlatform: {platform}"
+
+    resp = await llm.call(
+        system=sys_prompt,
+        user=user_prompt,
+        tier="writer",
+        mock=f"🔥 أقوى العروض وصلت مع {brand}! ✨\nاطلب الآن واستمتع بتوصيل فوري ودفع عند الاستلام 🛵📦\n#مصر #تسوق #{brand.replace(' ', '_')}"
+    )
+
+    content = resp.get("text") or "محتوى بوست تسويقي"
+    title = f"منشور {platform.title()}: {theme[:30]}"
+
+    auto_id = db.x(
+        "INSERT INTO site_automations (job_id, type, title, content, target_platform, status, created_at) VALUES (?, 'social', ?, ?, ?, 'pending_approval', ?)",
+        (jid, title, content, platform, time.time())
+    )
+
+    return {
+        "success": True,
+        "automation_id": auto_id,
+        "title": title,
+        "status": "pending_approval",
+        "content": content,
+        "message": f"تم تجهيز بوست {platform} بنجاح!"
+    }
+
+
+
 @app.post("/api/discovery/questions")
 def get_discovery_questions(body: dict):
     category = body.get("category") or "عام"
@@ -1425,9 +2178,89 @@ async def handle_telegram_update(u: dict):
             await corp.tg_send(chat_id, "❌ كلمة المرور غير صحيحة.")
         return
 
+    # 6.1 /delete command: delete site by ID
+    if text.startswith("/delete"):
+        parts = text.split()
+        if len(parts) > 1 and parts[1].isdigit():
+            target_jid = int(parts[1])
+            target_job = db.one("SELECT * FROM jobs WHERE id=?", (target_jid,))
+            if not target_job:
+                await corp.tg_send(chat_id, f"❌ المشروع #{target_jid} غير موجود.")
+                return
+            can_del = is_user_admin or (user_id and target_job.get("user_id") == user_id) or str(target_job.get("client")) == f"tg:{chat_id}"
+            if can_del:
+                for tbl in ["jobs", "site_pages", "site_items", "site_orders", "site_settings", "site_files", "site_automations", "site_bot_configs", "events", "contracts", "ledger"]:
+                    try:
+                        db.x(f"DELETE FROM {tbl} WHERE {'id' if tbl=='jobs' else 'job_id'}=?", (target_jid,))
+                    except Exception:
+                        pass
+                shutil.rmtree(os.path.join(corp.SITES, str(target_jid)), ignore_errors=True)
+                await corp.tg_send(chat_id, f"🗑️ تم حذف المشروع #{target_jid} وكافة ملفاته وبياناته نهائياً بنجاح!")
+            else:
+                await corp.tg_send(chat_id, "❌ ليس لديك صلاحية لحذف هذا المشروع.")
+        else:
+            await corp.tg_send(chat_id, "⚠️ الصيغة الصحيحة: /delete رقم_المشروع (مثال: /delete 5)")
+        return
+
     # 7. Conversational Handling & Guardrails
     check_guardrails(text)
     
+    # Process attached document (PDF / Text / Catalog / Menu)
+    uploaded_doc_text = ""
+    uploaded_doc_name = ""
+    if msg.get("document"):
+        doc = msg["document"]
+        file_id = doc.get("file_id")
+        file_name = doc.get("file_name", "document.pdf")
+        mime = doc.get("mime_type", "")
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if file_id and token:
+            try:
+                async with httpx.AsyncClient(timeout=40) as cl:
+                    f_info = (await cl.get(f"https://api.telegram.org/bot{token}/getFile", params={"file_id": file_id})).json()
+                    f_path = f_info.get("result", {}).get("file_path")
+                    if f_path:
+                        raw_bytes = (await cl.get(f"https://api.telegram.org/file/bot{token}/{f_path}")).content
+                        clean_fn = f"{int(time.time())}_{re.sub(r'[^a-zA-Z0-9_.-]', '_', file_name)}"
+                        up_path = os.path.join(BASE, "static", "uploads", clean_fn)
+                        os.makedirs(os.path.dirname(up_path), exist_ok=True)
+                        with open(up_path, "wb") as f:
+                            f.write(raw_bytes)
+                        if file_name.lower().endswith(".pdf") or "pdf" in mime:
+                            try:
+                                import fitz
+                                d_doc = fitz.open(stream=raw_bytes, filetype="pdf")
+                                uploaded_doc_text = "\n".join(page.get_text() for page in d_doc).strip()
+                            except Exception as ex:
+                                uploaded_doc_text = f"Error extracting PDF: {ex}"
+                        uploaded_doc_name = clean_fn
+                        text = f"{text}\n\n[مستند مرفق من العميل: {file_name}]:\n{uploaded_doc_text[:3500]}".strip()
+            except Exception as e:
+                print(f"[TG DOC ERR] {e}")
+
+    # Process attached photo
+    uploaded_photo_url = ""
+    if msg.get("photo"):
+        photo_id = msg["photo"][-1]["file_id"]
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if token:
+            try:
+                async with httpx.AsyncClient(timeout=40) as cl:
+                    f_info = (await cl.get(f"https://api.telegram.org/bot{token}/getFile", params={"file_id": photo_id})).json()
+                    f_path = f_info.get("result", {}).get("file_path")
+                    if f_path:
+                        raw_bytes = (await cl.get(f"https://api.telegram.org/file/bot{token}/{f_path}")).content
+                        clean_fn = f"{int(time.time())}_tg_photo.jpg"
+                        up_path = os.path.join(BASE, "static", "uploads", clean_fn)
+                        os.makedirs(os.path.dirname(up_path), exist_ok=True)
+                        with open(up_path, "wb") as f:
+                            f.write(raw_bytes)
+                        uploaded_photo_url = f"/static/uploads/{clean_fn}"
+            except Exception as e:
+                print(f"[TG PHOTO SAVE ERR] {e}")
+        desc = await corp.tg_image_to_text(photo_id, text)
+        text = f"{text}\n\n[تحليل صورة العميل بواسطة Vision Analyst]:\n{desc}".strip()
+
     # 7.1 Multi-Turn Conversation State Check
     conv = db.one("SELECT * FROM telegram_conversations WHERE chat_id = ?", (chat_id,))
     if conv and conv.get("stage") == "waiting_niche":
@@ -1441,7 +2274,7 @@ async def handle_telegram_update(u: dict):
         # Greeting Detection
         greetings = ["اهلا", "أهلا", "مرحبا", "سلام", "السلام عليكم", "ازيك", "صباح الخير", "مساء الخير", "هاي", "الو", "مين انت", "عرفني بيك"]
         t_clean = text.lower().strip()
-        if any(t_clean == g or t_clean.startswith(g + " ") for g in greetings) and len(t_clean) < 35 and not msg.get("photo"):
+        if any(t_clean == g or t_clean.startswith(g + " ") for g in greetings) and len(t_clean) < 35 and not msg.get("photo") and not msg.get("document"):
             await corp.tg_send(
                 chat_id,
                 "أهلاً بك يا فندم! 🤖🇪🇬\n"
@@ -1450,11 +2283,12 @@ async def handle_telegram_update(u: dict):
                 "مع بوابات الدفع المصرية (فودافون كاش، إنستاباي، فوري) وتصميم متجاوب بالكامل.\n\n"
                 "💡 كيف تحب نبدأ؟\n"
                 "• لبدء البناء فوراً: اكتب تفاصيل نشاطك (مثال: 'عايز اعمل بورتفوليو لواحد اسمه ياسين احمد في السايبر سيكيورتي' أو 'متجر عسل').\n"
+                "• يمكنك أيضاً إرسال ملف PDF (كتالوج أو منيو) أو صورة اللوجو وسأقوم ببناء الموقع بناءً عليها فوراً!\n"
                 "• لتسجيل الدخول: اكتب /login اسم_المستخدم كلمة_المرور\n"
                 "• أو اسألني أي سؤال حول الميزات والأسعار وبوابات الدفع!"
             )
             return
-        is_store_request = bool(msg.get("photo")) or is_store_creation_intent(text)
+        is_store_request = bool(msg.get("photo")) or bool(msg.get("document")) or is_store_creation_intent(text)
 
     # 7.2 Store / Website Creation
     if is_store_request:
@@ -1472,10 +2306,6 @@ async def handle_telegram_update(u: dict):
                 )
                 return
 
-        if msg.get("photo"):
-            desc = await corp.tg_image_to_text(msg["photo"][-1]["file_id"], text)
-            text = f"{text}\n\n[تحليل صورة العميل بواسطة Vision Analyst]:\n{desc}".strip()
-            
         niche = builder.detect_niche(text)
         brand = extract_smart_brand(text, niche)
 
@@ -1484,7 +2314,7 @@ async def handle_telegram_update(u: dict):
             "سايبر", "سيكيورتي", "أمن", "امن", "برمج", "مطور", "عسل", "مطعم", "خضار", "اجهز",
             "ملابس", "عياد", "دكتور", "شركة", "وكالة", "بورتفوليو", "متجر", "محل", "كافيه"
         ])
-        if not has_niche_clue and any(k in text for k in ["لواحد اسمه", "واحد اسمه", "اسمه"]) and len(text.split()) <= 6:
+        if not has_niche_clue and any(k in text for k in ["لواحد اسمه", "واحد اسمه", "اسمه"]) and len(text.split()) <= 6 and not msg.get("document"):
             # Save multi-turn state and ask for specialization!
             db.x("INSERT OR REPLACE INTO telegram_conversations (chat_id, stage, pending_brand, pending_niche, last_message, updated_at) VALUES (?, 'waiting_niche', ?, ?, ?, ?)",
                  (chat_id, brand, "", text, time.time()))
@@ -1520,6 +2350,7 @@ async def handle_telegram_update(u: dict):
             "category": niche,
             "color_primary": pal["primary"],
             "color_secondary": pal["secondary"],
+            "logo_url": uploaded_photo_url,
             "phone": "01000000000",
             "whatsapp": "01000000000",
             "vodafone_cash": "01000000000",
@@ -1529,14 +2360,32 @@ async def handle_telegram_update(u: dict):
         }
         db.x("""
             INSERT OR REPLACE INTO site_settings (
-                job_id, brand_name, category, color_primary, color_secondary,
+                job_id, brand_name, category, color_primary, color_secondary, logo_url,
                 phone, whatsapp, vodafone_cash, instapay, fawry_code, cod_enabled, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            jid, brand, niche, pal["primary"], pal["secondary"],
+            jid, brand, niche, pal["primary"], pal["secondary"], uploaded_photo_url,
             settings["phone"], settings["whatsapp"], settings["vodafone_cash"], settings["instapay"],
             settings["fawry_code"], 1, time.time()
         ))
+
+        # Record file if uploaded
+        if uploaded_doc_name:
+            try:
+                db.x(
+                    "INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, ?, 'pdf', ?, ?, ?)",
+                    (jid, uploaded_doc_name, uploaded_doc_text[:4000], f"/static/uploads/{uploaded_doc_name}", time.time())
+                )
+            except Exception:
+                pass
+        if uploaded_photo_url:
+            try:
+                db.x(
+                    "INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, ?, 'image', 'لوجو أو صورة المتجر', ?, ?)",
+                    (jid, os.path.basename(uploaded_photo_url), uploaded_photo_url, time.time())
+                )
+            except Exception:
+                pass
         
         # Insert default catalog items
         default_items = builder.DEFAULT_CATALOGS.get(niche, builder.DEFAULT_CATALOGS["general"])

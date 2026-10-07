@@ -497,6 +497,22 @@ textarea{resize:vertical;min-height:75px}
           </div>
         </div>
 
+        <!-- Step 5.5: رفع الشعار والمستندات (Multimodal Assets & PDF Upload) -->
+        <div style="margin-bottom:22px;background:rgba(255,255,255,.02);padding:16px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+          <div style="font-weight:900;font-size:.95rem;color:var(--accent2);margin-bottom:6px">
+            <span>📎 رفع شعار أو ملف PDF للمشروع (كتالوج، منيو، بروفايل شركة)</span>
+          </div>
+          <p style="font-size:.78rem;color:var(--fg2);font-family:'Readex Pro',sans-serif;margin-bottom:12px">
+            يقوم الذكاء الاصطناعي بتحليل صور المنتجات والشعار واستخراج نصوص الـ PDF لبناء موقع مخصص بالكامل لمحتواك:
+          </p>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <input type="file" id="wizard-file-input" accept="image/*,.pdf,.txt" onchange="handleWizardFileUpload(event)" style="flex:1">
+            <input type="hidden" id="wizard-uploaded-url">
+            <input type="hidden" id="wizard-extracted-text">
+          </div>
+          <div id="wizard-upload-status" style="margin-top:8px;font-size:.8rem;color:var(--accent);display:none"></div>
+        </div>
+
         <!-- Step 6: تخصيص ميزات المشروع البرمجية (Enterprise Modular Features Checklist) -->
         <div style="margin-bottom:22px;background:rgba(0,206,201,.04);padding:16px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.25)">
           <div style="font-weight:900;font-size:.95rem;color:var(--accent2);margin-bottom:6px">
@@ -646,6 +662,7 @@ textarea{resize:vertical;min-height:75px}
 
       <!-- Admin Tabs Subnav -->
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="loadAdminSitesManager()">🗂️ إدارة وتحكم بكافة المشاريع والملفات</button>
         <button class="btn btn-ghost btn-sm" onclick="loadAdminLedger()">📑 سجل اللدجر والعمليات المالية</button>
         <button class="btn btn-ghost btn-sm" onclick="loadAdminRoster()">🤖 كادر الـ 70 وكيل ذكي</button>
         <button class="btn btn-ghost btn-sm" onclick="loadAdminProviders()">⚡ فحص مزودي نماذج الـ AI</button>
@@ -944,6 +961,310 @@ textarea{resize:vertical;min-height:75px}
     </div>
   </div>
 
+  <!-- ========================================================= -->
+  <!-- MODAL: DELETE PROJECT CONFIRMATION                        -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="delete-confirm-modal">
+    <div class="modal" style="max-width:460px;text-align:center">
+      <div style="font-size:3rem;margin-bottom:10px">⚠️</div>
+      <h3 style="color:var(--danger);font-weight:900;font-size:1.25rem;margin-bottom:8px">تأكيد حذف المشروع نهائياً</h3>
+      <p style="color:var(--fg2);font-size:.85rem;line-height:1.6;margin-bottom:16px">
+        هل أنت متأكد من رغبتك في حذف المشروع <b id="del-modal-target" style="color:#fff"></b>؟<br>
+        <span style="color:var(--danger);font-size:.8rem;font-weight:700">تنبيه: سيتم مسح كافة ملفات الكود، المنتجات، الأوردرات، والبيانات نهائياً من السيرفر وقاعدة البيانات ولا يمكن التراجع عن هذه الخطوة.</span>
+      </p>
+      <input type="hidden" id="del-modal-jid">
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn btn-danger" id="btn-confirm-delete" onclick="executeSiteDelete()" style="padding:10px 24px;font-weight:800">
+          🗑️ نعم، احذف المشروع نهائياً
+        </button>
+        <button class="btn btn-ghost" onclick="closeDeleteConfirmModal()" style="padding:10px 20px">
+          إلغاء وتراجع
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: IN-BROWSER CODE & FILE EDITOR                      -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="file-editor-modal">
+    <div class="modal" style="max-width:850px;width:95%">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2)" id="fem-title">✏️ محرر الأكواد والملفات</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeFileEditorModal()">✕</button>
+      </div>
+      <input type="hidden" id="fem-jid">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <label style="font-size:.82rem;font-weight:700;color:var(--fg2)">اختر الملف للتعديل:</label>
+        <select id="fem-file-select" onchange="onFileEditorSelectChange()" style="flex:1;min-width:200px">
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="reloadFileEditorList()">🔄 تحديث الملفات</button>
+      </div>
+      <div style="margin-bottom:12px">
+        <textarea id="fem-code-editor" rows="18" style="width:100%;font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.5;background:#0d1117;color:#c9d1d9;border:1px solid var(--border);padding:14px;border-radius:var(--radius-sm);direction:ltr;text-align:left;white-space:pre"></textarea>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <span id="fem-status-msg" style="font-size:.8rem;color:var(--success)"></span>
+        <button class="btn btn-success" id="btn-save-file" onclick="saveActiveFileContent()" style="padding:10px 24px;font-weight:800">
+          💾 حفظ التعديلات على الملف فوراً
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: PROMPT-BASED ITERATIVE REFINEMENT                  -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="refine-modal">
+    <div class="modal" style="max-width:600px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2)" id="refine-modal-title">🪄 تطوير وتحديث الموقع ببرومبت ذكي</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeRefineModal()">✕</button>
+      </div>
+      <input type="hidden" id="refine-jid">
+      <p style="font-size:.82rem;color:var(--fg2);font-family:'Readex Pro',sans-serif;margin-bottom:12px">
+        اكتب توجيهاتك وسيقوم كبير مهندسي AutoCorp بتحديث الواجهة وتصميم وتطوير العناصر فوراً:
+      </p>
+      <div class="form-group">
+        <label>تعليمات التعديل والتطوير (Prompt) *</label>
+        <textarea id="refine-prompt" rows="4" placeholder="مثال: غير ألوان الموقع للأزرق الداكن الملكي، وأضف قسم أسئلة شائعة FAQ عن مدة التوصيل، وضع خصم 20% في الهيرو"></textarea>
+      </div>
+      <div class="form-group">
+        <label>📎 إرفاق ملف أو صورة أو مستند PDF داعم (اختياري)</label>
+        <input type="file" id="refine-file-input" accept="image/*,.pdf,.txt" onchange="handleRefineFileUpload(event)">
+        <input type="hidden" id="refine-file-url">
+        <input type="hidden" id="refine-doc-text">
+        <div id="refine-upload-note" style="font-size:.75rem;color:var(--accent);margin-top:4px"></div>
+      </div>
+      <button class="btn btn-primary" id="btn-run-refine" onclick="submitRefineSite()" style="width:100%;padding:12px;font-weight:900">
+        🪄 تطبيق التعديل والتطوير بالذكاء الاصطناعي
+      </button>
+      <div id="refine-output-msg" style="margin-top:12px;display:none"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: VISUAL & COMPONENT EDITOR                          -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="visual-edit-modal">
+    <div class="modal" style="max-width:640px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2)" id="vem-title">🎨 المحرر المرئي وإدارة الأقسام</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeVisualEditModal()">✕</button>
+      </div>
+      <input type="hidden" id="vem-jid">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="form-group">
+          <label>اسم المتجر / العلامة التجارية</label>
+          <input type="text" id="vem-brand">
+        </div>
+        <div class="form-group">
+          <label>الشعار اللفظي (Slogan)</label>
+          <input type="text" id="vem-slogan">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="form-group">
+          <label>اللون الأساسي (Primary Color)</label>
+          <input type="color" id="vem-color-primary" style="height:42px;padding:2px;cursor:pointer">
+        </div>
+        <div class="form-group">
+          <label>اللون الثانوي (Secondary Color)</label>
+          <input type="color" id="vem-color-secondary" style="height:42px;padding:2px;cursor:pointer">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>رابط الشعار أو رفعه (Logo URL / Upload)</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="vem-logo" placeholder="/static/uploads/... أو رابط خارجي" style="flex:1">
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;white-space:nowrap;display:flex;align-items:center">
+            📎 رفع
+            <input type="file" accept="image/*" onchange="handleVemLogoUpload(event)" style="display:none">
+          </label>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="form-group">
+          <label>رقم الواتساب</label>
+          <input type="text" id="vem-whatsapp">
+        </div>
+        <div class="form-group">
+          <label>فودافون كاش / إنستاباي</label>
+          <input type="text" id="vem-vcash">
+        </div>
+      </div>
+      <div style="margin-bottom:14px;background:rgba(0,0,0,.25);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <b style="font-size:.82rem;color:var(--accent2);display:block;margin-bottom:8px">تفعيل وتعطيل أقسام الصفحة:</b>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.8rem">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="vem-toggle-faq" checked style="width:auto"> ❓ قسم الأسئلة الشائعة FAQ</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="vem-toggle-reviews" checked style="width:auto"> ⭐ تقييمات وآراء العملاء</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="vem-toggle-gallery" checked style="width:auto"> 🖼️ معرض الصور المرئي</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="vem-toggle-promo" checked style="width:auto"> 🎟️ كوبون وخصم العروض</label>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="submitVisualEdit()" style="width:100%;padding:12px;font-weight:900">
+        🎨 حفظ وتطبيق التعديلات المرئية فوراً
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: PRODUCTS & SERVICES CATALOG MANAGER                -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="products-modal">
+    <div class="modal" style="max-width:720px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2)" id="pm-title">📦 إدارة منتجات وخدمات المتجر</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeProductsModal()">✕</button>
+      </div>
+      <input type="hidden" id="pm-jid">
+      <div style="margin-bottom:16px;max-height:220px;overflow-y:auto;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <table style="width:100%;font-size:.78rem;border-collapse:collapse;text-align:right" id="pm-table">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);color:var(--fg3)">
+              <th style="padding:8px">الصورة</th>
+              <th style="padding:8px">الاسم</th>
+              <th style="padding:8px">السعر</th>
+              <th style="padding:8px">التصنيف</th>
+              <th style="padding:8px">إجراء</th>
+            </tr>
+          </thead>
+          <tbody id="pm-tbody"></tbody>
+        </table>
+      </div>
+      <div style="background:rgba(0,206,201,.03);padding:14px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.2)">
+        <h4 style="font-size:.85rem;font-weight:900;color:var(--accent);margin-bottom:10px">➕ إضافة منتج / خدمة جديدة مع صورة:</h4>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px">
+          <input type="text" id="pm-new-title" placeholder="اسم المنتج أو الخدمة *">
+          <input type="number" id="pm-new-price" placeholder="السعر (ج.م) *">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <input type="text" id="pm-new-cat" placeholder="التصنيف (مثال: الأكثر طلباً)">
+          <input type="text" id="pm-new-badge" placeholder="شارة ترويجية (مثال: خصم 20%)">
+        </div>
+        <input type="text" id="pm-new-desc" placeholder="وصف موجز للمنتج أو الخدمة..." style="margin-bottom:8px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+          <input type="text" id="pm-new-image" placeholder="رابط صورة المنتج أو رفعها من جهازك" style="flex:1">
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;white-space:nowrap;display:flex;align-items:center">
+            📷 رفع صورة
+            <input type="file" accept="image/*" onchange="handleProductImageUpload(event)" style="display:none">
+          </label>
+        </div>
+        <button class="btn btn-success" onclick="submitAddNewProduct()" style="width:100%;padding:10px;font-weight:800">
+          ➕ إضافة هذا المنتج إلى المتجر
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: BOT INTEGRATIONS (Telegram & WhatsApp)              -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="bot-integration-modal">
+    <div class="modal" style="max-width:620px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2)" id="bim-title">🤖 ربط بوت خدمة العملاء (Telegram & WhatsApp)</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeBotModal()">✕</button>
+      </div>
+      <input type="hidden" id="bim-jid">
+      <div style="background:rgba(0,0,0,.3);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:14px;font-size:.78rem;line-height:1.6;color:var(--fg2)">
+        <b style="color:var(--gold);display:block;margin-bottom:4px">📖 خطوات إنشاء وربط بوت Telegram مجاناً:</b>
+        <div>1. افتح تطبيق تيليجرام وابحث عن <b>@BotFather</b></div>
+        <div>2. أرسل الأمر <code>/newbot</code> ثم اختر اسماً ومعرّفاً للبوت ينتهي بـ <code>bot</code></div>
+        <div>3. انسخ رمز الـ <b>HTTP API Token</b> والصقه في الخانة أدناه.</div>
+      </div>
+      <div class="form-group">
+        <label>منصة البوت</label>
+        <select id="bim-platform">
+          <option value="telegram">Telegram Bot</option>
+          <option value="whatsapp">WhatsApp Business API</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>رمز الوصول البرمجي (Bot API Token) *</label>
+        <input type="password" id="bim-token" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ...">
+      </div>
+      <div class="form-group">
+        <label>اسم البوت</label>
+        <input type="text" id="bim-name" placeholder="مثال: بوت خدمة عملاء متجر الهدى">
+      </div>
+      <div class="form-group">
+        <label>توجيهات الذكاء الاصطناعي للبوت (System Prompt)</label>
+        <textarea id="bim-prompt" rows="3" placeholder="كيف ترغب أن يتحدث البوت مع العملاء ويرد على استفسارات المنتجات والتوصيل..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="submitSaveBotConfig()" style="width:100%;padding:12px;font-weight:900">
+        🤖 حفظ وتفعيل البوت للمتجر
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: AI MARKETING AUTOMATIONS                           -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="marketing-modal">
+    <div class="modal" style="max-width:680px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2)" id="mm-title">📢 التسويق الذكي واعتماد الحملات (AI Marketing)</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeMarketingModal()">✕</button>
+      </div>
+      <input type="hidden" id="mm-jid">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="tab-mkt-email" class="btn btn-primary btn-sm" onclick="switchMktTab('email')">📧 حملات البريد الإلكتروني</button>
+        <button id="tab-mkt-social" class="btn btn-ghost btn-sm" onclick="switchMktTab('social')">📱 منشورات السوشيال ميديا</button>
+      </div>
+      <div id="mkt-email-sec">
+        <div class="form-group">
+          <label>هدف الحملة البريدية</label>
+          <input type="text" id="mkt-email-goal" placeholder="مثال: عروض نهاية الأسبوع وخصم 20% على أول طلب">
+        </div>
+        <button class="btn btn-gold" id="btn-gen-email" onclick="generateMarketingEmail()" style="width:100%;padding:10px;font-weight:800;margin-bottom:12px">
+          ✍️ توليد مسودة إيميل تسويقي بالذكاء الاصطناعي
+        </button>
+        <div id="mkt-email-draft-box" style="display:none;background:rgba(0,0,0,.3);border:1px solid var(--border);padding:14px;border-radius:var(--radius-sm);margin-top:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <b style="color:var(--accent);font-size:.85rem" id="mkt-draft-title">مسودة الإيميل:</b>
+            <span class="tag" id="mkt-draft-status" style="background:rgba(243,156,18,.15);color:var(--gold);border-color:var(--gold)">بانتظار موافقتك</span>
+          </div>
+          <div id="mkt-draft-content" style="font-size:.8rem;color:var(--fg);white-space:pre-wrap;line-height:1.6;margin-bottom:12px;background:rgba(255,255,255,.02);padding:10px;border-radius:4px"></div>
+          <input type="hidden" id="mkt-active-auto-id">
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-success btn-sm" onclick="decideMarketingEmail('approve')" style="flex:1;font-weight:800">
+              ✅ موافقة واعتماد الإرسال (Approve)
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="decideMarketingEmail('reject')" style="flex:1">
+              ❌ رفض المسودة (Reject)
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="mkt-social-sec" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:10px">
+          <div class="form-group">
+            <label>المنصة</label>
+            <select id="mkt-social-plat">
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="x">X / Twitter</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>موضوع البوست</label>
+            <input type="text" id="mkt-social-theme" placeholder="مثال: إعلان وصول تشكيلة جديدة + خصم فوري">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="generateSocialPost()" style="width:100%;padding:10px;font-weight:800;margin-bottom:12px">
+          🚀 توليد بوست فيروسي للمنصة
+        </button>
+        <div id="mkt-social-output-box" style="display:none;background:rgba(0,0,0,.3);border:1px solid var(--border);padding:14px;border-radius:var(--radius-sm)">
+          <div id="mkt-social-content" style="font-size:.8rem;color:var(--fg);white-space:pre-wrap;line-height:1.6;margin-bottom:10px"></div>
+          <button class="btn btn-ghost btn-sm" onclick="copySocialPost()">📋 نسخ المنشور</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <script>
 // State
 let currentMode = 'landing';
@@ -1126,7 +1447,7 @@ function updateAdminView(){
     $('#admin-auth-view').style.display = 'block';
     $('#admin-unauth-view').style.display = 'none';
     loadSummary();
-    loadAdminLedger();
+    loadAdminSitesManager();
   }else{
     $('#admin-auth-view').style.display = 'none';
     $('#admin-unauth-view').style.display = 'block';
@@ -1371,11 +1692,14 @@ async function handleCreateStore(e){
     if(a) aiAnswers.push({label: inp.dataset.label, a: a});
   });
 
+  const uploadedLogo = $('#wizard-uploaded-url')?.value || '';
+  const uploadedDocText = $('#wizard-extracted-text')?.value || '';
+
   const payload = {
     brand_name: $('#b-brand').value.trim(),
     category: $('#b-category').value,
     slogan: $('#b-slogan').value.trim(),
-    logo_url: $('#b-logo').value.trim(),
+    logo_url: $('#b-logo').value.trim() || uploadedLogo,
     palette: $('#b-palette').value,
     vodafone_cash: $('#b-vcash').value.trim(),
     instapay: $('#b-instapay').value.trim(),
@@ -1386,6 +1710,7 @@ async function handleCreateStore(e){
     address: $('#b-address').value.trim(),
     items: items,
     ai_answers: aiAnswers,
+    extracted_text: uploadedDocText,
     features: {
       auth: $('#feat-auth')?.checked ?? true,
       bilingual: $('#feat-bilingual')?.checked ?? true,
@@ -1530,30 +1855,62 @@ function renderMyStores(jobs){
           📋 <b>تفاصيل الطلب:</b> ${esc(j.request)}
         </div>
 
-        <!-- Actions (Only shown to owner or admin!) -->
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(0,206,201,.04);padding:12px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.15)">
-          <a href="${siteUrl}" target="_blank" class="btn btn-success" style="font-weight:900;padding:10px 20px">
-            🌐 فتح وتشغيل الموقع الإلكتروني (Live Website)
-          </a>
+        <!-- Actions (Shown to owner and admin) -->
+        <div style="background:rgba(0,206,201,.04);padding:14px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.18);display:flex;flex-direction:column;gap:10px">
+          <!-- Row 1: Core site and edit tools -->
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <a href="${siteUrl}" target="_blank" class="btn btn-success" style="font-weight:900;padding:8px 18px">
+              🌐 فتح وتشغيل الموقع
+            </a>
 
-          ${!isPaid ? `
-          <button class="btn btn-gold btn-sm" onclick="openPaymentModal(${j.id})">
-            💳 تفعيل الاشتراك والدفع (299 ج.م)
-          </button>` : ''}
+            <button class="btn btn-primary btn-sm" onclick="openRefineModal(${j.id}, '${esc(j.client)}')">
+              🪄 تطوير ببرومبت
+            </button>
 
-          <button class="btn btn-ghost btn-sm" onclick="openHostingModal(${j.id}, '${esc(j.client)}')">
-            ⚙️ إعدادات النشر والدومين والتحميل
-          </button>
+            <button class="btn btn-ghost btn-sm" onclick="openVisualEditModal(${j.id}, '${esc(j.client)}')">
+              🎨 المحرر المرئي
+            </button>
 
-          <button class="btn btn-primary btn-sm" onclick="openGitVercelModal(${j.id}, '${esc(j.client)}')">
-            🚀 نشر على GitHub & Vercel
-          </button>
+            <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, '${esc(j.client)}')">
+              ✏️ محرر الأكواد والملفات
+            </button>
 
-          <a href="/api/sites/${j.id}/orders" target="_blank" class="btn btn-ghost btn-sm">
-            📦 أوردرات المتجر (<b style="color:var(--gold)">${j.orders_count || 0}</b>)
-          </a>
+            <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, '${esc(j.client)}')">
+              📦 إدارة المنتجات
+            </button>
 
-          <span style="color:var(--fg3);font-size:.72rem;margin-right:auto">Subdomain: <code>${j.id}.localhost:8000</code></span>
+            <a href="/api/sites/${j.id}/orders" target="_blank" class="btn btn-ghost btn-sm">
+              🛒 الأوردرات (<b style="color:var(--gold)">${j.orders_count || 0}</b>)
+            </a>
+          </div>
+
+          <!-- Row 2: Marketing, Integrations, Deployment & Deletion -->
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.06);padding-top:10px">
+            <button class="btn btn-gold btn-sm" onclick="openMarketingModal(${j.id}, '${esc(j.client)}')">
+              📢 التسويق الذكي بالإيميل
+            </button>
+
+            <button class="btn btn-ghost btn-sm" onclick="openBotModal(${j.id}, '${esc(j.client)}')">
+              🤖 ربط بوت Telegram & WhatsApp
+            </button>
+
+            <button class="btn btn-ghost btn-sm" onclick="openHostingModal(${j.id}, '${esc(j.client)}')">
+              ⚙️ النشر والدومين و ZIP
+            </button>
+
+            <button class="btn btn-primary btn-sm" onclick="openGitVercelModal(${j.id}, '${esc(j.client)}')">
+              🚀 نشر GitHub & Vercel
+            </button>
+
+            ${!isPaid ? `
+            <button class="btn btn-gold btn-sm" onclick="openPaymentModal(${j.id})">
+              💳 تفعيل الاشتراك
+            </button>` : ''}
+
+            <button class="btn btn-danger btn-sm" onclick="openDeleteConfirmModal(${j.id}, '${esc(j.client)}')" style="margin-right:auto">
+              🗑️ حذف المشروع نهائياً
+            </button>
+          </div>
         </div>
 
         <!-- Collapsible internal logs -->
@@ -2006,6 +2363,735 @@ function logoutAdmin(){
   isAdmin = false;
   renderUserBadge();
   updateAdminView();
+}
+
+// =========================================================
+// Multimodal Wizard File Upload (Logo / PDF Menu / Catalog)
+// =========================================================
+async function handleWizardFileUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusDiv = $('#wizard-upload-status');
+  statusDiv.style.display = 'block';
+  statusDiv.innerHTML = '<span style="color:var(--gold)">⏳ جاري رفع الملف وقراءة محتواه بالذكاء الاصطناعي...</span>';
+  
+  const fd = new FormData();
+  fd.append('file', file);
+  
+  try{
+    const res = await fetch('/api/upload', {method: 'POST', body: fd});
+    const d = await res.json();
+    if(res.ok && d.success){
+      $('#wizard-uploaded-url').value = d.url;
+      $('#wizard-extracted-text').value = d.extracted_text || '';
+      if(d.file_type === 'image'){
+        $('#b-logo').value = d.url;
+        statusDiv.innerHTML = `<span style="color:var(--success)">✅ تم رفع الشعار بنجاح! تم تعيينه كـ Logo للمشروع.</span>`;
+      } else {
+        const charCount = (d.extracted_text || '').length;
+        statusDiv.innerHTML = `<span style="color:var(--success)">✅ تم فحص ملف (${esc(d.original_name)}) بنجاح! تم استخراج ${charCount} حرف سيتم استخدامها في برمجة محتوى الموقع.</span>`;
+      }
+    } else {
+      statusDiv.innerHTML = `<span style="color:var(--danger)">❌ فشل رفع الملف: ${esc(d.detail || 'خطأ غير معروف')}</span>`;
+    }
+  }catch(err){
+    statusDiv.innerHTML = `<span style="color:var(--danger)">❌ خطأ في الرفع: ${esc(err.message)}</span>`;
+  }
+}
+
+// =========================================================
+// Delete Project Confirmation Modal Logic
+// =========================================================
+function openDeleteConfirmModal(jid, brand){
+  $('#del-modal-jid').value = jid;
+  $('#del-modal-target').textContent = `#${jid} (${brand})`;
+  $('#delete-confirm-modal').classList.add('open');
+}
+
+function closeDeleteConfirmModal(){
+  $('#delete-confirm-modal').classList.remove('open');
+}
+
+async function executeSiteDelete(){
+  const jid = $('#del-modal-jid').value;
+  const btn = $('#btn-confirm-delete');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الحذف...';
+  
+  try{
+    const token = getSafeToken();
+    const res = await fetch(`/api/sites/${jid}`, {
+      method: 'DELETE',
+      headers: {'x-user-token': token}
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      alert('🗑️ ' + d.message);
+      closeDeleteConfirmModal();
+      loadJobs();
+      if(isAdmin) loadAdminSitesManager();
+    } else {
+      alert('❌ خطأ: ' + (d.detail || 'تعذر حذف المشروع'));
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🗑️ نعم، احذف المشروع نهائياً';
+  }
+}
+
+// =========================================================
+// In-Browser Code & File Editor Logic
+// =========================================================
+async function openFileEditorModal(jid, brand){
+  $('#fem-jid').value = jid;
+  $('#fem-title').textContent = `✏️ محرر الأكواد والملفات: #${jid} (${brand})`;
+  $('#fem-status-msg').textContent = '';
+  await reloadFileEditorList();
+  $('#file-editor-modal').classList.add('open');
+}
+
+function closeFileEditorModal(){
+  $('#file-editor-modal').classList.remove('open');
+}
+
+async function reloadFileEditorList(){
+  const jid = $('#fem-jid').value;
+  const token = getSafeToken();
+  const sel = $('#fem-file-select');
+  sel.innerHTML = '<option value="">جاري جلب قائمة الملفات...</option>';
+  
+  try{
+    const res = await fetch(`/api/sites/${jid}/files`, {headers: {'x-user-token': token}});
+    const files = await res.json();
+    sel.innerHTML = files.map(f => `<option value="${f.filename}">${f.filename} (${f.type})</option>`).join('');
+    if(files.length){
+      sel.value = files[0].filename;
+      await onFileEditorSelectChange();
+    }
+  }catch(e){
+    sel.innerHTML = `<option value="">فشل التحميل: ${e.message}</option>`;
+  }
+}
+
+async function onFileEditorSelectChange(){
+  const jid = $('#fem-jid').value;
+  const filename = $('#fem-file-select').value;
+  if(!filename) return;
+  const editor = $('#fem-code-editor');
+  editor.value = 'جاري تحميل محتوى الملف...';
+  
+  try{
+    const token = getSafeToken();
+    const res = await fetch(`/api/sites/${jid}/files/${filename}`, {headers: {'x-user-token': token}});
+    const d = await res.json();
+    if(res.ok){
+      editor.value = d.content || (d.file_url ? `[ملف وسائط: ${d.file_url}]` : '');
+    } else {
+      editor.value = `❌ تعذر فتح الملف: ${d.detail || 'غير موجود'}`;
+    }
+  }catch(e){
+    editor.value = `خطأ: ${e.message}`;
+  }
+}
+
+async function saveActiveFileContent(){
+  const jid = $('#fem-jid').value;
+  const filename = $('#fem-file-select').value;
+  const content = $('#fem-code-editor').value;
+  const btn = $('#btn-save-file');
+  const msg = $('#fem-status-msg');
+  
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الحفظ...';
+  msg.textContent = '';
+  
+  try{
+    const token = getSafeToken();
+    const res = await fetch(`/api/sites/${jid}/files/${filename}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify({content: content})
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      msg.textContent = '✅ ' + d.message;
+      setTimeout(() => { msg.textContent = ''; }, 4000);
+    } else {
+      alert('❌ خطأ: ' + (d.detail || 'فشل حفظ الملف'));
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '💾 حفظ التعديلات على الملف فوراً';
+  }
+}
+
+// =========================================================
+// Prompt-Based Iterative Refinement Logic
+// =========================================================
+function openRefineModal(jid, brand){
+  $('#refine-jid').value = jid;
+  $('#refine-modal-title').textContent = `🪄 تطوير وتحديث الموقع ببرومبت ذكي: #${jid} (${brand})`;
+  $('#refine-prompt').value = '';
+  $('#refine-file-url').value = '';
+  $('#refine-doc-text').value = '';
+  $('#refine-upload-note').textContent = '';
+  $('#refine-output-msg').style.display = 'none';
+  $('#refine-modal').classList.add('open');
+}
+
+function closeRefineModal(){
+  $('#refine-modal').classList.remove('open');
+}
+
+async function handleRefineFileUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const note = $('#refine-upload-note');
+  note.textContent = '⏳ جاري الرفع واستخراج المحتوى...';
+  
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('job_id', $('#refine-jid').value);
+  
+  try{
+    const res = await fetch('/api/upload', {method: 'POST', body: fd});
+    const d = await res.json();
+    if(res.ok && d.success){
+      $('#refine-file-url').value = d.url;
+      $('#refine-doc-text').value = d.extracted_text || '';
+      note.textContent = `✅ تم إرفاق الملف بنجاح (${d.filename})`;
+    } else {
+      note.textContent = '❌ فشل إرفاق الملف';
+    }
+  }catch(err){
+    note.textContent = '❌ خطأ: ' + err.message;
+  }
+}
+
+async function submitRefineSite(){
+  const jid = $('#refine-jid').value;
+  const prompt = $('#refine-prompt').value.trim();
+  const fileUrl = $('#refine-file-url').value;
+  const docText = $('#refine-doc-text').value;
+  const btn = $('#btn-run-refine');
+  const out = $('#refine-output-msg');
+  
+  if(!prompt){
+    alert('يرجى كتابة تعليمات التعديل والتطوير');
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الآن إعادة بناء وتطوير الموقع...';
+  out.style.display = 'block';
+  out.innerHTML = '<div style="color:var(--gold);font-size:.82rem">🔄 كبير مهندسي AutoCorp يقوم الآن بتطبيق التعديلات وإعادة كتابة الأكواد...</div>';
+  
+  try{
+    const token = getSafeToken();
+    const res = await fetch(`/api/sites/${jid}/refine`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        file_url: fileUrl || undefined,
+        extracted_text: docText || undefined
+      })
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      out.innerHTML = `
+        <div style="background:rgba(0,206,201,.1);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;margin-top:10px">
+          <div style="color:var(--accent);font-weight:900;margin-bottom:6px">🎉 تم تحديث الموقع بنجاح!</div>
+          <p style="font-size:.8rem;color:var(--fg);margin-bottom:8px">${esc(d.message)}</p>
+          <a href="${d.frontend_url}" target="_blank" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
+            🌐 فتح الموقع المحدّث (${esc(d.frontend_url)})
+          </a>
+        </div>
+      `;
+      loadJobs();
+    } else {
+      out.innerHTML = `<div style="color:var(--danger);font-size:.82rem">❌ ${esc(d.detail || 'فشل التعديل')}</div>`;
+    }
+  }catch(e){
+    out.innerHTML = `<div style="color:var(--danger);font-size:.82rem">❌ ${esc(e.message)}</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🪄 تطبيق التعديل والتطوير بالذكاء الاصطناعي';
+  }
+}
+
+// =========================================================
+// Visual & Component Editor Logic
+// =========================================================
+async function openVisualEditModal(jid, brand){
+  $('#vem-jid').value = jid;
+  $('#vem-title').textContent = `🎨 المحرر المرئي وإدارة الأقسام: #${jid} (${brand})`;
+  
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/settings`, {headers: {'x-user-token': token}});
+    const s = await res.json();
+    $('#vem-brand').value = s.brand_name || brand;
+    $('#vem-slogan').value = s.slogan || '';
+    $('#vem-color-primary').value = s.color_primary || '#00cec9';
+    $('#vem-color-secondary').value = s.color_secondary || '#6c5ce7';
+    $('#vem-logo').value = s.logo_url || '';
+    $('#vem-whatsapp').value = s.whatsapp || '';
+    $('#vem-vcash').value = s.vodafone_cash || '';
+  }catch(e){}
+  
+  $('#visual-edit-modal').classList.add('open');
+}
+
+function closeVisualEditModal(){
+  $('#visual-edit-modal').classList.remove('open');
+}
+
+async function handleVemLogoUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('job_id', $('#vem-jid').value);
+  try{
+    const res = await fetch('/api/upload', {method: 'POST', body: fd});
+    const d = await res.json();
+    if(res.ok && d.success){
+      $('#vem-logo').value = d.url;
+      alert('✅ تم رفع اللوجو بنجاح!');
+    }
+  }catch(err){
+    alert('❌ خطأ في الرفع: ' + err.message);
+  }
+}
+
+async function submitVisualEdit(){
+  const jid = $('#vem-jid').value;
+  const token = getSafeToken();
+  const payload = {
+    brand_name: $('#vem-brand').value.trim(),
+    slogan: $('#vem-slogan').value.trim(),
+    color_primary: $('#vem-color-primary').value,
+    color_secondary: $('#vem-color-secondary').value,
+    logo_url: $('#vem-logo').value.trim(),
+    whatsapp: $('#vem-whatsapp').value.trim(),
+    vodafone_cash: $('#vem-vcash').value.trim(),
+    enable_faq: $('#vem-toggle-faq').checked,
+    enable_reviews: $('#vem-toggle-reviews').checked,
+    enable_gallery: $('#vem-toggle-gallery').checked,
+    enable_promo: $('#vem-toggle-promo').checked
+  };
+  
+  try{
+    const res = await fetch(`/api/sites/${jid}/visual-edit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      alert('🎨 ' + d.message);
+      closeVisualEditModal();
+      loadJobs();
+    } else {
+      alert('❌ خطأ: ' + (d.detail || 'تعذر حفظ التعديلات'));
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
+}
+
+// =========================================================
+// Products & Services Catalog Manager Logic
+// =========================================================
+async function openProductsModal(jid, brand){
+  $('#pm-jid').value = jid;
+  $('#pm-title').textContent = `📦 إدارة منتجات وخدمات المتجر: #${jid} (${brand})`;
+  await loadProductsList(jid);
+  $('#products-modal').classList.add('open');
+}
+
+function closeProductsModal(){
+  $('#products-modal').classList.remove('open');
+}
+
+async function loadProductsList(jid){
+  const tb = $('#pm-tbody');
+  tb.innerHTML = '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--fg3)">جاري جلب المنتجات...</td></tr>';
+  try{
+    const res = await fetch(`/api/sites/${jid}/items`);
+    const items = await res.json();
+    if(!items.length){
+      tb.innerHTML = '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--fg3)">لا توجد منتجات مسجلة حتى الآن</td></tr>';
+      return;
+    }
+    tb.innerHTML = items.map(it => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <td style="padding:6px">
+          ${it.image_url ? `<img src="${it.image_url}" style="width:34px;height:34px;object-fit:cover;border-radius:4px">` : '🛒'}
+        </td>
+        <td style="padding:6px;font-weight:700">${esc(it.title)}</td>
+        <td style="padding:6px;color:var(--gold)">${it.price} ج.م</td>
+        <td style="padding:6px;color:var(--fg3)">${esc(it.category || 'عام')}</td>
+        <td style="padding:6px">
+          <button class="btn btn-danger btn-sm" onclick="deleteProductItem(${it.id})" style="padding:4px 8px;font-size:.7rem">حذف</button>
+        </td>
+      </tr>
+    `).join('');
+  }catch(e){
+    tb.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">فشل التحميل: ${e.message}</td></tr>`;
+  }
+}
+
+async function handleProductImageUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('job_id', $('#pm-jid').value);
+  try{
+    const res = await fetch('/api/upload', {method: 'POST', body: fd});
+    const d = await res.json();
+    if(res.ok && d.success){
+      $('#pm-new-image').value = d.url;
+      alert('📷 تم رفع صورة المنتج بنجاح!');
+    }
+  }catch(err){
+    alert('❌ خطأ في الرفع: ' + err.message);
+  }
+}
+
+async function submitAddNewProduct(){
+  const jid = $('#pm-jid').value;
+  const title = $('#pm-new-title').value.trim();
+  const price = parseFloat($('#pm-new-price').value) || 0;
+  const cat = $('#pm-new-cat').value.trim();
+  const badge = $('#pm-new-badge').value.trim();
+  const desc = $('#pm-new-desc').value.trim();
+  const img = $('#pm-new-image').value.trim();
+  
+  if(!title){
+    alert('يرجى إدخال اسم المنتج أو الخدمة');
+    return;
+  }
+  
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/items`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify({
+        title: title,
+        price: price,
+        category: cat,
+        badge: badge,
+        description: desc,
+        image_url: img
+      })
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      alert('✅ ' + d.message);
+      $('#pm-new-title').value = '';
+      $('#pm-new-price').value = '';
+      $('#pm-new-desc').value = '';
+      $('#pm-new-image').value = '';
+      loadProductsList(jid);
+      loadJobs();
+    } else {
+      alert('❌ خطأ: ' + (d.detail || 'فشل إضافة المنتج'));
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
+}
+
+async function deleteProductItem(itemId){
+  if(!confirm('هل أنت متأكد من حذف هذا الصنف من المتجر؟')) return;
+  const jid = $('#pm-jid').value;
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/items/${itemId}`, {
+      method: 'DELETE',
+      headers: {'x-user-token': token}
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      loadProductsList(jid);
+      loadJobs();
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
+}
+
+// =========================================================
+// Bot Integrations (Telegram & WhatsApp) Logic
+// =========================================================
+async function openBotModal(jid, brand){
+  $('#bim-jid').value = jid;
+  $('#bim-title').textContent = `🤖 ربط بوت خدمة العملاء: #${jid} (${brand})`;
+  
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/integrations`, {headers: {'x-user-token': token}});
+    const d = await res.json();
+    if(d.config){
+      $('#bim-platform').value = d.config.bot_platform || 'telegram';
+      $('#bim-token').value = d.config.bot_token || '';
+      $('#bim-name').value = d.config.bot_name || '';
+      $('#bim-prompt').value = d.config.system_prompt || d.suggested_prompt || '';
+    } else {
+      $('#bim-prompt').value = d.suggested_prompt || '';
+    }
+  }catch(e){}
+  
+  $('#bot-integration-modal').classList.add('open');
+}
+
+function closeBotModal(){
+  $('#bot-integration-modal').classList.remove('open');
+}
+
+async function submitSaveBotConfig(){
+  const jid = $('#bim-jid').value;
+  const plat = $('#bim-platform').value;
+  const btoken = $('#bim-token').value.trim();
+  const bname = $('#bim-name').value.trim();
+  const bprompt = $('#bim-prompt').value.trim();
+  
+  if(!btoken){
+    alert('يرجى إدخال رمز الـ API Token للبوت');
+    return;
+  }
+  
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/integrations/bot`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify({
+        bot_platform: plat,
+        bot_token: btoken,
+        bot_name: bname,
+        system_prompt: bprompt
+      })
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      alert('🤖 ' + d.message);
+      closeBotModal();
+    } else {
+      alert('❌ خطأ: ' + (d.detail || 'فشل حفظ إعدادات البوت'));
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
+}
+
+// =========================================================
+// AI Marketing Automations & Human Approval Logic
+// =========================================================
+function openMarketingModal(jid, brand){
+  $('#mm-jid').value = jid;
+  $('#mm-title').textContent = `📢 التسويق الذكي واعتماد الحملات: #${jid} (${brand})`;
+  $('#mkt-email-draft-box').style.display = 'none';
+  $('#mkt-social-output-box').style.display = 'none';
+  switchMktTab('email');
+  $('#marketing-modal').classList.add('open');
+}
+
+function closeMarketingModal(){
+  $('#marketing-modal').classList.remove('open');
+}
+
+function switchMktTab(tab){
+  if(tab === 'email'){
+    $('#tab-mkt-email').className = 'btn btn-primary btn-sm';
+    $('#tab-mkt-social').className = 'btn btn-ghost btn-sm';
+    $('#mkt-email-sec').style.display = 'block';
+    $('#mkt-social-sec').style.display = 'none';
+  } else {
+    $('#tab-mkt-email').className = 'btn btn-ghost btn-sm';
+    $('#tab-mkt-social').className = 'btn btn-primary btn-sm';
+    $('#mkt-email-sec').style.display = 'none';
+    $('#mkt-social-sec').style.display = 'block';
+  }
+}
+
+async function generateMarketingEmail(){
+  const jid = $('#mm-jid').value;
+  const goal = $('#mkt-email-goal').value.trim();
+  const btn = $('#btn-gen-email');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري كتابة مسودة الإيميل بالذكاء الاصطناعي...';
+  
+  try{
+    const token = getSafeToken();
+    const res = await fetch(`/api/sites/${jid}/automations/generate-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify({goal: goal || undefined})
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      $('#mkt-draft-title').textContent = d.title;
+      $('#mkt-draft-content').textContent = d.content;
+      $('#mkt-draft-status').textContent = 'بانتظار موافقتك (Pending Approval)';
+      $('#mkt-active-auto-id').value = d.automation_id;
+      $('#mkt-email-draft-box').style.display = 'block';
+    } else {
+      alert('❌ خطأ: ' + (d.detail || 'فشل توليد الإيميل'));
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '✍️ توليد مسودة إيميل تسويقي بالذكاء الاصطناعي';
+  }
+}
+
+async function decideMarketingEmail(decision){
+  const jid = $('#mm-jid').value;
+  const autoId = $('#mkt-active-auto-id').value;
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/automations/approve-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify({automation_id: autoId, decision: decision})
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      alert('✅ ' + d.message);
+      $('#mkt-draft-status').textContent = decision === 'approve' ? '✅ معتمد وجاهز للإرسال' : '❌ مرفوض';
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
+}
+
+async function generateSocialPost(){
+  const jid = $('#mm-jid').value;
+  const plat = $('#mkt-social-plat').value;
+  const theme = $('#mkt-social-theme').value.trim();
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/automations/generate-social`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify({platform: plat, theme: theme || undefined})
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      $('#mkt-social-content').textContent = d.content;
+      $('#mkt-social-output-box').style.display = 'block';
+    }
+  }catch(e){
+    alert('خطأ: ' + e.message);
+  }
+}
+
+function copySocialPost(){
+  const t = $('#mkt-social-content').textContent;
+  navigator.clipboard.writeText(t).then(() => {
+    alert('📋 تم نسخ محتوى المنشور إلى الحافظة!');
+  });
+}
+
+// =========================================================
+// Super Admin All-Sites & Files Manager
+// =========================================================
+async function loadAdminSitesManager(){
+  const c = $('#admin-subcontent');
+  c.innerHTML = '<div style="color:var(--fg3);padding:10px">جاري جلب كافة مشاريع الوكالة...</div>';
+  try{
+    const token = getSafeToken();
+    const res = await fetch('/api/jobs', {headers: {'x-admin-key': token}});
+    const jobs = await res.json();
+    if(!jobs.length){
+      c.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--fg3)">لا توجد أي مشاريع مسجلة حالياً في النظام.</div>';
+      return;
+    }
+    c.innerHTML = `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <h4 style="font-weight:900;color:var(--gold)">🗂️ إدارة وتحكم بكافة المشاريع والملفات (${jobs.length} مشروع)</h4>
+          <span style="font-size:.78rem;color:var(--fg3)">صلاحيات المدير العام: تعديل الأكواد والملفات، التطوير بالبرومبت، الحذف الجذري</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;font-size:.78rem;border-collapse:collapse;text-align:right">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);color:var(--fg3)">
+                <th style="padding:8px">المعرف</th>
+                <th style="padding:8px">الاسم والعميل</th>
+                <th style="padding:8px">الحالة</th>
+                <th style="padding:8px">الاشتراك</th>
+                <th style="padding:8px">الأوردرات</th>
+                <th style="padding:8px">إجراءات التحكم السريع</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${jobs.map(j => {
+                const siteUrl = j.frontend_url || ('/sites/' + (j.slug || j.id) + '/');
+                return `
+                <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+                  <td style="padding:8px;font-family:'JetBrains Mono',monospace;color:var(--accent2)">#${j.id}</td>
+                  <td style="padding:8px"><b>${esc(j.client || j.brand_name)}</b></td>
+                  <td style="padding:8px"><span class="tag ${j.status === 'delivered' ? 'tag-delivered' : 'tag-running'}">${j.status}</span></td>
+                  <td style="padding:8px;color:${j.is_paid ? 'var(--success)' : 'var(--gold)'}">${j.is_paid ? '✅ مدفوع' : '⏳ تجريبي'}</td>
+                  <td style="padding:8px"><b>${j.orders_count || 0}</b></td>
+                  <td style="padding:8px">
+                    <div style="display:flex;gap:4px;flex-wrap:wrap">
+                      <a href="${siteUrl}" target="_blank" class="btn btn-success btn-sm" style="padding:3px 7px;font-size:.7rem">🌐 فتح</a>
+                      <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">✏️ الأكواد</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openVisualEditModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🎨 المرئي</button>
+                      <button class="btn btn-primary btn-sm" onclick="openRefineModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🪄 برومبت</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">📦 المنتجات</button>
+                      <button class="btn btn-gold btn-sm" onclick="openMarketingModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">📢 تسويق</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openBotModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🤖 بوتات</button>
+                      <button class="btn btn-danger btn-sm" onclick="openDeleteConfirmModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🗑️ حذف</button>
+                    </div>
+                  </td>
+                </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }catch(e){
+    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
+  }
 }
 
 // Initial Run

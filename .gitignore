@@ -31,3 +31,10 @@ Thumbs.db
 
 # Vercel
 .vercel/
+
+# Uploads
+static/uploads/*
+!static/uploads/.gitkeep
+api/static/uploads/*
+!api/static/uploads/.gitkeep
+

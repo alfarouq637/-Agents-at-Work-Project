@@ -170,6 +170,34 @@ CREATE TABLE IF NOT EXISTS telegram_conversations (
     last_message TEXT,
     updated_at REAL
 );
+CREATE TABLE IF NOT EXISTS site_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER,
+    filename TEXT,
+    file_type TEXT,
+    content TEXT,
+    file_url TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS site_automations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER,
+    type TEXT,
+    title TEXT,
+    content TEXT,
+    target_platform TEXT,
+    status TEXT DEFAULT 'pending_approval',
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS site_bot_configs (
+    job_id INTEGER PRIMARY KEY,
+    bot_platform TEXT,
+    bot_token TEXT,
+    bot_name TEXT,
+    system_prompt TEXT,
+    is_active INTEGER DEFAULT 1,
+    updated_at REAL
+);
 """
 
 # --------------- Turso HTTP helpers ---------------
