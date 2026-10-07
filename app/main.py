@@ -149,12 +149,19 @@ async def upload_file(
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
-    """Uploads logos, images, or PDF documents with PyMuPDF text extraction."""
-    upload_dir = os.path.join(BASE, "static", "uploads")
+    """Uploads logos, images, or PDF documents with PyMuPDF / pypdf text extraction."""
+    if IS_VERCEL:
+        upload_dir = "/tmp/uploads"
+    else:
+        upload_dir = os.path.join(BASE, "static", "uploads")
     os.makedirs(upload_dir, exist_ok=True)
-    api_upload_dir = os.path.join(BASE, "api", "static", "uploads")
-    if os.path.exists(os.path.join(BASE, "api")):
-        os.makedirs(api_upload_dir, exist_ok=True)
+
+    if not IS_VERCEL:
+        api_upload_dir = os.path.join(BASE, "api", "static", "uploads")
+        if os.path.exists(os.path.join(BASE, "api")):
+            os.makedirs(api_upload_dir, exist_ok=True)
+    else:
+        api_upload_dir = None
 
     raw_filename = file.filename or "upload"
     ext = os.path.splitext(raw_filename)[1].lower()
@@ -166,7 +173,7 @@ async def upload_file(
     with open(target_path, "wb") as f:
         f.write(content_bytes)
 
-    if os.path.exists(api_upload_dir):
+    if api_upload_dir and os.path.exists(api_upload_dir):
         try:
             with open(os.path.join(api_upload_dir, safe_filename), "wb") as f:
                 f.write(content_bytes)
@@ -186,8 +193,13 @@ async def upload_file(
                 if t:
                     pages_text.append(t)
             extracted_text = "\n".join(pages_text).strip()
-        except Exception as e:
-            extracted_text = f"(تعذر استخراج النص من PDF: {e})"
+        except Exception:
+            try:
+                import io, pypdf
+                reader = pypdf.PdfReader(io.BytesIO(content_bytes))
+                extracted_text = "\n".join([p.extract_text() or "" for p in reader.pages]).strip()
+            except Exception as e:
+                extracted_text = f"(تعذر استخراج النص من PDF: {e})"
     elif ext in (".txt", ".md", ".json", ".csv"):
         try:
             extracted_text = content_bytes.decode("utf-8", errors="ignore")[:10000]
@@ -220,12 +232,14 @@ async def upload_file(
 async def serve_uploaded_file(filename: str):
     """Serves uploaded media and PDF documents."""
     fn = os.path.basename(filename)
-    p = os.path.join(BASE, "static", "uploads", fn)
-    if os.path.exists(p):
-        return FileResponse(p)
-    p2 = os.path.join(BASE, "api", "static", "uploads", fn)
-    if os.path.exists(p2):
-        return FileResponse(p2)
+    candidates = [
+        os.path.join(BASE, "static", "uploads", fn),
+        os.path.join(BASE, "api", "static", "uploads", fn),
+        os.path.join("/tmp", "uploads", fn)
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return FileResponse(p)
     raise HTTPException(404, "الملف غير موجود")
 
 
@@ -2222,8 +2236,9 @@ async def handle_telegram_update(u: dict):
                     if f_path:
                         raw_bytes = (await cl.get(f"https://api.telegram.org/file/bot{token}/{f_path}")).content
                         clean_fn = f"{int(time.time())}_{re.sub(r'[^a-zA-Z0-9_.-]', '_', file_name)}"
-                        up_path = os.path.join(BASE, "static", "uploads", clean_fn)
-                        os.makedirs(os.path.dirname(up_path), exist_ok=True)
+                        up_dir = "/tmp/uploads" if IS_VERCEL else os.path.join(BASE, "static", "uploads")
+                        os.makedirs(up_dir, exist_ok=True)
+                        up_path = os.path.join(up_dir, clean_fn)
                         with open(up_path, "wb") as f:
                             f.write(raw_bytes)
                         if file_name.lower().endswith(".pdf") or "pdf" in mime:
@@ -2231,8 +2246,13 @@ async def handle_telegram_update(u: dict):
                                 import fitz
                                 d_doc = fitz.open(stream=raw_bytes, filetype="pdf")
                                 uploaded_doc_text = "\n".join(page.get_text() for page in d_doc).strip()
-                            except Exception as ex:
-                                uploaded_doc_text = f"Error extracting PDF: {ex}"
+                            except Exception:
+                                try:
+                                    import io, pypdf
+                                    reader = pypdf.PdfReader(io.BytesIO(raw_bytes))
+                                    uploaded_doc_text = "\n".join([p.extract_text() or "" for p in reader.pages]).strip()
+                                except Exception as ex:
+                                    uploaded_doc_text = f"Error extracting PDF: {ex}"
                         uploaded_doc_name = clean_fn
                         text = f"{text}\n\n[مستند مرفق من العميل: {file_name}]:\n{uploaded_doc_text[:3500]}".strip()
             except Exception as e:
@@ -2251,8 +2271,9 @@ async def handle_telegram_update(u: dict):
                     if f_path:
                         raw_bytes = (await cl.get(f"https://api.telegram.org/file/bot{token}/{f_path}")).content
                         clean_fn = f"{int(time.time())}_tg_photo.jpg"
-                        up_path = os.path.join(BASE, "static", "uploads", clean_fn)
-                        os.makedirs(os.path.dirname(up_path), exist_ok=True)
+                        up_dir = "/tmp/uploads" if IS_VERCEL else os.path.join(BASE, "static", "uploads")
+                        os.makedirs(up_dir, exist_ok=True)
+                        up_path = os.path.join(up_dir, clean_fn)
                         with open(up_path, "wb") as f:
                             f.write(raw_bytes)
                         uploaded_photo_url = f"/static/uploads/{clean_fn}"

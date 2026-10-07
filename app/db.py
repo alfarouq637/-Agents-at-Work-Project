@@ -13,7 +13,7 @@ import httpx
 
 TURSO_URL = os.getenv("TURSO_DATABASE_URL", "").strip()
 TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
-LOCAL_DB = os.getenv("SQLITE_PATH", "corp.db")
+LOCAL_DB = os.getenv("SQLITE_PATH", "/tmp/corp.db" if os.getenv("VERCEL", "0") == "1" else "corp.db")
 
 # Normalize libsql:// → https://
 _TURSO_HTTP = ""
