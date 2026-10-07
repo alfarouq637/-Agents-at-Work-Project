@@ -687,18 +687,49 @@ textarea{resize:vertical;min-height:75px}
   </div>
 
   <!-- Global Footer -->
-  <footer style="margin-top:40px;padding:24px 0 16px;border-top:1px solid var(--border);text-align:center;font-size:.82rem;color:var(--fg3);font-family:'Readex Pro',sans-serif">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-weight:900;color:var(--fg)">⚡ AutoCorp</span>
-        <span>— Autonomous AI Agency for Egyptian SMEs</span>
+  <footer style="margin-top:40px;padding:28px 0 20px;border-top:1px solid var(--border);text-align:center;font-size:.84rem;color:var(--fg3);font-family:'Readex Pro',sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-weight:900;color:var(--fg);font-size:1.05rem">⚡ AutoCorp</span>
+        <span style="color:var(--fg2)">— الوكالة البرمجية الذكية لتمكين وتطوير الشركات الناشئة المصرية</span>
       </div>
-      <div style="display:flex;gap:14px;align-items:center">
-        <a href="https://t.me/autocorp_Alfarouq_Ibrahim_bot" target="_blank" style="color:var(--accent2);text-decoration:none">🤖 Telegram Bot</a>
-        <a href="https://github.com/alfarouq637/-Agents-at-Work-Project" target="_blank" style="color:var(--fg2);text-decoration:none">GitHub</a>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:.82rem">
+        <a href="https://www.linkedin.com/in/alfarouq-ibrahim" target="_blank" style="color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+          💼 LinkedIn
+        </a>
+        <a href="https://github.com/alfarouq637" target="_blank" style="color:var(--fg);text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+          🐙 GitHub
+        </a>
+        <a href="https://wa.me/201023456789" target="_blank" style="color:#2ecc71;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+          📱 WhatsApp
+        </a>
+        <a href="https://t.me/autocorp_Alfarouq_Ibrahim_bot" target="_blank" style="color:var(--accent2);text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:4px">
+          🤖 Telegram Bot
+        </a>
       </div>
     </div>
-    <div>
+
+    <!-- Lead Engineer & Founder Attribution Bar -->
+    <div style="background:rgba(0,206,201,.05);border:1px solid rgba(0,206,201,.18);border-radius:var(--radius-sm);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;text-align:right">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.05rem;box-shadow:0 4px 14px rgba(0,206,201,.3);flex-shrink:0">
+          AF
+        </div>
+        <div>
+          <div style="font-weight:900;color:var(--fg);font-size:.95rem">
+            م. الفاروق إبراهيم فاروق <span style="font-weight:400;color:var(--fg3);font-size:.8rem">(Alfarouq Ibrahim Farouq)</span>
+          </div>
+          <div style="font-size:.76rem;color:var(--accent2);font-weight:700">
+            Founder & Lead AI Engineer — صانع بنية AutoCorp ونظام الوكلاء الذاتيين
+          </div>
+        </div>
+      </div>
+      <div style="font-size:.78rem;color:var(--fg2);display:flex;gap:10px;align-items:center">
+        <span>📧 <a href="mailto:alfarwqabrahym0@gmail.com" style="color:var(--accent2);text-decoration:none">alfarwqabrahym0@gmail.com</a></span>
+      </div>
+    </div>
+
+    <div style="font-size:.76rem;color:var(--fg3)">
       AutoCorp &copy; 2026 — Autonomous AI Digital Agency for Egyptian SMEs. All rights reserved.
     </div>
   </footer>
@@ -1262,6 +1293,107 @@ textarea{resize:vertical;min-height:75px}
           <button class="btn btn-ghost btn-sm" onclick="copySocialPost()">📋 نسخ المنشور</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: TENANT DATABASE ENGINE STUDIO                      -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="database-modal">
+    <div class="modal" style="max-width:840px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <div>
+          <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2);margin:0" id="dbm-title">🗄️ استوديو قاعدة بيانات المتجر (Tenant Database)</h3>
+          <p style="font-size:.78rem;color:var(--fg3);margin:2px 0 0" id="dbm-subtitle">إدارة واستعراض قاعدة البيانات المستقلة للمتجر (Enterprise Multi-Tenant Engine)</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeDatabaseModal()">✕</button>
+      </div>
+      <input type="hidden" id="dbm-jid">
+
+      <!-- Database Info Banner -->
+      <div style="background:linear-gradient(135deg,rgba(0,206,201,.08),rgba(108,92,231,.08));border:1px solid rgba(0,206,201,.2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;font-size:.8rem">
+          <div>
+            <span style="color:var(--fg3);display:block;font-size:.72rem">معرف قاعدة البيانات</span>
+            <b id="dbm-tenant-id" style="color:var(--accent2);font-family:monospace">tenant_db_#</b>
+          </div>
+          <div>
+            <span style="color:var(--fg3);display:block;font-size:.72rem">محرك قاعدة البيانات</span>
+            <b id="dbm-engine" style="color:var(--fg)">SQLite 3 / libSQL</b>
+          </div>
+          <div>
+            <span style="color:var(--fg3);display:block;font-size:.72rem">ملف قاعدة البيانات</span>
+            <b id="dbm-filename" style="color:var(--gold);font-family:monospace">database.sqlite</b>
+          </div>
+          <div>
+            <span style="color:var(--fg3);display:block;font-size:.72rem">إجمالي الجداول والسجلات</span>
+            <b id="dbm-stats" style="color:var(--success)">8 جداول (0 سجل)</b>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-success btn-sm" onclick="downloadTenantDbSqlite()">
+            ⬇️ تحميل ملف database.sqlite
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="openSchemaInCodeEditor()">
+            📜 استعراض schema.sql في المحرر
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="refreshTenantDbData()">
+            🔄 تحديث البيانات
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:8px">
+        <button id="tab-db-explorer" class="btn btn-primary btn-sm" onclick="switchDbTab('explorer')">📊 مستعرض الجداول والسجلات</button>
+        <button id="tab-db-sql" class="btn btn-ghost btn-sm" onclick="switchDbTab('sql')">⚡ محرر استعلامات SQL</button>
+        <button id="tab-db-schema" class="btn btn-ghost btn-sm" onclick="switchDbTab('schema')">📐 مخطط DDL (schema.sql)</button>
+      </div>
+
+      <!-- Tab 1: Table Explorer -->
+      <div id="db-sec-explorer">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:.82rem;color:var(--fg2);font-weight:700">اختر الجدول:</span>
+          <div id="db-tables-pills" style="display:flex;gap:6px;flex-wrap:wrap">
+            <!-- Table pills filled dynamically -->
+          </div>
+        </div>
+        <div id="db-table-data-container" style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:var(--radius-sm);max-height:340px;overflow:auto;padding:8px">
+          <div style="color:var(--fg3);padding:14px;text-align:center">جاري تحميل بيانات الجدول...</div>
+        </div>
+      </div>
+
+      <!-- Tab 2: SQL Console -->
+      <div id="db-sec-sql" style="display:none">
+        <div class="form-group" style="margin-bottom:8px">
+          <label style="display:flex;justify-content:space-between">
+            <span>استعلام SQL (Interactive SQL Runner):</span>
+            <span style="font-size:.7rem;color:var(--fg3)">آمن - قراءة وتحليل فقط</span>
+          </label>
+          <textarea id="db-sql-input" rows="3" style="font-family:monospace;font-size:.84rem;background:#0d1117;color:#58a6ff" placeholder="SELECT * FROM products WHERE price > 0 ORDER BY price ASC LIMIT 20;"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="btn btn-primary btn-sm" onclick="runTenantSqlQuery()" id="btn-run-sql">
+            ⚡ تشغيل الاستعلام (Run Query)
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="setSampleSql('SELECT * FROM products LIMIT 10')">منتجات</button>
+          <button class="btn btn-ghost btn-sm" onclick="setSampleSql('SELECT * FROM orders ORDER BY id DESC LIMIT 10')">أوردرات</button>
+          <button class="btn btn-ghost btn-sm" onclick="setSampleSql('SELECT * FROM promo_codes')">كوبونات</button>
+        </div>
+        <div id="db-sql-results-container" style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:var(--radius-sm);max-height:300px;overflow:auto;padding:8px">
+          <div style="color:var(--fg3);padding:10px;text-align:center;font-size:.8rem">اضغط على تشغيل الاستعلام لعرض النتائج هنا.</div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Schema DDL -->
+      <div id="db-sec-schema" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:.8rem;color:var(--fg2)">مخطط الجداول وهجرات قاعدة البيانات (DDL):</span>
+          <button class="btn btn-ghost btn-sm" onclick="copySchemaDdl()">📋 نسخ المخطط</button>
+        </div>
+        <pre id="db-schema-code" style="background:#0d1117;color:#38bdf8;padding:12px;border-radius:var(--radius-sm);font-size:.78rem;line-height:1.5;max-height:360px;overflow:auto;border:1px solid var(--border)"></pre>
+      </div>
+
     </div>
   </div>
 
@@ -1873,6 +2005,10 @@ function renderMyStores(jobs){
 
             <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, '${esc(j.client)}')">
               ✏️ محرر الأكواد والملفات
+            </button>
+
+            <button class="btn btn-ghost btn-sm" onclick="openDatabaseModal(${j.id}, '${esc(j.client)}')">
+              🗄️ قاعدة بيانات المتجر
             </button>
 
             <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, '${esc(j.client)}')">
@@ -3028,6 +3164,213 @@ function copySocialPost(){
 }
 
 // =========================================================
+// Multi-Tenant Database Studio Logic
+// =========================================================
+let currentDbTables = [];
+let activeDbTable = '';
+
+async function openDatabaseModal(jid, brand){
+  $('#dbm-jid').value = jid;
+  $('#dbm-title').textContent = `🗄️ استوديو قاعدة بيانات المتجر: #${jid} (${brand})`;
+  $('#dbm-subtitle').textContent = `إدارة واستعراض قاعدة البيانات المستقلة للمتجر (AutoCorp Enterprise Engine)`;
+  switchDbTab('explorer');
+  $('#database-modal').classList.add('open');
+  await refreshTenantDbData();
+}
+
+function closeDatabaseModal(){
+  $('#database-modal').classList.remove('open');
+}
+
+function switchDbTab(tabName){
+  $('#db-sec-explorer').style.display = (tabName === 'explorer') ? 'block' : 'none';
+  $('#db-sec-sql').style.display = (tabName === 'sql') ? 'block' : 'none';
+  $('#db-sec-schema').style.display = (tabName === 'schema') ? 'block' : 'none';
+
+  $('#tab-db-explorer').className = (tabName === 'explorer') ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+  $('#tab-db-sql').className = (tabName === 'sql') ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+  $('#tab-db-schema').className = (tabName === 'schema') ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+}
+
+async function refreshTenantDbData(){
+  const jid = $('#dbm-jid').value;
+  if(!jid) return;
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/database`, {
+      headers: {'x-user-token': token}
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      $('#dbm-tenant-id').textContent = d.tenant_id;
+      $('#dbm-engine').textContent = d.engine;
+      $('#dbm-filename').textContent = d.db_filename;
+      $('#dbm-stats').textContent = `${d.total_tables} جداول (${d.total_records} سجل) — ${Math.round((d.size_bytes||0)/1024)} KB`;
+      $('#db-schema-code').textContent = d.schema_ddl || '-- لا يتوفر كود مخطط حالياً';
+
+      currentDbTables = d.tables || [];
+      renderTablePills(currentDbTables);
+
+      const defaultTable = currentDbTables.find(t => t.table_name === 'products') || currentDbTables[0];
+      if(defaultTable){
+        loadTenantTableData(defaultTable.table_name);
+      }
+    }
+  }catch(err){
+    console.error('Error fetching tenant db:', err);
+  }
+}
+
+function renderTablePills(tables){
+  const c = $('#db-tables-pills');
+  if(!c) return;
+  c.innerHTML = tables.map(t => `
+    <button class="btn btn-sm ${t.table_name === activeDbTable ? 'btn-primary' : 'btn-ghost'}" onclick="loadTenantTableData('${t.table_name}')" style="font-size:.76rem;padding:4px 9px">
+      📁 ${t.table_name} <span class="badge" style="background:rgba(255,255,255,.15);margin-right:4px">${t.row_count}</span>
+    </button>
+  `).join('');
+}
+
+async function loadTenantTableData(tableName){
+  activeDbTable = tableName;
+  renderTablePills(currentDbTables);
+  const jid = $('#dbm-jid').value;
+  const c = $('#db-table-data-container');
+  c.innerHTML = '<div style="color:var(--fg3);padding:14px;text-align:center">جاري جلب سجلات الجدول...</div>';
+
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/database/tables/${tableName}`, {
+      headers: {'x-user-token': token}
+    });
+    const d = await res.json();
+    const rows = d.rows || [];
+    if(!rows.length){
+      c.innerHTML = `<div style="color:var(--fg3);padding:16px;text-align:center">الجدول <b>${tableName}</b> فارغ حالياً (لا توجد سجلات).</div>`;
+      return;
+    }
+    const cols = Object.keys(rows[0]);
+    c.innerHTML = `
+      <div style="font-size:.76rem;color:var(--fg2);margin-bottom:6px">عرض <b>${rows.length}</b> سجل من جدول <b>${tableName}</b>:</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.76rem">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--accent2);text-align:right">
+            ${cols.map(col => `<th style="padding:6px">${col}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+              ${cols.map(col => {
+                let val = r[col];
+                if(typeof val === 'object') val = JSON.stringify(val);
+                return `<td style="padding:6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(String(val||''))}</td>`;
+              }).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }catch(e){
+    c.innerHTML = `<div style="color:var(--danger);padding:10px">فشل قراءة بيانات الجدول: ${e.message}</div>`;
+  }
+}
+
+async function runTenantSqlQuery(){
+  const jid = $('#dbm-jid').value;
+  const sql = $('#db-sql-input').value.trim();
+  if(!sql){
+    alert('يرجى كتابة استعلام SQL');
+    return;
+  }
+  const btn = $('#btn-run-sql');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري التنفيذ...';
+  const c = $('#db-sql-results-container');
+  c.innerHTML = '<div style="color:var(--fg3);padding:10px;text-align:center">جاري تشغيل الاستعلام...</div>';
+
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/database/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': token
+      },
+      body: JSON.stringify({query: sql})
+    });
+    const d = await res.json();
+    btn.disabled = false;
+    btn.textContent = '⚡ تشغيل الاستعلام (Run Query)';
+
+    if(!res.ok || !d.success){
+      c.innerHTML = `<div style="color:var(--danger);padding:10px">❌ خطأ في تنفيذ الاستعلام: ${esc(d.detail || 'تعذر تشغيل SQL')}</div>`;
+      return;
+    }
+
+    const rows = d.rows || [];
+    const cols = d.columns || [];
+    if(!rows.length){
+      c.innerHTML = `<div style="color:var(--success);padding:10px">✅ تم تنفيذ الاستعلام بنجاح في (${d.execution_ms} ms). لم يتم إرجاع أي صفوف.</div>`;
+      return;
+    }
+    c.innerHTML = `
+      <div style="font-size:.76rem;color:var(--success);margin-bottom:6px">
+        ✅ تم إرجاع <b>${d.count}</b> صف بنجاح في <b>${d.execution_ms} ms</b>:
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:.76rem">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--accent2);text-align:right">
+            ${cols.map(col => `<th style="padding:6px">${col}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+              ${cols.map(col => {
+                let val = r[col];
+                if(typeof val === 'object') val = JSON.stringify(val);
+                return `<td style="padding:6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(String(val||''))}</td>`;
+              }).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }catch(e){
+    btn.disabled = false;
+    btn.textContent = '⚡ تشغيل الاستعلام (Run Query)';
+    c.innerHTML = `<div style="color:var(--danger);padding:10px">فشل الاستعلام: ${e.message}</div>`;
+  }
+}
+
+function setSampleSql(sql){
+  $('#db-sql-input').value = sql;
+  runTenantSqlQuery();
+}
+
+function downloadTenantDbSqlite(){
+  const jid = $('#dbm-jid').value;
+  window.open(`/api/sites/${jid}/database/download`, '_blank');
+}
+
+function openSchemaInCodeEditor(){
+  const jid = $('#dbm-jid').value;
+  closeDatabaseModal();
+  openFileEditorModal(jid, `site_${jid}`);
+  setTimeout(() => {
+    loadFileToEditor('schema.sql');
+  }, 400);
+}
+
+function copySchemaDdl(){
+  const code = $('#db-schema-code').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    alert('📋 تم نسخ مخطط DDL إلى الحافظة!');
+  });
+}
+
+// =========================================================
 // Super Admin All-Sites & Files Manager
 // =========================================================
 async function loadAdminSitesManager(){
@@ -3073,6 +3416,7 @@ async function loadAdminSitesManager(){
                     <div style="display:flex;gap:4px;flex-wrap:wrap">
                       <a href="${siteUrl}" target="_blank" class="btn btn-success btn-sm" style="padding:3px 7px;font-size:.7rem">🌐 فتح</a>
                       <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">✏️ الأكواد</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openDatabaseModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🗄️ الداتابيز</button>
                       <button class="btn btn-ghost btn-sm" onclick="openVisualEditModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🎨 المرئي</button>
                       <button class="btn btn-primary btn-sm" onclick="openRefineModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🪄 برومبت</button>
                       <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">📦 المنتجات</button>

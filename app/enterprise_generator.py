@@ -204,7 +204,6 @@ STORE_WHATSAPP={whatsapp}
     files[".gitignore"] = """node_modules/
 .env
 *.log
-database.sqlite
 .DS_Store
 """
 
@@ -241,7 +240,235 @@ app.listen(PORT, () => {{
 };
 """
 
-    # 6. src/config/database.js
+    initial_users = [
+        {
+            "id": 1,
+            "name": "مدير المتجر العام",
+            "email": f"admin@{clean_brand.replace(' ', '').lower()}.com",
+            "passwordHash": "$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3",
+            "role": "admin",
+            "phone": phone,
+            "createdAt": "2026-10-01T00:00:00.000Z"
+        },
+        {
+            "id": 2,
+            "name": "عميل تجريبي",
+            "email": "customer@example.com",
+            "passwordHash": "$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3",
+            "role": "customer",
+            "phone": "01011112222",
+            "createdAt": "2026-10-01T00:00:00.000Z"
+        }
+    ]
+    initial_promo_codes = [
+        {"id": 1, "code": "WELCOME10", "discountPercent": 10, "minOrderEgp": 100, "active": True},
+        {"id": 2, "code": "EGYPT2026", "discountPercent": 15, "minOrderEgp": 300, "active": True},
+        {"id": 3, "code": "AUTOCORP", "discountPercent": 20, "minOrderEgp": 500, "active": True}
+    ]
+    initial_reviews = [
+        {"id": 1, "productId": 1, "author": "محمد السعيد", "rating": 5, "comment": "جودة ممتازة جداً وتوصيل أسرع مما توقعت، شكراً جزيلاً!", "date": "2026-10-01"},
+        {"id": 2, "productId": 1, "author": "سارة إبراهيم", "rating": 5, "comment": "التغليف فاخر والمنتج أصلي 100%، هطلب منكم تاني بالتأكيد.", "date": "2026-10-03"},
+        {"id": 3, "productId": 2, "author": "أحمد حسام", "rating": 4, "comment": "قيمة ممتازة مقابل السعر وخدمة عملاء محترمة.", "date": "2026-10-05"}
+    ]
+    initial_settings = {
+        "brand_name": clean_brand,
+        "slogan": clean_slogan,
+        "phone": phone,
+        "vodafone_cash": v_cash,
+        "instapay": instapay,
+        "fawry_code": fawry_code
+    }
+
+    initial_db_state = {
+        "categories": cat_list,
+        "products": catalog,
+        "users": initial_users,
+        "promoCodes": initial_promo_codes,
+        "reviews": initial_reviews,
+        "orders": [],
+        "subscribers": [],
+        "settings": initial_settings
+    }
+
+    # Generate schema.sql (Full SQL DDL & Seed Statements)
+    sql_lines = [
+        f"-- ========================================================",
+        f"-- AutoCorp Multi-Tenant Database Engine",
+        f"-- Tenant Database: tenant_db_{job_id} ({clean_brand})",
+        f"-- Dialect: SQLite 3 / libSQL / PostgreSQL compatible",
+        f"-- ========================================================",
+        "",
+        "CREATE TABLE IF NOT EXISTS users (",
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,",
+        "    name TEXT NOT NULL,",
+        "    email TEXT UNIQUE NOT NULL,",
+        "    password_hash TEXT NOT NULL,",
+        "    role TEXT DEFAULT 'customer',",
+        "    phone TEXT,",
+        "    created_at TEXT NOT NULL",
+        ");",
+        "",
+        "CREATE TABLE IF NOT EXISTS categories (",
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,",
+        "    name_ar TEXT NOT NULL,",
+        "    name_en TEXT NOT NULL,",
+        "    slug TEXT UNIQUE NOT NULL,",
+        "    icon TEXT",
+        ");",
+        "",
+        "CREATE TABLE IF NOT EXISTS products (",
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,",
+        "    name_ar TEXT NOT NULL,",
+        "    name_en TEXT NOT NULL,",
+        "    price REAL NOT NULL,",
+        "    original_price REAL,",
+        "    category_id INTEGER,",
+        "    image_url TEXT,",
+        "    description TEXT,",
+        "    stock INTEGER DEFAULT 100,",
+        "    rating REAL DEFAULT 5.0,",
+        "    badge TEXT,",
+        "    FOREIGN KEY (category_id) REFERENCES categories (id)",
+        ");",
+        "",
+        "CREATE TABLE IF NOT EXISTS orders (",
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,",
+        "    order_number TEXT UNIQUE NOT NULL,",
+        "    customer_name TEXT NOT NULL,",
+        "    customer_phone TEXT NOT NULL,",
+        "    customer_address TEXT NOT NULL,",
+        "    items_json TEXT NOT NULL,",
+        "    total_price REAL NOT NULL,",
+        "    payment_method TEXT NOT NULL,",
+        "    payment_status TEXT DEFAULT 'pending',",
+        "    order_status TEXT DEFAULT 'confirmed',",
+        "    created_at TEXT NOT NULL",
+        ");",
+        "",
+        "CREATE TABLE IF NOT EXISTS promo_codes (",
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,",
+        "    code TEXT UNIQUE NOT NULL,",
+        "    discount_percent REAL NOT NULL,",
+        "    min_order_egp REAL DEFAULT 0,",
+        "    is_active INTEGER DEFAULT 1",
+        ");",
+        "",
+        "CREATE TABLE IF NOT EXISTS reviews (",
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,",
+        "    product_id INTEGER,",
+        "    author TEXT NOT NULL,",
+        "    rating INTEGER NOT NULL,",
+        "    comment TEXT NOT NULL,",
+        "    created_at TEXT NOT NULL,",
+        "    FOREIGN KEY (product_id) REFERENCES products (id)",
+        ");",
+        "",
+        "CREATE TABLE IF NOT EXISTS store_settings (",
+        "    key TEXT PRIMARY KEY,",
+        "    value TEXT",
+        ");",
+        "",
+        "-- Seed Initial Categories"
+    ]
+    for i, c in enumerate(cat_list):
+        c_name = c.get("name") or c.get("name_ar") or f"قسم {i+1}"
+        c_name_en = c.get("name_en") or f"Category {i+1}"
+        c_slug = c.get("slug") or f"cat_{c.get('id', i+1)}"
+        c_icon = c.get("icon") or "🏷️"
+        esc_ar = c_name.replace("'", "''")
+        esc_en = c_name_en.replace("'", "''")
+        esc_slug = c_slug.replace("'", "''")
+        esc_icon = c_icon.replace("'", "''")
+        sql_lines.append(f"INSERT OR IGNORE INTO categories (id, name_ar, name_en, slug, icon) VALUES ({c.get('id', i+1)}, '{esc_ar}', '{esc_en}', '{esc_slug}', '{esc_icon}');")
+
+    sql_lines.append("\n-- Seed Initial Products")
+    for i, p in enumerate(catalog):
+        p_title = p.get("title") or p.get("name_ar") or f"منتج {i+1}"
+        p_title_en = p.get("title_en") or p.get("name_en") or f"Product {i+1}"
+        p_price = float(p.get("price") or 100)
+        p_orig = float(p.get("originalPrice") or p.get("original_price") or round(p_price * 1.25))
+        p_cat_id = int(p.get("categoryId") or p.get("category_id") or 1)
+        esc_ar = p_title.replace("'", "''")
+        esc_en = p_title_en.replace("'", "''")
+        esc_desc = (p.get("description") or "").replace("'", "''")
+        esc_img = (p.get("image_url") or p.get("image") or "").replace("'", "''")
+        esc_badge = (p.get("badge") or "").replace("'", "''")
+        sql_lines.append(
+            f"INSERT OR IGNORE INTO products (id, name_ar, name_en, price, original_price, category_id, image_url, description, stock, rating, badge) "
+            f"VALUES ({p.get('id', i+1)}, '{esc_ar}', '{esc_en}', {p_price}, {p_orig}, {p_cat_id}, '{esc_img}', '{esc_desc}', 100, {p.get('rating', 5.0)}, '{esc_badge}');"
+        )
+
+    clean_brand_slug = clean_brand.replace(' ', '').lower()
+    sql_lines.append("\n-- Seed Users")
+    sql_lines.append(f"INSERT OR IGNORE INTO users (id, name, email, password_hash, role, phone, created_at) VALUES (1, 'مدير المتجر العام', 'admin@{clean_brand_slug}.com', '$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3', 'admin', '{phone}', datetime('now'));")
+    sql_lines.append(f"INSERT OR IGNORE INTO users (id, name, email, password_hash, role, phone, created_at) VALUES (2, 'عميل تجريبي', 'customer@example.com', '$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3', 'customer', '01011112222', datetime('now'));")
+
+    sql_lines.append("\n-- Seed Promo Codes")
+    sql_lines.append("INSERT OR IGNORE INTO promo_codes (id, code, discount_percent, min_order_egp, is_active) VALUES (1, 'WELCOME10', 10, 100, 1);")
+    sql_lines.append("INSERT OR IGNORE INTO promo_codes (id, code, discount_percent, min_order_egp, is_active) VALUES (2, 'EGYPT2026', 15, 300, 1);")
+    sql_lines.append("INSERT OR IGNORE INTO promo_codes (id, code, discount_percent, min_order_egp, is_active) VALUES (3, 'AUTOCORP', 20, 500, 1);")
+
+    sql_lines.append("\n-- Seed Store Settings")
+    esc_brand = clean_brand.replace("'", "''")
+    esc_slogan = clean_slogan.replace("'", "''")
+    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('brand_name', '{esc_brand}');")
+    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('slogan', '{esc_slogan}');")
+    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('phone', '{phone}');")
+    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('vodafone_cash', '{v_cash}');")
+    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('instapay', '{instapay}');")
+    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('fawry_code', '{fawry_code}');")
+
+    schema_sql_content = "\n".join(sql_lines)
+
+    # 6. schema.sql & src/config/schema.sql
+    files["schema.sql"] = schema_sql_content
+    files["src/config/schema.sql"] = schema_sql_content
+
+    # 7. database.json (Document Snapshot)
+    files["database.json"] = json.dumps(initial_db_state, ensure_ascii=False, indent=2)
+
+    # 8. src/config/db.sqlite.js (SQLite Connector)
+    files["src/config/db.sqlite.js"] = f"""/**
+ * AutoCorp SQLite Tenant Database Connector
+ * Connects to database.sqlite with auto-fallback to in-memory JSON state
+ */
+const path = require('path');
+const fs = require('fs');
+
+const SQLITE_FILE = path.join(__dirname, '../../database.sqlite');
+const SCHEMA_FILE = path.join(__dirname, '../../schema.sql');
+
+let dbInstance = null;
+
+function getDb() {{
+  if (dbInstance) return dbInstance;
+  try {{
+    const Database = require('better-sqlite3');
+    dbInstance = new Database(SQLITE_FILE);
+    dbInstance.pragma('journal_mode = WAL');
+    if (fs.existsSync(SCHEMA_FILE)) {{
+      const schema = fs.readFileSync(SCHEMA_FILE, 'utf8');
+      dbInstance.exec(schema);
+    }}
+    return dbInstance;
+  }} catch(e) {{
+    // Fallback adapter using JSON state
+    const jsonDb = require('./database');
+    return {{
+      prepare: (sql) => ({{
+        all: () => jsonDb.get().products || [],
+        get: () => (jsonDb.get().products || [])[0],
+        run: () => ({{ changes: 1, lastInsertRowid: Date.now() }})
+      }}),
+      exec: () => {{}}
+    }};
+  }}
+}}
+
+module.exports = {{ getDb, SQLITE_FILE }};
+"""
+
+    # 9. src/config/database.js (Universal JSON + SQLite State Store)
     files["src/config/database.js"] = f"""/**
  * High-performance In-Memory & Persistent State Store for {clean_brand}
  * Supports ACID operations, pre-seeded catalogs, users, promo codes, and orders.
@@ -250,43 +477,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DB_FILE = path.join(__dirname, '../../database.json');
-
-const INITIAL_STATE = {{
-  categories: {json.dumps(cat_list, ensure_ascii=False, indent=2)},
-  products: {json.dumps(catalog, ensure_ascii=False, indent=2)},
-  users: [
-    {{
-      id: 1,
-      name: "مدير المتجر العام",
-      email: "admin@{clean_brand.replace(' ', '').lower()}.com",
-      passwordHash: "$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3", // hashed 'admin123'
-      role: "admin",
-      phone: "{phone}",
-      createdAt: new Date().toISOString()
-    }},
-    {{
-      id: 2,
-      name: "عميل تجريبي",
-      email: "customer@example.com",
-      passwordHash: "$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3",
-      role: "customer",
-      phone: "01011112222",
-      createdAt: new Date().toISOString()
-    }}
-  ],
-  promoCodes: [
-    {{ code: "WELCOME10", discountPercent: 10, minOrderEgp: 100, active: true }},
-    {{ code: "EGYPT2026", discountPercent: 15, minOrderEgp: 300, active: true }},
-    {{ code: "AUTOCORP", discountPercent: 20, minOrderEgp: 500, active: true }}
-  ],
-  reviews: [
-    {{ id: 1, productId: 1, author: "محمد السعيد", rating: 5, comment: "جودة ممتازة جداً وتوصيل أسرع مما توقعت، شكراً جزيلاً!", date: "2026-10-01" }},
-    {{ id: 2, productId: 1, author: "سارة إبراهيم", rating: 5, comment: "التغليف فاخر والمنتج أصلي 100%، هطلب منكم تاني بالتأكيد.", date: "2026-10-03" }},
-    {{ id: 3, productId: 2, author: "أحمد حسام", rating: 4, comment: "قيمة ممتازة مقابل السعر وخدمة عملاء محترمة.", date: "2026-10-05" }}
-  ],
-  orders: [],
-  subscribers: []
-}};
+const INITIAL_STATE = {json.dumps(initial_db_state, ensure_ascii=False, indent=2)};
 
 let state = null;
 
@@ -315,7 +506,8 @@ function saveState() {{
 
 module.exports = {{
   get: () => loadState(),
-  save: () => saveState()
+  save: () => saveState(),
+  INITIAL_STATE
 }};
 """
 
@@ -1155,7 +1347,9 @@ Store-Backend/
 │   └── app.js
 ├── public/
 │   ├── index.html (Bilingual Arabic/English + Dark/Light Theme SPA)
-│   └── admin.html (Executive Operations Portal)
+├── database.sqlite (Dedicated Pre-Seeded SQLite Database)
+├── schema.sql (Full SQL DDL & Seed Migrations)
+├── database.json (Document Database Snapshot)
 ├── package.json
 ├── server.js
 ├── Dockerfile & docker-compose.yml

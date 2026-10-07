@@ -6,6 +6,7 @@ import io
 import json
 import os
 import re
+import sqlite3
 import time
 import zipfile
 
@@ -382,11 +383,58 @@ async def run_job(job_id):
             # Store site in DB (works on Vercel) and optionally on filesystem
             db.x("INSERT OR REPLACE INTO site_pages(job_id, html, created_at) VALUES(?,?,?)",
                  (job_id, html, time.time()))
-            if not IS_VERCEL:
-                d = os.path.join(SITES, str(job_id))
-                os.makedirs(d, exist_ok=True)
-                with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
-                    f.write(html)
+
+            # Generate modular enterprise files & multi-tenant database
+            try:
+                from app.enterprise_generator import generate_enterprise_project
+                settings = db.one("select * from site_settings where job_id=?", (job_id,)) or {}
+                items = db.q("select * from site_items where job_id=? order by id", (job_id,))
+                brand = settings.get("brand_name") or f"site_{job_id}"
+                ent_files = generate_enterprise_project(
+                    job_id=job_id,
+                    brand_name=brand,
+                    niche=settings.get("category", "general"),
+                    slogan=settings.get("slogan", ""),
+                    primary_color=settings.get("color_primary", ""),
+                    secondary_color=settings.get("color_secondary", ""),
+                    items=items,
+                    settings=settings
+                )
+
+                # 1. Register tenant database in Master DB
+                schema_sql = ent_files.get("schema.sql", "")
+                initial_json = json.loads(ent_files.get("database.json", "{}"))
+                catalog_tables = ["users", "categories", "products", "orders", "promo_codes", "reviews", "store_settings"]
+                db.register_tenant_db(job_id, brand, schema_sql, catalog_tables, initial_json)
+
+                # 2. Register database files in site_files table
+                db.x("INSERT OR REPLACE INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, 'schema.sql', 'database', ?, '', ?)",
+                     (job_id, schema_sql, time.time()))
+                db.x("INSERT OR REPLACE INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, 'database.json', 'database', ?, '', ?)",
+                     (job_id, ent_files.get("database.json", ""), time.time()))
+
+                # 3. Write to disk if not Vercel
+                if not IS_VERCEL:
+                    d = os.path.join(SITES, str(job_id))
+                    os.makedirs(d, exist_ok=True)
+                    for rel_p, f_content in ent_files.items():
+                        full_p = os.path.join(d, rel_p)
+                        os.makedirs(os.path.dirname(full_p), exist_ok=True)
+                        with open(full_p, "w", encoding="utf-8") as f_out:
+                            f_out.write(f_content)
+
+                    # Physically initialize and seed database.sqlite on disk
+                    sqlite_path = os.path.join(d, "database.sqlite")
+                    try:
+                        conn = sqlite3.connect(sqlite_path)
+                        conn.executescript(schema_sql)
+                        conn.commit()
+                        conn.close()
+                    except Exception as sq_err:
+                        print(f"[SQLITE INIT ERR] {sq_err}")
+            except Exception as ent_err:
+                print(f"[ENTERPRISE FILES GEN ERR] {ent_err}")
+
             site_url = await deploy_netlify(html, job_id) or f"/sites/{job_id}/"
         auto_deliver = os.getenv("AUTO_DELIVER", "1") == "1"
         if auto_deliver:

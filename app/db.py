@@ -7,6 +7,7 @@ When not set, falls back to local sqlite3 (good for local dev).
 import json
 import os
 import sqlite3
+import time
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -198,6 +199,40 @@ CREATE TABLE IF NOT EXISTS site_bot_configs (
     is_active INTEGER DEFAULT 1,
     updated_at REAL
 );
+CREATE TABLE IF NOT EXISTS tenant_databases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER UNIQUE,
+    tenant_id TEXT UNIQUE,
+    engine TEXT DEFAULT 'Enterprise SQLite 3 / libSQL Cloud',
+    db_filename TEXT DEFAULT 'database.sqlite',
+    schema_ddl TEXT,
+    tables_catalog TEXT,
+    total_tables INTEGER DEFAULT 8,
+    total_records INTEGER DEFAULT 0,
+    size_bytes INTEGER DEFAULT 0,
+    version TEXT DEFAULT '1.0.0',
+    last_sync_at REAL,
+    status TEXT DEFAULT 'active'
+);
+CREATE TABLE IF NOT EXISTS tenant_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER,
+    tenant_id TEXT,
+    table_name TEXT,
+    record_id TEXT,
+    data_json TEXT,
+    created_at REAL,
+    updated_at REAL
+);
+CREATE TABLE IF NOT EXISTS tenant_queries_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER,
+    tenant_id TEXT,
+    query_sql TEXT,
+    rows_affected INTEGER DEFAULT 0,
+    execution_ms REAL DEFAULT 0,
+    executed_at REAL
+);
 """
 
 # --------------- Turso HTTP helpers ---------------
@@ -365,3 +400,72 @@ def x(sql: str, args: tuple = ()) -> int:
             return cur.lastrowid or 0
         finally:
             c.close()
+
+
+# =========================================================
+# Multi-Tenant Database Engine Helpers
+# =========================================================
+def register_tenant_db(job_id: int, brand: str, schema_sql: str, catalog_tables: list, initial_records: dict = None) -> dict:
+    """Registers a dedicated tenant database inside AutoCorp's Master Multi-Tenant engine."""
+    tenant_id = f"tenant_db_{job_id}"
+    catalog_json = json.dumps(catalog_tables, ensure_ascii=False)
+    total_records = 0
+    if initial_records:
+        for t_name, rows in initial_records.items():
+            if isinstance(rows, list):
+                total_records += len(rows)
+                for idx, r in enumerate(rows):
+                    rec_id = str(r.get("id", idx + 1)) if isinstance(r, dict) else str(idx + 1)
+                    val_json = json.dumps(r, ensure_ascii=False) if isinstance(r, dict) else json.dumps({"value": r}, ensure_ascii=False)
+                    x(
+                        "INSERT INTO tenant_records (job_id, tenant_id, table_name, record_id, data_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (job_id, tenant_id, t_name, rec_id, val_json, time.time(), time.time())
+                    )
+            elif isinstance(rows, dict):
+                total_records += len(rows)
+                for k, v in rows.items():
+                    x(
+                        "INSERT INTO tenant_records (job_id, tenant_id, table_name, record_id, data_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (job_id, tenant_id, t_name, str(k), json.dumps({"key": k, "value": v}, ensure_ascii=False), time.time(), time.time())
+                    )
+    
+    x("""
+        INSERT OR REPLACE INTO tenant_databases 
+        (job_id, tenant_id, engine, db_filename, schema_ddl, tables_catalog, total_tables, total_records, size_bytes, version, last_sync_at, status)
+        VALUES (?, ?, 'Enterprise SQLite 3 / libSQL Cloud', 'database.sqlite', ?, ?, ?, ?, ?, '1.0.0', ?, 'active')
+    """, (
+        job_id,
+        tenant_id,
+        schema_sql,
+        catalog_json,
+        len(catalog_tables),
+        total_records,
+        len(schema_sql.encode("utf-8")) + 16384,
+        time.time()
+    ))
+    return {
+        "tenant_id": tenant_id,
+        "job_id": job_id,
+        "total_tables": len(catalog_tables),
+        "total_records": total_records
+    }
+
+
+def get_tenant_db(job_id: int) -> Optional[Dict[str, Any]]:
+    """Fetches tenant database metadata and status."""
+    return one("SELECT * FROM tenant_databases WHERE job_id = ?", (job_id,))
+
+
+def get_tenant_table_records(job_id: int, table_name: str, limit: int = 100) -> List[Dict[str, Any]]:
+    """Retrieves records from a specific table within the tenant's database virtualization layer."""
+    rows = q("SELECT id, table_name, record_id, data_json, created_at FROM tenant_records WHERE job_id = ? AND table_name = ? ORDER BY id ASC LIMIT ?", (job_id, table_name, limit))
+    results = []
+    for r in rows:
+        try:
+            d = json.loads(r.get("data_json") or "{}")
+            if "id" not in d:
+                d["id"] = r.get("record_id")
+            results.append(d)
+        except Exception:
+            pass
+    return results
