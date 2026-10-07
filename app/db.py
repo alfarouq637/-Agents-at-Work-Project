@@ -233,6 +233,19 @@ CREATE TABLE IF NOT EXISTS tenant_queries_log (
     execution_ms REAL DEFAULT 0,
     executed_at REAL
 );
+CREATE TABLE IF NOT EXISTS site_security_audits (
+    job_id INTEGER PRIMARY KEY,
+    score INTEGER DEFAULT 100,
+    grade TEXT DEFAULT 'A+',
+    status TEXT DEFAULT 'APPROVED',
+    owasp_compliance TEXT,
+    findings TEXT,
+    passed_rules TEXT,
+    checks_passed INTEGER DEFAULT 0,
+    checks_total INTEGER DEFAULT 0,
+    reviewer_agent TEXT DEFAULT 'Cybersecurity Reviewer',
+    audited_at REAL
+);
 """
 
 # --------------- Turso HTTP helpers ---------------
@@ -469,3 +482,59 @@ def get_tenant_table_records(job_id: int, table_name: str, limit: int = 100) -> 
         except Exception:
             pass
     return results
+
+
+def save_security_audit(job_id: int, audit_data: Dict[str, Any]) -> None:
+    """Saves or updates a site's OWASP Top 10 security audit results."""
+    x("""
+    INSERT OR REPLACE INTO site_security_audits (
+        job_id, score, grade, status, owasp_compliance, findings, passed_rules,
+        checks_passed, checks_total, reviewer_agent, audited_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        job_id,
+        audit_data.get("score", 100),
+        audit_data.get("grade", "A+"),
+        audit_data.get("status", "APPROVED"),
+        json.dumps(audit_data.get("owasp_compliance", {}), ensure_ascii=False),
+        json.dumps(audit_data.get("findings", []), ensure_ascii=False),
+        json.dumps(audit_data.get("passed_rules", []), ensure_ascii=False),
+        audit_data.get("checks_passed", 0),
+        audit_data.get("checks_total", 0),
+        audit_data.get("reviewer_agent", "Cybersecurity Reviewer"),
+        audit_data.get("audited_at", time.time())
+    ))
+
+
+def get_security_audit(job_id: int) -> Optional[Dict[str, Any]]:
+    """Retrieves a cached OWASP Top 10 security audit for a site."""
+    row = one("SELECT * FROM site_security_audits WHERE job_id = ?", (job_id,))
+    if not row:
+        return None
+    try:
+        owasp = json.loads(row.get("owasp_compliance") or "{}")
+    except Exception:
+        owasp = {}
+    try:
+        findings = json.loads(row.get("findings") or "[]")
+    except Exception:
+        findings = []
+    try:
+        passed = json.loads(row.get("passed_rules") or "[]")
+    except Exception:
+        passed = []
+
+    return {
+        "job_id": job_id,
+        "score": row.get("score", 100),
+        "grade": row.get("grade", "A+"),
+        "status": row.get("status", "APPROVED"),
+        "owasp_compliance": owasp,
+        "findings": findings,
+        "passed_rules": passed,
+        "checks_passed": row.get("checks_passed", 0),
+        "checks_total": row.get("checks_total", 0),
+        "reviewer_agent": row.get("reviewer_agent", "Cybersecurity Reviewer"),
+        "audited_at": row.get("audited_at", 0)
+    }
+

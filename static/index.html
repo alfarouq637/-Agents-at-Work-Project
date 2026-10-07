@@ -1397,6 +1397,102 @@ textarea{resize:vertical;min-height:75px}
     </div>
   </div>
 
+  <!-- ========================================================= -->
+  <!-- MODAL: CYBERSECURITY REVIEWER & OWASP TOP 10 AUDIT STUDIO -->
+  <!-- ========================================================= -->
+  <div class="modal-overlay" id="security-modal">
+    <div class="modal" style="max-width:860px;max-height:92vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#00cec9,#6c5ce7);display:flex;align-items:center;justify-content:center;font-size:1.3rem">
+            🛡️
+          </div>
+          <div>
+            <h3 style="font-weight:900;font-size:1.15rem;color:var(--accent2);margin:0" id="sec-title">فحص الأمان الشامل (OWASP Top 10 Security Audit)</h3>
+            <p style="font-size:.78rem;color:var(--fg3);margin:2px 0 0" id="sec-subtitle">مراجعة أمنية متقدمة بواسطة Cybersecurity Reviewer وأدوات الـ SAST التلقائية</p>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeSecurityModal()">✕</button>
+      </div>
+      <input type="hidden" id="sec-jid">
+
+      <!-- Security Score Banner -->
+      <div style="background:linear-gradient(135deg,rgba(0,206,201,.1),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.3);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div id="sec-grade-badge" style="width:64px;height:64px;border-radius:50%;background:#00cec9;color:#0b0f19;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.8rem;box-shadow:0 0 20px rgba(0,206,201,.5)">
+            A+
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <h4 style="margin:0;font-size:1.1rem;font-weight:900" id="sec-score-txt">درجة الأمان: 100 / 100</h4>
+              <span id="sec-status-pill" class="tag tag-delivered" style="font-size:.72rem">معتمد للأمان (APPROVED)</span>
+            </div>
+            <p style="margin:4px 0 0;font-size:.78rem;color:var(--fg3)" id="sec-reviewer-txt">
+              فاحص الأمان: <b>Cybersecurity Reviewer (AutoCorp SecOps)</b>
+            </p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="runLiveSastScan()" id="btn-rescan-sast">
+            🔄 إعادة الفحص التلقائي (Run SAST)
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="copySecurityReportJson()">
+            📋 نسخ التقرير
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Grid -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px">
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px">
+          <span style="font-size:.72rem;color:var(--fg3);display:block">مفاتيح مكشوفة (Secrets Scan)</span>
+          <b id="sec-metric-secrets" style="color:var(--success);font-size:.9rem">✅ 0 تسريبات (Clean)</b>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px">
+          <span style="font-size:.72rem;color:var(--fg3);display:block">حماية الحقن (SQLi Defense)</span>
+          <b id="sec-metric-sqli" style="color:var(--success);font-size:.9rem">✅ Drizzle ORM معزول</b>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px">
+          <span style="font-size:.72rem;color:var(--fg3);display:block">حماية الجلسات (JWT Tokens)</span>
+          <b id="sec-metric-jwt" style="color:var(--success);font-size:.9rem">✅ HttpOnly Secure Cookies</b>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px">
+          <span style="font-size:.72rem;color:var(--fg3);display:block">الهيدرز والحماية (Headers & CORS)</span>
+          <b id="sec-metric-headers" style="color:var(--success);font-size:.9rem">✅ Helmet.js & Strict CORS</b>
+        </div>
+      </div>
+
+      <!-- Tabs: OWASP Checklist vs Passed Checks vs Findings -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px">
+        <button id="tab-sec-checklist" class="btn btn-primary btn-sm" onclick="switchSecTab('checklist')">📋 معايير OWASP Top 10 (10/10)</button>
+        <button id="tab-sec-passed" class="btn btn-ghost btn-sm" onclick="switchSecTab('passed')">✅ الفحوصات المجتازة (<span id="sec-passed-count">0</span>)</button>
+        <button id="tab-sec-findings" class="btn btn-ghost btn-sm" onclick="switchSecTab('findings')">⚠️ الملاحظات والتنبيهات (<span id="sec-findings-count">0</span>)</button>
+      </div>
+
+      <!-- Tab 1: OWASP Top 10 Checklist -->
+      <div id="sec-view-checklist">
+        <div id="sec-checklist-items" style="display:grid;grid-template-columns:1fr;gap:8px">
+          <!-- Filled dynamically -->
+        </div>
+      </div>
+
+      <!-- Tab 2: Passed Checks Details -->
+      <div id="sec-view-passed" style="display:none">
+        <div id="sec-passed-items" style="display:grid;grid-template-columns:1fr;gap:8px">
+          <!-- Filled dynamically -->
+        </div>
+      </div>
+
+      <!-- Tab 3: Findings & Remediation -->
+      <div id="sec-view-findings" style="display:none">
+        <div id="sec-findings-items" style="display:grid;grid-template-columns:1fr;gap:8px">
+          <!-- Filled dynamically -->
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 <script>
 // State
 let currentMode = 'landing';
@@ -2009,6 +2105,10 @@ function renderMyStores(jobs){
 
             <button class="btn btn-ghost btn-sm" onclick="openDatabaseModal(${j.id}, '${esc(j.client)}')">
               🗄️ قاعدة بيانات المتجر
+            </button>
+
+            <button class="btn btn-ghost btn-sm" onclick="openSecurityModal(${j.id}, '${esc(j.client)}')">
+              🛡️ فحص الأمان (OWASP)
             </button>
 
             <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, '${esc(j.client)}')">
@@ -3371,6 +3471,181 @@ function copySchemaDdl(){
 }
 
 // =========================================================
+// Cybersecurity Reviewer & OWASP Top 10 Security Audit Studio
+// =========================================================
+let currentSecurityAudit = null;
+
+async function openSecurityModal(jid, brand){
+  $('#sec-jid').value = jid;
+  $('#sec-title').textContent = `🛡️ فحص الأمان الشامل (OWASP Top 10): #${jid} (${brand || ''})`;
+  $('#sec-subtitle').textContent = `مراجعة كود الفرونت إند والباك إند وقواعد البيانات عبر Cybersecurity Reviewer والـ SAST`;
+  switchSecTab('checklist');
+  $('#security-modal').classList.add('open');
+  await fetchSiteSecurityAudit(jid);
+}
+
+function closeSecurityModal(){
+  $('#security-modal').classList.remove('open');
+}
+
+function switchSecTab(tabName){
+  $('#sec-view-checklist').style.display = (tabName === 'checklist') ? 'block' : 'none';
+  $('#sec-view-passed').style.display = (tabName === 'passed') ? 'block' : 'none';
+  $('#sec-view-findings').style.display = (tabName === 'findings') ? 'block' : 'none';
+
+  $('#tab-sec-checklist').className = (tabName === 'checklist') ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+  $('#tab-sec-passed').className = (tabName === 'passed') ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+  $('#tab-sec-findings').className = (tabName === 'findings') ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+}
+
+async function fetchSiteSecurityAudit(jid){
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/security-audit`, {
+      headers: {'x-user-token': token}
+    });
+    const d = await res.json();
+    if(res.ok && d.success){
+      renderSecurityAudit(d.audit);
+    }
+  }catch(err){
+    console.error('Error fetching security audit:', err);
+  }
+}
+
+async function runLiveSastScan(){
+  const jid = $('#sec-jid').value;
+  if(!jid) return;
+  const btn = $('#btn-rescan-sast');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الفحص البرمجي الشامل...';
+  const token = getSafeToken();
+  try{
+    const res = await fetch(`/api/sites/${jid}/security-audit/scan`, {
+      method: 'POST',
+      headers: {'x-user-token': token}
+    });
+    const d = await res.json();
+    btn.disabled = false;
+    btn.textContent = '🔄 إعادة الفحص التلقائي (Run SAST)';
+    if(res.ok && d.success){
+      renderSecurityAudit(d.audit);
+      alert('✅ تم الانتهاء من فحص الأمان SAST بنجاح وتحديث شهادة OWASP Top 10!');
+    }
+  }catch(err){
+    btn.disabled = false;
+    btn.textContent = '🔄 إعادة الفحص التلقائي (Run SAST)';
+    alert('حدث خطأ أثناء إجراء الفحص: ' + err.message);
+  }
+}
+
+function renderSecurityAudit(audit){
+  currentSecurityAudit = audit;
+  const score = audit.score || 100;
+  const grade = audit.grade || 'A+';
+  const status = audit.status || 'APPROVED';
+
+  $('#sec-score-txt').textContent = `درجة الأمان: ${score} / 100`;
+  $('#sec-grade-badge').textContent = grade;
+  $('#sec-reviewer-txt').innerHTML = `فاحص الأمان: <b>${esc(audit.reviewer_agent || 'Cybersecurity Reviewer')}</b>`;
+
+  const badge = $('#sec-grade-badge');
+  if(score >= 90){
+    badge.style.background = '#00cec9';
+    badge.style.boxShadow = '0 0 20px rgba(0,206,201,.5)';
+    $('#sec-status-pill').className = 'tag tag-delivered';
+    $('#sec-status-pill').textContent = 'معتمد للأمان (APPROVED)';
+  } else if(score >= 75){
+    badge.style.background = '#fdcb6e';
+    badge.style.boxShadow = '0 0 20px rgba(253,203,110,.5)';
+    $('#sec-status-pill').className = 'tag tag-running';
+    $('#sec-status-pill').textContent = 'يحتاج لملاحظات (WARNING)';
+  } else {
+    badge.style.background = '#ff7675';
+    badge.style.boxShadow = '0 0 20px rgba(255,118,117,.5)';
+    $('#sec-status-pill').className = 'tag tag-danger';
+    $('#sec-status-pill').textContent = 'غير معتمد (NEEDS FIX)';
+  }
+
+  // Quick metrics
+  const findings = audit.findings || [];
+  const hasSecret = findings.some(f => f.category && f.category.includes('Cryptographic'));
+  const hasSqli = findings.some(f => f.category && f.category.includes('Injection'));
+  const hasJwt = findings.some(f => f.category && f.category.includes('Authentication'));
+  const hasHeaders = findings.some(f => f.category && f.category.includes('Security Misconfiguration'));
+
+  $('#sec-metric-secrets').innerHTML = hasSecret ? '<span style="color:var(--danger)">⚠️ تسريب مكتشف</span>' : '<span style="color:var(--success)">✅ 0 تسريبات (Clean)</span>';
+  $('#sec-metric-sqli').innerHTML = hasSqli ? '<span style="color:var(--danger)">⚠️ فحص مطلوب</span>' : '<span style="color:var(--success)">✅ Drizzle ORM معزول</span>';
+  $('#sec-metric-jwt').innerHTML = hasJwt ? '<span style="color:var(--gold)">⚠️ مراجعة الكوكيز</span>' : '<span style="color:var(--success)">✅ HttpOnly Secure Cookies</span>';
+  $('#sec-metric-headers').innerHTML = hasHeaders ? '<span style="color:var(--danger)">⚠️ هيدرز ناقصة</span>' : '<span style="color:var(--success)">✅ Helmet.js & Strict CORS</span>';
+
+  // Counts
+  const passed = audit.passed_rules || [];
+  $('#sec-passed-count').textContent = passed.length;
+  $('#sec-findings-count').textContent = findings.length;
+
+  // OWASP Checklist tab
+  const owasp = audit.owasp_compliance || {};
+  const checklistContainer = $('#sec-checklist-items');
+  checklistContainer.innerHTML = Object.entries(owasp).map(([k, item]) => {
+    const isPass = item.status === 'PASS';
+    return `
+      <div style="background:rgba(255,255,255,.03);border:1px solid ${isPass ? 'rgba(0,206,201,.2)' : 'rgba(255,118,117,.3)'};border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-weight:700;font-size:.84rem;color:${isPass ? 'var(--accent2)' : 'var(--danger)'}">
+            ${k}: ${item.title}
+          </div>
+          <div style="font-size:.76rem;color:var(--fg3);margin-top:2px">${item.details}</div>
+        </div>
+        <span class="tag ${isPass ? 'tag-delivered' : 'tag-danger'}" style="font-size:.72rem">
+          ${isPass ? '✅ اجتياز (PASS)' : '⚠️ تنبيه (ATTN)'}
+        </span>
+      </div>
+    `;
+  }).join('');
+
+  // Passed rules tab
+  const passedContainer = $('#sec-passed-items');
+  passedContainer.innerHTML = passed.map(p => `
+    <div style="background:rgba(0,206,201,.05);border:1px solid rgba(0,206,201,.2);border-radius:var(--radius-sm);padding:10px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="color:var(--success);font-size:.82rem">✓ ${p.name}</b>
+        <span style="font-size:.7rem;color:var(--fg3)">${p.category}</span>
+      </div>
+      <p style="margin:4px 0 0;font-size:.76rem;color:var(--fg2)">${p.description}</p>
+    </div>
+  `).join('') || '<div style="color:var(--fg3);padding:10px">لا توجد عناصر مجتازة مسجلة.</div>';
+
+  // Findings tab
+  const findingsContainer = $('#sec-findings-items');
+  if(!findings.length){
+    findingsContainer.innerHTML = '<div style="background:rgba(0,206,201,.05);border:1px solid rgba(0,206,201,.2);border-radius:var(--radius-sm);padding:16px;text-align:center;color:var(--success);font-weight:700">🎉 رائع! كود الموقع نظيف تماماً ومطابق لمعايير OWASP Top 10 بدون أي ثغرات مكشوفة.</div>';
+  } else {
+    findingsContainer.innerHTML = findings.map(f => `
+      <div style="background:rgba(255,118,117,.06);border:1px solid rgba(255,118,117,.3);border-radius:var(--radius-sm);padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b style="color:var(--danger);font-size:.84rem">⚠️ ${f.rule} (${f.severity.toUpperCase()})</b>
+          <span style="font-size:.7rem;color:var(--fg3);font-family:monospace">${f.file} : السطر ${f.line}</span>
+        </div>
+        <p style="margin:4px 0 0;font-size:.78rem;color:var(--fg)">${f.description}</p>
+        <div style="margin-top:6px;font-size:.74rem;color:var(--accent2)"><b>الحل المقترح:</b> ${f.fix}</div>
+      </div>
+    `).join('');
+  }
+}
+
+function copySecurityReportJson(){
+  if(!currentSecurityAudit){
+    alert('لا يوجد تقرير أمان متاح للنسخ.');
+    return;
+  }
+  navigator.clipboard.writeText(JSON.stringify(currentSecurityAudit, null, 2)).then(() => {
+    alert('📋 تم نسخ تقرير فحص الأمان (JSON) إلى الحافظة!');
+  });
+}
+
+
+// =========================================================
 // Super Admin All-Sites & Files Manager
 // =========================================================
 async function loadAdminSitesManager(){
@@ -3417,6 +3692,7 @@ async function loadAdminSitesManager(){
                       <a href="${siteUrl}" target="_blank" class="btn btn-success btn-sm" style="padding:3px 7px;font-size:.7rem">🌐 فتح</a>
                       <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">✏️ الأكواد</button>
                       <button class="btn btn-ghost btn-sm" onclick="openDatabaseModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🗄️ الداتابيز</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openSecurityModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🛡️ الأمان</button>
                       <button class="btn btn-ghost btn-sm" onclick="openVisualEditModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🎨 المرئي</button>
                       <button class="btn btn-primary btn-sm" onclick="openRefineModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🪄 برومبت</button>
                       <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">📦 المنتجات</button>

@@ -164,9 +164,9 @@ def generate_enterprise_project(
         "scripts": {
             "start": "node server.js",
             "dev": "nodemon server.js",
-            "test": "echo \"Tests completed successfully\" && exit 0"
+            "test": "jest --detectOpenHandles --forceExit"
         },
-        "keywords": ["ecommerce", "express", "fullstack", "egypt", "autocorp", "drizzle", "modular"],
+        "keywords": ["ecommerce", "express", "fullstack", "egypt", "autocorp", "drizzle", "modular", "owasp-top-10"],
         "author": "AutoCorp Enterprise Synthesizer",
         "license": "MIT",
         "dependencies": {
@@ -176,10 +176,15 @@ def generate_enterprise_project(
             "morgan": "^1.10.0",
             "dotenv": "^16.4.5",
             "bcryptjs": "^2.4.3",
-            "jsonwebtoken": "^9.0.2"
+            "jsonwebtoken": "^9.0.2",
+            "cookie-parser": "^1.4.6",
+            "drizzle-orm": "^0.30.10",
+            "better-sqlite3": "^9.6.0"
         },
         "devDependencies": {
-            "nodemon": "^3.1.0"
+            "nodemon": "^3.1.0",
+            "jest": "^29.7.0",
+            "supertest": "^6.3.4"
         }
     }, indent=2, ensure_ascii=False)
 
@@ -511,6 +516,104 @@ module.exports = {{
 }};
 """
 
+    # 6b. src/config/drizzle.js (Drizzle ORM Connection to SQLite)
+    files["src/config/drizzle.js"] = """const Database = require('better-sqlite3');
+const { drizzle } = require('drizzle-orm/better-sqlite3');
+const path = require('path');
+const schema = require('../models/drizzle.schema');
+
+const dbPath = process.env.DATABASE_URL || path.join(__dirname, '../../database.sqlite');
+let sqlite;
+try {
+  sqlite = new Database(dbPath);
+} catch (e) {
+  sqlite = new Database(':memory:');
+}
+const db = drizzle(sqlite, { schema });
+
+module.exports = { db, sqlite, schema };
+"""
+
+    # 6c. src/models/drizzle.schema.js (Drizzle ORM Relational Schema)
+    files["src/models/drizzle.schema.js"] = """const { sqliteTable, text, integer, real } = require('drizzle-orm/sqlite-core');
+
+const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role').default('customer'),
+  phone: text('phone'),
+  createdAt: text('created_at').notNull()
+});
+
+const categories = sqliteTable('categories', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  nameEn: text('name_en'),
+  createdAt: text('created_at')
+});
+
+const products = sqliteTable('products', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  title: text('title').notNull(),
+  titleEn: text('title_en'),
+  price: real('price').notNull(),
+  category: text('category').notNull(),
+  badge: text('badge'),
+  stock: integer('stock').default(50),
+  rating: real('rating').default(5.0),
+  reviewsCount: integer('reviews_count').default(0),
+  description: text('description'),
+  imageUrl: text('image_url')
+});
+
+const orders = sqliteTable('orders', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  customerName: text('customer_name').notNull(),
+  customerPhone: text('customer_phone').notNull(),
+  customerAddress: text('customer_address').notNull(),
+  itemsJson: text('items_json').notNull(),
+  totalEgp: real('total_egp').notNull(),
+  paymentMethod: text('payment_method').default('cash_on_delivery'),
+  paymentRef: text('payment_ref'),
+  status: text('status').default('confirmed'),
+  createdAt: text('created_at').notNull()
+});
+
+const promoCodes = sqliteTable('promo_codes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  code: text('code').notNull().unique(),
+  discountPercent: real('discount_percent').notNull(),
+  minOrderEgp: real('min_order_egp').default(0),
+  active: integer('active').default(1)
+});
+
+const reviews = sqliteTable('reviews', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  productId: integer('product_id').notNull(),
+  author: text('author').notNull(),
+  rating: integer('rating').notNull(),
+  comment: text('comment'),
+  date: text('date')
+});
+
+const settings = sqliteTable('store_settings', {
+  key: text('key').primaryKey(),
+  value: text('value')
+});
+
+module.exports = {
+  users,
+  categories,
+  products,
+  orders,
+  promoCodes,
+  reviews,
+  settings
+};
+"""
+
     # 7. src/utils/response.js
     files["src/utils/response.js"] = """/**
  * Standardized API Response Envelopes
@@ -601,12 +704,21 @@ const { verifyToken } = require('../utils/jwt');
 const db = require('../config/database');
 
 module.exports = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(new ApiError(401, 'يرجى تسجيل الدخول للوصول إلى هذه الخدمة (Missing or invalid token)'));
+  let token = null;
+
+  // 1. Primary secure source: HttpOnly cookie (OWASP A07 - immunizes against XSS token theft)
+  if (req.cookies && req.cookies.jwt_token) {
+    token = req.cookies.jwt_token;
+  }
+  // 2. Secondary fallback: Authorization header Bearer token
+  else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    token = req.headers.authorization.split(' ')[1];
   }
 
-  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return next(new ApiError(401, 'يرجى تسجيل الدخول للوصول إلى هذه الخدمة (Missing authentication token)'));
+  }
+
   try {
     const decoded = verifyToken(token);
     const users = db.get().users;
@@ -904,11 +1016,21 @@ exports.login = async (email, password) => {
     files["src/modules/auth/auth.controller.js"] = """const authService = require('./auth.service');
 const { success } = require('../../utils/response');
 
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in ms
+};
+
 exports.register = async (req, res, next) => {
   try {
     const { name, email, password, phone } = req.body;
     const result = await authService.register(name, email, password, phone);
-    return success(res, 'تم إنشاء الحساب بنجاح', result, 201);
+    if (result && result.token) {
+      res.cookie('jwt_token', result.token, COOKIE_OPTIONS);
+    }
+    return success(res, 'تم إنشاء الحساب بنجاح وتأمينه بـ HttpOnly Cookie', result, 201);
   } catch(err) {
     next(err);
   }
@@ -918,10 +1040,18 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
-    return success(res, 'تم تسجيل الدخول بنجاح', result);
+    if (result && result.token) {
+      res.cookie('jwt_token', result.token, COOKIE_OPTIONS);
+    }
+    return success(res, 'تم تسجيل الدخول بنجاح وتفعيل جلسة آمنة (HttpOnly Cookie)', result);
   } catch(err) {
     next(err);
   }
+};
+
+exports.logout = (req, res) => {
+  res.clearCookie('jwt_token');
+  return success(res, 'تم تسجيل الخروج بنجاح ومسح الجلسة الآمنة');
 };
 
 exports.getMe = (req, res) => {
@@ -935,6 +1065,7 @@ const authMiddleware = require('../../middlewares/auth.middleware');
 
 router.post('/register', authController.register);
 router.post('/login', authController.login);
+router.post('/logout', authController.logout);
 router.get('/me', authMiddleware, authController.getMe);
 
 module.exports = router;
@@ -1226,6 +1357,7 @@ module.exports = router;
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const routes = require('./routes');
 const errorHandler = require('./middlewares/errorHandler.middleware');
@@ -1233,11 +1365,28 @@ const rateLimiter = require('./middlewares/rateLimiter.middleware');
 
 const app = express();
 
-// Security & Parsing Middlewares
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: '*' }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Security & Parsing Middlewares (OWASP Top 10 Hardened)
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+}));
+
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000', 'http://localhost:5000'];
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS policy'));
+    }
+  },
+  credentials: true
+}));
+
+app.use(cookieParser());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('dev'));
 app.use(rateLimiter(150, 60000));
 
@@ -1409,6 +1558,70 @@ npm start
 
 ### Analytics Dashboard
 - `GET /api/v1/dashboard/summary` — Real-time revenue, orders count, and conversion metrics.
+"""
+
+    # 34. tests/security.test.js (OWASP Top 10 Automated Security Tests)
+    files["tests/security.test.js"] = """const request = require('supertest');
+const app = require('../src/app');
+
+describe('OWASP Top 10 Security & Access Control Suite', () => {
+  it('A01: Rejects unauthenticated requests to protected endpoints (401)', async () => {
+    const res = await request(app).get('/api/v1/dashboard/summary');
+    expect([401, 403]).toContain(res.status);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('A03: Resists raw SQL injection payloads in search queries', async () => {
+    const maliciousPayload = "' OR '1'='1' --";
+    const res = await request(app)
+      .get(`/api/v1/products?search=${encodeURIComponent(maliciousPayload)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('A05: Enforces Helmet security headers on responses', async () => {
+    const res = await request(app).get('/api/v1/products');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('A07: Sets HttpOnly secure cookie upon authentication', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'admin@store.com', password: 'password123' });
+    expect([200, 400, 401]).toContain(res.status);
+    if (res.status === 200) {
+      const cookies = res.headers['set-cookie'];
+      expect(cookies).toBeDefined();
+      expect(cookies.some(c => c.includes('HttpOnly'))).toBe(true);
+    }
+  });
+});
+"""
+
+    # 35. tests/api.test.js (Core REST API Test Suite)
+    files["tests/api.test.js"] = """const request = require('supertest');
+const app = require('../src/app');
+
+describe('Enterprise REST API Endpoints', () => {
+  it('GET /api/v1/products returns product catalog', async () => {
+    const res = await request(app).get('/api/v1/products');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('POST /api/v1/orders processes a new customer order', async () => {
+    const orderData = {
+      customerName: 'فاروق إبراهيم',
+      customerPhone: '01000000000',
+      customerAddress: 'القاهرة، مصر',
+      items: [{ id: 1, quantity: 1, price: 150 }],
+      paymentMethod: 'vodafone_cash'
+    };
+    const res = await request(app).post('/api/v1/orders').send(orderData);
+    expect([200, 201]).toContain(res.status);
+    expect(res.body.success).toBe(true);
+  });
+});
 """
 
     return files

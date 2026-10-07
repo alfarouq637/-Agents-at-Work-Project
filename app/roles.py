@@ -30,6 +30,7 @@ DEPARTMENTS = {
         "Accessibility Auditor": "Checks contrast, semantics and RTL/mobile usability.",
         "Performance Engineer": "Keeps pages light and fast.",
         "Security Reviewer": "Reviews code for common web vulnerabilities.",
+        "Cybersecurity Reviewer": "Audits full-stack code against OWASP Top 10, validates inputs, flags hardcoded secrets, and enforces secure headers and HttpOnly cookies.",
         "Deployment Engineer": "Packages and deploys finished sites.",
     },
     "QA": {

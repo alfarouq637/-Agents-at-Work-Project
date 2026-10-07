@@ -12,7 +12,7 @@ import zipfile
 
 import httpx
 
-from . import builder, db, llm, roles, skills, tools
+from . import builder, db, llm, roles, skills, tools, security
 
 RATE = float(os.getenv("SALARY_EGP_PER_1K_TOKENS", "0.8"))
 THRESHOLD = float(os.getenv("PLAN_APPROVAL_THRESHOLD_EGP", "2000"))
@@ -214,9 +214,10 @@ def normalize(plan, request):
     steps = [{"role": str(s.get("role", "")).strip(), "task": str(s.get("task", ""))}
              for s in plan["steps"] if isinstance(s, dict) and s.get("role")][:6]
     if plan["service"] == "web":
-        steps = [s for s in steps if s["role"] not in ("Frontend Developer", "Code Reviewer")]
-        steps += [{"role": "Frontend Developer", "task": "Build the final single-file website."},
-                  {"role": "Code Reviewer", "task": "Review the website."}]
+        steps = [s for s in steps if s["role"] not in ("Frontend Developer", "Cybersecurity Reviewer", "Code Reviewer")]
+        steps += [{"role": "Frontend Developer", "task": "Build the final full-stack website following Atomic UI components and Drizzle ORM."},
+                  {"role": "Cybersecurity Reviewer", "task": "Conduct an exhaustive OWASP Top 10 security audit and SAST scan on generated code."},
+                  {"role": "Code Reviewer", "task": "Review website user experience and design quality."}]
     plan["steps"] = steps
     try:
         plan["price_egp"] = max(500.0, float(plan.get("price_egp", 1500)))
@@ -264,7 +265,38 @@ async def plan_job(job_id):
         log(job_id, f"FAILED during planning: {e}")
 
 
-# ---------- Execution ----------
+# ---------- Execution & 4 Advanced Metaprompting Layers ----------
+LAYER_1_THINKING = (
+    "\n\n### [Layer 1: Mandatory Chain-of-Thought & Planning]\n"
+    "Before outputting any code or architecture, start your response with a <thinking>...</thinking> block.\n"
+    "In this block:\n"
+    "1. Deconstruct client requirements and identify the SME niche.\n"
+    "2. Architect the Atomic UI component layout (Buttons, Cards, Modals, Drawer, Toast) with Tailwind CSS.\n"
+    "3. Perform Threat-Modeling against OWASP Top 10 vulnerabilities (XSS, SQLi, CSRF, broken access).\n"
+    "4. Formulate the Drizzle ORM data models and Egyptian payment flow (Vodafone Cash, InstaPay, Fawry).\n"
+    "5. Ensure native Arabic RTL with Cairo typography and high-speed mobile performance."
+)
+
+LAYER_2_GUARDRAILS = (
+    "\n\n### [Layer 2: Architectural Constraints & Guardrails]\n"
+    "1. UI: Atomic component library inspired by Shadcn UI / Radix UI with Tailwind CSS.\n"
+    "2. RTL: Native dir='rtl' lang='ar' with Cairo/Tajawal typography.\n"
+    "3. Backend: Modular Express 5 with Drizzle ORM and strictly parameterized queries.\n"
+    "4. Auth: Tokens MUST be handled with HttpOnly secure cookies.\n"
+    "5. Security: Helmet HTTP security headers and CORS credentials protection enabled.\n"
+    "6. Zero hardcoded secrets: everything loads from process.env."
+)
+
+CYBERSECURITY_REVIEWER_SYS = (
+    "You are the Cybersecurity Reviewer agent at AutoCorp. Your job is to strictly inspect full-stack code "
+    "and architecture against OWASP Top 10 standards: A01 Broken Access Control, A02 Cryptographic Failures & Leaked Secrets, "
+    "A03 Injection (SQLi & XSS), A04 Insecure Design, A05 Security Misconfiguration (Helmet, CORS), A06 Dependencies, "
+    "A07 Authentication (JWT in HttpOnly secure cookies), A08 Data Integrity, A09 Logging & Monitoring, A10 SSRF.\n"
+    "Instructions:\n"
+    "- If you detect any security violation, output on the first line: '[FIX REASON: line <num> - <issue>]' followed by required remediations.\n"
+    "- If code is completely compliant and secure, output on the first line: '[APPROVED: OWASP Top 10 Compliant]'."
+)
+
 WEB_RULES = ("Output ONE complete self-contained HTML document starting with <!doctype html> and ending with </html> enclosed in an html code fence. Use Tailwind via "
              "<script src=\"https://cdn.tailwindcss.com\"></script>. Use dir=\"rtl\" lang=\"ar\" if the client is "
              "Arabic. Mobile-first. No external images (use CSS gradients/emoji). Include every section in the brief. "
@@ -279,8 +311,12 @@ MOCK_HTML = ("```html\n<!doctype html><html lang=\"ar\" dir=\"rtl\"><head><meta 
 
 async def call_agent(ag, ctx, task, job_id):
     name = ag["name"]
-    mock = MOCK_HTML if name == "Frontend Developer" else ("APPROVED" if name == "Code Reviewer"
-                                                          else f"[MOCK] {name} output for: {task[:80]}")
+    mock = (
+        MOCK_HTML if name == "Frontend Developer"
+        else ("[APPROVED: OWASP Top 10 Compliant]\nAll OWASP Top 10 checks passed. HttpOnly cookies and parameterized queries verified." if name == "Cybersecurity Reviewer"
+        else ("APPROVED" if name == "Code Reviewer"
+        else f"[MOCK] {name} output for: {task[:80]}"))
+    )
     tier = "brain" if ag["department"] in ("Executive", "Custom") else "worker"
     skill_text, wanted = skills.for_agent(name, ag["department"])
     allowed = {t for t in wanted if t in tools.REGISTRY}
@@ -339,12 +375,30 @@ async def run_job(job_id):
             ag = await ensure_agent(role, job_id)
             log(job_id, f"{ag['name']} starts: {step['task'][:90]}")
             if ag["name"] == "Frontend Developer":
-                text = await call_agent(ag, ctx, step["task"] + "\n\n" + WEB_RULES, job_id)
+                text = await call_agent(ag, ctx, step["task"] + "\n\n" + WEB_RULES + LAYER_1_THINKING + LAYER_2_GUARDRAILS, job_id)
                 html = extract_html(text)
                 if html:
                     log(job_id, f"Frontend Developer generated complete HTML ({len(html)} chars)")
                 else:
                     log(job_id, "Frontend Developer generated code (parsing HTML document)")
+            elif ag["name"] == "Cybersecurity Reviewer":
+                # Layer 3 & Layer 4: OWASP Top 10 Review + SAST Scan & Self-Correction
+                sast_pre = security.run_sast_security_scan({}, html or "")
+                review_input = (
+                    f"{CYBERSECURITY_REVIEWER_SYS}\n\n"
+                    f"Automated SAST Scan Status: Score {sast_pre['score']}/100, Findings: {len(sast_pre['findings'])}\n"
+                    f"Code snippet for audit:\n{html[:8000] if html else 'Generated modular project'}"
+                )
+                text = await call_agent(ag, "", review_input, job_id)
+                needs_fix = "FIX REASON" in text.upper() or "REJECT" in text.upper() or sast_pre["score"] < 80
+                if needs_fix and html:
+                    fb = text.strip()[:500] if "FIX REASON" in text.upper() else f"SAST score {sast_pre['score']}/100 with findings"
+                    db.x("insert into feedback(agent,note,ts) values(?,?,?)", ("Frontend Developer", f"Security: {fb}", time.time()))
+                    log(job_id, f"Cybersecurity Reviewer requested remediation (Layer 4 Self-Correction): {fb[:120]}")
+                    fe = await ensure_agent("Frontend Developer", job_id)
+                    t2 = await call_agent(fe, ctx, f"Remediate security flaws reported by Cybersecurity Reviewer:\n{fb}\n\nPrevious HTML:\n{html[:8000]}\n\n{WEB_RULES}{LAYER_2_GUARDRAILS}", job_id)
+                    html = extract_html(t2) or html
+                    outputs.append({"role": "Frontend Developer (security-hardened)", "text": "Hardened code following Cybersecurity Reviewer audit."})
             elif ag["name"] == "Code Reviewer" and html:
                 text = await call_agent(ag, "", REVIEW_TASK + html[:12000], job_id)
                 if "REJECT" in text.strip()[:30].upper():
@@ -432,6 +486,11 @@ async def run_job(job_id):
                         conn.close()
                     except Exception as sq_err:
                         print(f"[SQLITE INIT ERR] {sq_err}")
+
+                # 4. Run automated SAST Security Scan on generated enterprise files (OWASP Top 10)
+                sast_report = security.run_sast_security_scan(ent_files, html)
+                db.save_security_audit(job_id, sast_report)
+                log(job_id, f"OWASP Top 10 Security Audit: Score {sast_report['score']}/100 (Grade {sast_report['grade']}), Status: {sast_report['status']}")
             except Exception as ent_err:
                 print(f"[ENTERPRISE FILES GEN ERR] {ent_err}")
 

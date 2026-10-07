@@ -25,7 +25,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, UploadFile, File, F
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, builder, corp, db, llm, roles, skills, tools
+from . import auth, builder, corp, db, llm, roles, skills, tools, security
 
 IS_VERCEL = os.getenv("VERCEL", "0") == "1"
 BASE = os.path.dirname(os.path.dirname(__file__))
@@ -1588,6 +1588,83 @@ def download_site_database_sqlite(
         media_type="application/sql",
         headers={"Content-Disposition": f"attachment; filename=site_{jid}_schema.sql"}
     )
+
+
+# =========================================================
+# Cybersecurity Reviewer & OWASP Top 10 SAST Audit APIs
+# =========================================================
+@app.get("/api/sites/{slug_or_id}/security-audit")
+def get_site_security_audit(
+    slug_or_id: str,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Retrieves OWASP Top 10 compliance score and SAST code inspection report."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+
+    cached = db.get_security_audit(jid)
+    if cached and cached.get("audited_at"):
+        return {"success": True, "job_id": jid, "audit": cached}
+
+    return execute_live_sast_scan(jid)
+
+
+@app.post("/api/sites/{slug_or_id}/security-audit/scan")
+def trigger_site_security_audit_scan(
+    slug_or_id: str,
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    """Forces a fresh SAST code scan and returns updated OWASP Top 10 compliance results."""
+    jid = resolve_job_id(slug_or_id)
+    require_site_access(jid, x_user_token, x_admin_key, authorization)
+    return execute_live_sast_scan(jid)
+
+
+def execute_live_sast_scan(jid: int):
+    page_row = db.one("SELECT html FROM site_pages WHERE job_id = ?", (jid,))
+    html = (page_row.get("html") or "") if page_row else ""
+
+    files_dict: Dict[str, str] = {}
+    db_files = db.q("SELECT filename, content FROM site_files WHERE job_id = ?", (jid,))
+    for f in db_files:
+        files_dict[f["filename"]] = f.get("content") or ""
+
+    local_dir = os.path.join(corp.SITES, str(jid))
+    if os.path.isdir(local_dir):
+        for root, _, filenames in os.walk(local_dir):
+            for fn in filenames:
+                rel = os.path.relpath(os.path.join(root, fn), local_dir).replace("\\", "/")
+                if rel.endswith((".js", ".json", ".html", ".sql", ".env")):
+                    try:
+                        with open(os.path.join(root, fn), "r", encoding="utf-8", errors="ignore") as rf:
+                            files_dict[rel] = rf.read()
+                    except Exception:
+                        pass
+
+    if len(files_dict) < 5:
+        from app.enterprise_generator import generate_enterprise_project
+        settings = db.one("SELECT * FROM site_settings WHERE job_id = ?", (jid,)) or {}
+        items = db.q("SELECT * FROM site_items WHERE job_id = ? ORDER BY id", (jid,))
+        brand = settings.get("brand_name") or f"site_{jid}"
+        files_dict = generate_enterprise_project(
+            job_id=jid,
+            brand_name=brand,
+            niche=settings.get("category", "general"),
+            slogan=settings.get("slogan", ""),
+            primary_color=settings.get("color_primary", ""),
+            secondary_color=settings.get("color_secondary", ""),
+            items=items,
+            settings=settings
+        )
+
+    audit_data = security.run_sast_security_scan(files_dict, html)
+    db.save_security_audit(jid, audit_data)
+    audit_data["job_id"] = jid
+    return {"success": True, "job_id": jid, "audit": audit_data}
 
 
 # =========================================================
