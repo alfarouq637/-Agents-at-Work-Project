@@ -238,7 +238,23 @@ async def subdomain_middleware(request: Request, call_next):
     """Allows accessing sites via subdomain like 3.localhost:8000 or koshary.localhost:8000."""
     # Browser sessions are HttpOnly cookies. Mirror the signed value into the
     # existing internal header interface so legacy route handlers never need a
-    # browser-readable bearer token.
+    # browser-readable bearer token. This must happen before any access to
+    # request.headers: Starlette caches that header view on first use.
+    raw_headers = list(request.scope.get("headers", []))
+    raw_cookie = next((value for name, value in raw_headers if name.lower() == b"cookie"), b"")
+    cookies = SimpleCookie()
+    cookies.load(raw_cookie.decode("latin-1", "ignore"))
+    session_cookie = cookies.get("autocorp_session")
+    session = session_cookie.value.strip() if session_cookie else ""
+    has_user_header = any(
+        name.lower() == b"x-user-token" and value.strip()
+        for name, value in raw_headers
+    )
+    if session and not has_user_header:
+        raw_headers.append((b"x-user-token", session.encode("latin-1", "ignore")))
+        raw_headers.append((b"x-admin-key", session.encode("latin-1", "ignore")))
+        request.scope["headers"] = raw_headers
+
     request_id = request.headers.get("x-request-id", "").strip()
     if not re.fullmatch(r"[A-Za-z0-9_-]{8,80}", request_id):
         request_id = uuid.uuid4().hex
@@ -260,12 +276,6 @@ async def subdomain_middleware(request: Request, call_next):
         response.headers["Retry-After"] = "3600"
         response.headers["X-Request-ID"] = request_id
         return response
-    raw_headers = list(request.scope.get("headers", []))
-    raw_cookie = next((value for name, value in raw_headers if name.lower() == b"cookie"), b"")
-    cookies = SimpleCookie()
-    cookies.load(raw_cookie.decode("latin-1", "ignore"))
-    session_cookie = cookies.get("autocorp_session")
-    session = session_cookie.value.strip() if session_cookie else ""
     # Cookie-authenticated browser writes must originate from this deployment or
     # an explicitly configured first-party origin. Requests without an Origin
     # header remain available to non-browser integrations authenticated by key.
@@ -304,18 +314,6 @@ async def subdomain_middleware(request: Request, call_next):
                     code="cross_origin_write_rejected",
                     message="Cross-origin state-changing request rejected",
                 )
-    # Existing clients may still send an empty legacy header. It must not block
-    # the HttpOnly session cookie from authenticating the request.
-    has_user_header = any(
-        name.lower() == b"x-user-token" and value.strip()
-        for name, value in raw_headers
-    )
-    if session and not has_user_header:
-        headers = raw_headers
-        headers.append((b"x-user-token", session.encode("latin-1", "ignore")))
-        headers.append((b"x-admin-key", session.encode("latin-1", "ignore")))
-        request.scope["headers"] = headers
-
     host = request.headers.get("host", "").split(":")[0].lower()
     parts = host.split(".")
     # If host has subdomain e.g. 'site-3' or 'koshary'
