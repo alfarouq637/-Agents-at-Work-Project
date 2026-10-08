@@ -700,8 +700,8 @@ textarea{resize:vertical;min-height:75px}
         <a href="https://github.com/alfarouq637" target="_blank" style="color:var(--fg);text-decoration:none;display:inline-flex;align-items:center;gap:4px">
           🐙 GitHub
         </a>
-        <a href="https://t.me/AlfarouqIbrahim" target="_blank" rel="noopener noreferrer" style="color:var(--accent2);text-decoration:none;display:inline-flex;align-items:center;gap:4px">
-          ✈️ @AlfarouqIbrahim
+        <a href="https://wa.me/AlfarouqIbrahim" target="_blank" rel="noopener noreferrer" style="color:var(--accent2);text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+          📱 WhatsApp
         </a>
         <a href="https://t.me/autocorp_Alfarouq_Ibrahim_bot" target="_blank" style="color:var(--accent2);text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:4px">
           🤖 Telegram Bot
@@ -1626,6 +1626,25 @@ function getSafeToken(){
   return '';
 }
 
+function apiErrorMessage(payload, fallback='حدث خطأ غير معروف'){
+  const detail = payload?.detail;
+  if(typeof detail === 'string' && detail.trim()) return detail;
+  if(Array.isArray(detail)){
+    const problems = detail.map(problem => {
+      if(!problem || typeof problem !== 'object') return '';
+      const location = Array.isArray(problem.location)
+        ? problem.location.filter(part => part !== 'body').join('.')
+        : '';
+      const message = typeof problem.message === 'string' ? problem.message : '';
+      return location && message ? `${location}: ${message}` : message;
+    }).filter(Boolean);
+    if(problems.length) return problems.join('\n');
+  }
+  if(detail && typeof detail === 'object' && typeof detail.message === 'string') return detail.message;
+  if(typeof payload?.error?.message === 'string') return payload.error.message;
+  return fallback;
+}
+
 function applyTranslations(){
   const dict = I18N[currentLang] || I18N.ar;
   document.documentElement.lang = currentLang;
@@ -1789,7 +1808,7 @@ async function handleAuthLogin(e){
       alert(`✅ أهلاً بك يا (${d.user.username})! تم تسجيل دخولك بنجاح.`);
       loadJobs();
     }else{
-      alert('❌ ' + (d.detail || 'بيانات الدخول غير صحيحة'));
+      alert('❌ ' + apiErrorMessage(d, 'بيانات الدخول غير صحيحة'));
     }
   }catch(err){
     alert('خطأ: ' + err.message);
@@ -1815,7 +1834,7 @@ async function handleAuthRegister(e){
       alert(`🎉 تم إنشاء حسابك بنجاح (${d.user.username})! رصيدك متاح لإنشاء موقعين مجاناً.`);
       loadJobs();
     }else{
-      alert('❌ ' + (d.detail || 'تعذر إنشاء الحساب'));
+      alert('❌ ' + apiErrorMessage(d, 'تعذر إنشاء الحساب'));
     }
   }catch(err){
     alert('خطأ: ' + err.message);
@@ -1972,7 +1991,7 @@ async function handleCreateStore(e){
       // Prompt for payment activation
       openPaymentModal(d.id);
     }else{
-      alert('خطأ: ' + (d.detail || 'فشل البدء'));
+      alert('خطأ: ' + apiErrorMessage(d, 'فشل البدء'));
     }
   }catch(err){
     alert('حدث خطأ: ' + err.message);
@@ -2609,6 +2628,12 @@ async function handleWizardFileUpload(e){
   const file = e.target.files[0];
   if(!file) return;
   const statusDiv = $('#wizard-upload-status');
+  if(!currentUser && !isAdmin){
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '<span style="color:var(--danger)">❌ سجّل الدخول أو أنشئ حساباً أولاً قبل رفع ملف.</span>';
+    showAuthModal('login');
+    return;
+  }
   statusDiv.style.display = 'block';
   statusDiv.innerHTML = '<span style="color:var(--gold)">⏳ جاري رفع الملف وقراءة محتواه بالذكاء الاصطناعي...</span>';
   
@@ -2616,7 +2641,7 @@ async function handleWizardFileUpload(e){
   fd.append('file', file);
   
   try{
-    const res = await fetch('/api/upload', {method: 'POST', body: fd});
+    const res = await fetch('/api/upload', {method: 'POST', body: fd, credentials: 'same-origin'});
     const d = await res.json();
     if(res.ok && d.success){
       $('#wizard-uploaded-url').value = d.url;
@@ -2629,7 +2654,7 @@ async function handleWizardFileUpload(e){
         statusDiv.innerHTML = `<span style="color:var(--success)">✅ تم فحص ملف (${esc(d.original_name)}) بنجاح! تم استخراج ${charCount} حرف سيتم استخدامها في برمجة محتوى الموقع.</span>`;
       }
     } else {
-      statusDiv.innerHTML = `<span style="color:var(--danger)">❌ فشل رفع الملف: ${esc(d.detail || 'خطأ غير معروف')}</span>`;
+      statusDiv.innerHTML = `<span style="color:var(--danger)">❌ فشل رفع الملف: ${esc(apiErrorMessage(d, 'خطأ غير معروف'))}</span>`;
     }
   }catch(err){
     statusDiv.innerHTML = `<span style="color:var(--danger)">❌ خطأ في الرفع: ${esc(err.message)}</span>`;
