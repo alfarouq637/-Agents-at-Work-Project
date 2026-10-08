@@ -23,10 +23,8 @@ if root not in sys.path:
     sys.path.insert(0, root)
 
 from app.main import app  # noqa: E402, F401
-from app.db import init  # noqa: E402
 
-# Init DB schema on cold start
-try:
-    init()
-except Exception as e:
-    print(f"[DB INIT WARNING] {e}")
+# Database initialization is owned by the FastAPI lifespan in app.main.
+# Do not initialize here as well: Vercel imports this module before serving
+# requests, and the duplicate Turso migration pass can exhaust the startup
+# budget and produce a serverless 500/timeout.
