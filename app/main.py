@@ -94,7 +94,13 @@ def check_guardrails(text: str) -> None:
 # =========================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db.init()
+    # A transient Turso/network/schema failure must not crash the entire
+    # serverless function during startup.  The health probe performs its own
+    # database check and reports 503 until durable storage is reachable.
+    try:
+        db.init()
+    except Exception as exc:
+        print(f"[DB INIT WARNING] {exc}")
     tasks = []
     
     # 1. Background Tick loop (if enabled locally)
