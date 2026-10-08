@@ -94,13 +94,15 @@ def check_guardrails(text: str) -> None:
 # =========================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # A transient Turso/network/schema failure must not crash the entire
-    # serverless function during startup.  The health probe performs its own
-    # database check and reports 503 until durable storage is reachable.
-    try:
-        db.init()
-    except Exception as exc:
-        print(f"[DB INIT WARNING] {exc}")
+    # Do not perform synchronous schema migrations during a Vercel cold start.
+    # Turso retries can consume the entire serverless invocation budget. Apply
+    # schema migrations separately, then let request/health checks verify the
+    # configured database connection.
+    if not IS_VERCEL:
+        try:
+            db.init()
+        except Exception as exc:
+            print(f"[DB INIT WARNING] {exc}")
     tasks = []
     
     # 1. Background Tick loop (if enabled locally)
