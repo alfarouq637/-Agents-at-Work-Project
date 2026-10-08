@@ -700,8 +700,8 @@ textarea{resize:vertical;min-height:75px}
         <a href="https://github.com/alfarouq637" target="_blank" style="color:var(--fg);text-decoration:none;display:inline-flex;align-items:center;gap:4px">
           🐙 GitHub
         </a>
-        <a href="https://wa.me/201023456789" target="_blank" style="color:#2ecc71;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
-          📱 WhatsApp
+        <a href="https://t.me/AlfarouqIbrahim" target="_blank" rel="noopener noreferrer" style="color:var(--accent2);text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+          ✈️ @AlfarouqIbrahim
         </a>
         <a href="https://t.me/autocorp_Alfarouq_Ibrahim_bot" target="_blank" style="color:var(--accent2);text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:4px">
           🤖 Telegram Bot
@@ -2983,7 +2983,7 @@ async function loadProductsList(jid){
         price: Number.isFinite(price) && price >= 0 ? price : 0,
         image_url: safeImageUrl(it.image_url)
       };
-    }).filter(Boolean) : [];
+    }).filter(Boolean);
     if(!safeItems.length){
       tb.innerHTML = '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--fg3)">لا توجد منتجات مسجلة حتى الآن</td></tr>';
       return;
