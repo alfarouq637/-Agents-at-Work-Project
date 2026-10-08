@@ -15,8 +15,55 @@ Supported Archetypes:
 """
 import html
 import json
+import math
 import random
 import re
+
+from . import artifacts
+
+
+def _json_for_script(value) -> str:
+    """Serialize tenant data without allowing it to close an inline script tag."""
+    return (
+        json.dumps(value, ensure_ascii=False)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
+def _inline_js_value(value) -> str:
+    """Encode a value for JavaScript source inside an HTML event attribute."""
+    return html.escape(_json_for_script(str(value)), quote=True)
+
+
+def _safe_price(value) -> float:
+    """Keep generated markup from treating a stored catalog value as code."""
+    try:
+        price = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return price if math.isfinite(price) and price >= 0 else 0.0
+
+
+def _safe_text(value, fallback: str, max_length: int = 240) -> str:
+    """Normalize merchant text before it reaches an HTML template."""
+    text = str(value or "").strip()
+    return text[:max_length] if text else fallback
+
+
+def _safe_hex_color(value, fallback: str) -> str:
+    """Allow only CSS hex colors in style and Tailwind configuration slots."""
+    candidate = str(value or "").strip()
+    return candidate if re.fullmatch(r"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?(?:[0-9A-Fa-f]{2})?", candidate) else fallback
+
+
+def _safe_phone(value, fallback: str = "") -> str:
+    """Keep telephone URLs and displayed contact values free of markup."""
+    digits = re.sub(r"\D", "", str(value or ""))[:20]
+    return digits or fallback
 
 PALETTES = {
     "cyber": {
@@ -230,9 +277,14 @@ def build_site_html(job_id: int, client: str, request: str, settings: dict = Non
     niche = detect_niche(request + " " + client + " " + (settings.get("category") or ""))
     
     if niche == "portfolio":
-        return build_portfolio_html(job_id, client, request, settings, items)
+        document = build_portfolio_html(job_id, client, request, settings, items)
     else:
-        return build_store_html(job_id, client, request, settings, items, niche)
+        document = build_store_html(job_id, client, request, settings, items, niche)
+
+    issues = artifacts.validate_site_html(document)
+    if issues:
+        raise RuntimeError("Generated template failed artifact validation: " + "; ".join(issues))
+    return document
 
 
 def build_portfolio_html(job_id: int, client: str, request: str, settings: dict = None, items: list = None) -> str:
@@ -241,22 +293,30 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
     items = items or []
     
     # Extract candidate name
-    brand_name = settings.get("brand_name") or client or "ياسين أحمد | Yaseen Ahmed"
+    brand_name = _safe_text(settings.get("brand_name") or client, "ياسين أحمد | Yaseen Ahmed", 120)
     if brand_name.startswith("tg:"):
         brand_name = "ياسين أحمد | Yaseen Ahmed"
         
-    slogan = settings.get("slogan") or "خبير الأمن السيبراني واختبار الاختراق وتأمين الأنظمة السحابية"
+    slogan = _safe_text(settings.get("slogan"), "خبير الأمن السيبراني واختبار الاختراق وتأمين الأنظمة السحابية", 500)
     
     pal = PALETTES["cyber"]
-    primary = settings.get("color_primary") or pal["primary"]
-    secondary = settings.get("color_secondary") or pal["secondary"]
+    primary = _safe_hex_color(settings.get("color_primary"), pal["primary"])
+    secondary = _safe_hex_color(settings.get("color_secondary"), pal["secondary"])
     accent = pal["accent"]
     
-    phone = settings.get("phone") or "01000000000"
-    whatsapp = settings.get("whatsapp") or phone
+    phone = _safe_phone(settings.get("phone"))
+    whatsapp = _safe_phone(settings.get("whatsapp"), phone)
     clean_wa = re.sub(r"[^\d]", "", whatsapp)
     if clean_wa.startswith("01"):
         clean_wa = "2" + clean_wa
+    if clean_wa:
+        portfolio_contact_cta = f'''<a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً ' + brand_name + '، أود مناقشة مشروع.')}" target="_blank" rel="noopener" class="px-8 py-3.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white font-bold text-sm transition">
+            💬 محادثة واتساب مباشرة
+          </a>'''
+        portfolio_footer_contact = f'''<a href="https://wa.me/{clean_wa}" target="_blank" rel="noopener" class="hover:text-cyan-400 font-bold">📲 WhatsApp: {html.escape(whatsapp)}</a>'''
+    else:
+        portfolio_contact_cta = '''<span class="px-8 py-3.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-bold text-sm">بيانات التواصل قيد الإعداد</span>'''
+        portfolio_footer_contact = '''<span class="font-bold">بيانات التواصل قيد الإعداد</span>'''
 
     if not items:
         raw_items = DEFAULT_CATALOGS["portfolio"]
@@ -271,7 +331,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
                 "description": it["desc"],
             })
 
-    items_json = json.dumps(items, ensure_ascii=False)
+    items_json = _json_for_script(items)
 
     return f"""<!doctype html>
 <html lang="ar" dir="rtl" class="scroll-smooth">
@@ -314,6 +374,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
   </style>
 </head>
 <body class="selection:bg-cyan-500 selection:text-black min-h-screen flex flex-col bg-grid">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-slate-950">تخطي إلى المحتوى الرئيسي / Skip to main content</a>
 
   <!-- Top Status Bar -->
   <div class="bg-slate-950/90 border-b border-cyan-950/60 text-xs py-2 px-4 backdrop-blur">
@@ -358,6 +419,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
     </div>
   </header>
 
+  <main id="main-content" tabindex="-1">
   <!-- Hero Section -->
   <section class="py-16 sm:py-24 relative overflow-hidden">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
@@ -379,9 +441,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         <button onclick="openHireModal()" class="px-8 py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-sm shadow-xl shadow-cyan-500/25 transition hover:scale-105 active:scale-95">
           🛡️ احجز فحصاً أمنياً لنظامك
         </button>
-        <a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً ' + brand_name + '، أود مناقشة مشروع أمني.')}" target="_blank" class="px-8 py-3.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white font-bold text-sm transition">
-          💬 محادثة واتساب مباشرة
-        </a>
+        {portfolio_contact_cta}
       </div>
 
       <!-- Stats Bar -->
@@ -498,12 +558,12 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
               <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">{html.escape(it.get("badge") or "موصى به")}</span>
               <span class="text-xs text-cyan-400 font-mono">{html.escape(it.get("category") or "خدمة")}</span>
             </div>
-            <h4 class="font-bold text-white text-base mb-2">{html.escape(it["title"])}</h4>
-            <p class="text-xs text-slate-400 font-readex leading-relaxed mb-6">{html.escape(it["description"])}</p>
+            <h4 class="font-bold text-white text-base mb-2">{html.escape(str(it.get("title") or ""))}</h4>
+            <p class="text-xs text-slate-400 font-readex leading-relaxed mb-6">{html.escape(str(it.get("description") or ""))}</p>
           </div>
           <div>
-            <div class="text-xl font-black text-cyan-400 font-mono mb-4">{it["price"]} ج.م</div>
-            <button onclick="requestService('{html.escape(it["title"])}', {it["price"]})" class="w-full py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/40 font-bold text-xs transition">
+            <div class="text-xl font-black text-cyan-400 font-mono mb-4">{_safe_price(it.get("price"))} ج.م</div>
+            <button onclick="requestService({_inline_js_value(it.get("title") or "")}, {_safe_price(it.get("price"))})" class="w-full py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/40 font-bold text-xs transition">
               🛡️ طلب الخدمة والتعاقد
             </button>
           </div>
@@ -514,6 +574,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
   </section>
 
   <!-- Contact & Footer -->
+  </main>
   <footer id="contact" class="py-12 bg-slate-950 border-t border-slate-900 text-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
       <div>
@@ -521,7 +582,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         <p class="text-slate-500 font-readex">جميع الحقوق محفوظة © 2026 — مصمم ومنشور عبر وكالة AutoCorp الذاتية</p>
       </div>
       <div class="flex items-center gap-4 text-slate-300">
-        <a href="https://wa.me/{clean_wa}" target="_blank" class="hover:text-cyan-400 font-bold">📲 WhatsApp: {html.escape(whatsapp)}</a>
+        {portfolio_footer_contact}
         <span>•</span>
         <a href="tel:{phone}" class="hover:text-cyan-400 font-bold">📞 {html.escape(phone)}</a>
       </div>
@@ -603,17 +664,21 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
       try {{
         const res = await fetch(`/api/sites/${{SITE_JOB_ID}}/orders`, {{
           method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
+          headers: {{ 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }},
           body: JSON.stringify(payload)
         }});
-        const d = await res.json();
+        const d = await res.json().catch(() => ({{}}));
+        if (!res.ok) throw new Error(d.detail || 'Unable to submit the service request.');
         closeHireModal();
         const msg = encodeURIComponent(`مرحباً {html.escape(brand_name)} 👋\\nأود التعاقد على خدمة: ${{payload.items[0].title}}\\nالاسم: ${{payload.customer_name}}\\nالهاتف: ${{payload.customer_phone}}`);
-        alert('✅ تم استلام طلبك بنجاح! سيتم فتح واتساب للتأكيد المباشر.');
-        window.open(`https://wa.me/${{WA_NUMBER}}?text=${{msg}}`, '_blank');
+        if (WA_NUMBER) {{
+          alert('✅ تم استلام طلبك بنجاح! سيتم فتح واتساب للتأكيد المباشر.');
+          window.open(`https://wa.me/${{WA_NUMBER}}?text=${{msg}}`, '_blank', 'noopener');
+        }} else {{
+          alert('✅ تم استلام طلبك بنجاح. بيانات التواصل قيد الإعداد.');
+        }}
       }} catch(err) {{
-        alert('تم تسجيل طلبك محلياً!');
-        closeHireModal();
+        alert('تعذر إرسال الطلب. يرجى المحاولة مرة أخرى.');
       }} finally {{
         btn.disabled = false;
         btn.textContent = '🚀 إرسال طلب التعاقد الآن';
@@ -626,17 +691,17 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
 
 def build_store_html(job_id: int, client: str, request: str, settings: dict, items: list, niche: str) -> str:
     """Generates the full-stack Arabic E-Commerce / Business SPA."""
-    brand_name = settings.get("brand_name") or client or ("خضار فريش" if niche == "vegetables" else "مناحل الشفاء" if niche == "honey" else "المتجر المصري")
+    brand_name = _safe_text(settings.get("brand_name") or client, "خضار فريش" if niche == "vegetables" else "مناحل الشفاء" if niche == "honey" else "المتجر المصري", 120)
     if brand_name.startswith("tg:"):
         brand_name = "مناحل الشفاء للعسل الطبيعي" if niche == "honey" else "متجر الخضار الطازج" if niche == "vegetables" else "المتجر الإلكتروني"
         
-    slogan = settings.get("slogan") or (
+    slogan = _safe_text(settings.get("slogan"), (
         "عسل سدر جبلي وطبيعي 100% مفحوص معملياً من المنحل لباب بيتك" if niche == "honey"
         else "خضارك طازج من المزرعة لباب بيتك بأعلى جودة وأفضل سعر في مصر" if niche == "vegetables" 
         else "أشهى المأكولات والمشويات على أصولها بتوصيل سريع وساخن" if niche == "restaurant"
         else "أحدث الأجهزة والإلكترونيات الذكية بأفضل الأسعار وضمان حقيقي" if niche == "electronics"
         else "خدمات احترافية متكاملة تلبي احتياجاتك بأعلى معايير الجودة"
-    )
+    ), 500)
     
     pal_key = settings.get("palette") or (
         "amber" if niche == "honey"
@@ -648,20 +713,30 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         else "ocean"
     )
     pal = PALETTES.get(pal_key, PALETTES["emerald"])
-    primary = settings.get("color_primary") or pal["primary"]
-    secondary = settings.get("color_secondary") or pal["secondary"]
+    primary = _safe_hex_color(settings.get("color_primary"), pal["primary"])
+    secondary = _safe_hex_color(settings.get("color_secondary"), pal["secondary"])
     accent = pal["accent"]
     hero_grad = pal["hero_gradient"]
     
-    phone = settings.get("phone") or "01000000000"
-    whatsapp = settings.get("whatsapp") or phone
+    phone = _safe_phone(settings.get("phone"))
+    whatsapp = _safe_phone(settings.get("whatsapp"), phone)
     clean_wa = re.sub(r"[^\d]", "", whatsapp)
     if clean_wa.startswith("01"):
         clean_wa = "2" + clean_wa
+    contact_phone = phone or "بيانات الاتصال قيد الإعداد"
+    contact_whatsapp = whatsapp or "بيانات الاتصال قيد الإعداد"
+    contact_address = _safe_text(settings.get("address"), "بيانات العنوان قيد الإعداد", 250)
+    if clean_wa:
+        contact_actions = f'''<a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً ' + brand_name + '، أريد التحدث مع خدمة العملاء.')}" target="_blank" rel="noopener" class="px-8 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-center text-sm shadow-lg transition">
+            📲 تحدث واتساب الآن
+          </a>'''
+        promo_contact_cta = f'''<a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً، أريد الاستفسار عن عروض ' + brand_name)}" target="_blank" rel="noopener" class="text-amber-400 hover:underline font-bold mr-2">طلب واتساب مباشر</a>'''
+        hero_contact_cta = f'''<a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً، أود التواصل مع إدارة ' + brand_name)}" target="_blank" rel="noopener" class="px-8 py-3.5 rounded-xl bg-white/15 backdrop-blur text-white border border-white/30 font-bold text-sm hover:bg-white/25 transition">💬 محادثة واتساب سريعة</a>'''
+    else:
+        contact_actions = '''<span class="px-8 py-3.5 rounded-xl bg-white/10 border border-white/20 text-slate-300 font-bold text-center text-sm">بيانات التواصل قيد الإعداد</span>'''
+        promo_contact_cta = '''<a href="#contact" class="text-amber-400 hover:underline font-bold mr-2">بيانات التواصل قيد الإعداد</a>'''
+        hero_contact_cta = '''<a href="#contact" class="px-8 py-3.5 rounded-xl bg-white/15 backdrop-blur text-white border border-white/30 font-bold text-sm hover:bg-white/25 transition">💬 بيانات التواصل قيد الإعداد</a>'''
         
-    v_cash = settings.get("vodafone_cash") or phone
-    instapay = settings.get("instapay") or (brand_name.replace(" ", "").lower() + "@instapay")
-    fawry_code = settings.get("fawry_code") or "88219"
     cod_enabled = settings.get("cod_enabled", True)
     
     if not items:
@@ -680,11 +755,11 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
             
     categories = list(dict.fromkeys(it.get("category", "الكل") for it in items))
     cat_buttons_html = "".join(
-        f'<button onclick="filterCategory(\'{html.escape(c)}\')" class="cat-btn px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-100" data-cat="{html.escape(c)}">{html.escape(c)}</button>'
+        f'<button onclick="filterCategory({_inline_js_value(c)})" class="cat-btn px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-100" data-cat="{html.escape(str(c))}">{html.escape(str(c))}</button>'
         for c in categories
     )
     
-    items_json = json.dumps(items, ensure_ascii=False)
+    items_json = _json_for_script(items)
     
     html_code = f"""<!doctype html>
 <html lang="ar" dir="rtl" class="scroll-smooth">
@@ -728,13 +803,14 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
   </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-slate-950">تخطي إلى المحتوى الرئيسي / Skip to main content</a>
 
   <!-- Top Announcement Bar -->
   <div class="bg-slate-900 text-slate-200 text-xs py-2 px-4 text-center flex items-center justify-between border-b border-slate-800">
     <div class="flex items-center gap-2 mx-auto">
       <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-      <span id="promo-bar-text">🎉 <b>عروض حصرية:</b> كود خصم 10%: <b>WELCOME10</b> | 🚚 توصيل سريع لجميع المحافظات</span>
-      <a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً، أريد الاستفسار عن عروض ' + brand_name)}" target="_blank" class="text-amber-400 hover:underline font-bold mr-2">طلب واتساب مباشر</a>
+      <span id="promo-bar-text">🎉 <b>تسوق عبر المتجر:</b> أضف المنتجات إلى طلبك وأرسله للمراجعة</span>
+      {promo_contact_cta}
     </div>
     <div class="flex items-center gap-2">
       <button onclick="toggleStoreTheme()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition flex items-center gap-1" id="store-theme-btn">
@@ -779,6 +855,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     </div>
   </header>
 
+  <main id="main-content" tabindex="-1">
   <!-- Hero Section -->
   <section id="hero" class="hero-grad text-white py-16 sm:py-24 relative overflow-hidden">
     <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
@@ -792,15 +869,13 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         {html.escape(slogan)}
       </h2>
       <p class="text-base sm:text-lg text-white/90 max-w-2xl mx-auto font-readex leading-relaxed mb-10">
-        تسوق بأمان، اطلب بنقرة زر واحدة، واستلم طلبك طازجاً وسريعاً حتى باب بيتك مع خيارات الدفع عبر فودافون كاش، إنستاباي، فوري، أو كاش عند الاستلام.
+        أرسل طلبك من المتجر، وسيتم التواصل معك من التاجر لتأكيد التوافر وطريقة الدفع والتسليم.
       </p>
       <div class="flex flex-wrap items-center justify-center gap-4">
         <a href="#catalog" class="px-8 py-3.5 rounded-xl bg-white text-slate-950 font-black text-sm shadow-xl hover:bg-slate-100 transition hover:scale-105 active:scale-95">
           🛒 تصفح القائمة والأسعار
         </a>
-        <a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً، أود التواصل مع إدارة ' + brand_name)}" target="_blank" class="px-8 py-3.5 rounded-xl bg-white/15 backdrop-blur text-white border border-white/30 font-bold text-sm hover:bg-white/25 transition">
-          💬 محادثة واتساب سريعة
-        </a>
+        {hero_contact_cta}
       </div>
     </div>
   </section>
@@ -911,29 +986,26 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
           </p>
           <div class="flex flex-wrap gap-6 mt-6 text-sm">
             <div class="flex items-center gap-2">
-              <span class="text-amber-400">📞</span> <b>هاتف:</b> <span>{html.escape(phone)}</span>
+              <span class="text-amber-400">📞</span> <b>هاتف:</b> <span>{html.escape(contact_phone)}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-emerald-400">💬</span> <b>واتساب:</b> <span>{html.escape(whatsapp)}</span>
+              <span class="text-emerald-400">💬</span> <b>واتساب:</b> <span>{html.escape(contact_whatsapp)}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-sky-400">📍</span> <b>المقر:</b> <span>{html.escape(settings.get("address") or "القاهرة، جمهورية مصر العربية")}</span>
+              <span class="text-sky-400">📍</span> <b>العنوان:</b> <span>{html.escape(contact_address)}</span>
             </div>
           </div>
         </div>
         <div class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-          <a href="https://wa.me/{clean_wa}?text={html.escape('مرحباً ' + brand_name + '، أريد التحدث مع خدمة العملاء.')}" target="_blank" class="px-8 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-center text-sm shadow-lg transition">
-            📲 تحدث واتساب الآن
-          </a>
-          <a href="tel:{phone}" class="px-8 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-center text-sm transition">
-            📞 اتصل هاتفياً
-          </a>
+          {contact_actions}
+          {f'''<a href="tel:{phone}" class="px-8 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-center text-sm transition">📞 اتصل هاتفياً</a>''' if phone else ''}
         </div>
       </div>
     </div>
   </section>
 
   <!-- Footer -->
+  </main>
   <footer class="bg-slate-950 text-slate-400 py-8 border-t border-slate-800 text-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div>
@@ -990,7 +1062,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         </div>
       </div>
       <button id="checkout-btn" onclick="openCheckoutModal()" disabled class="w-full py-3.5 rounded-xl font-black text-white text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed" style="background:{primary}">
-        💳 المتابعة لإتمام الطلب
+        📦 متابعة طلب التاجر
       </button>
     </div>
   </aside>
@@ -1000,8 +1072,8 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl relative">
       <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
         <div>
-          <h3 class="text-xl font-black text-slate-900">تأكيد الطلب والدفع 🇪🇬</h3>
-          <p class="text-xs text-slate-500 font-readex">أدخل بيانات التوصيل واختر طريقة الدفع المناسبة</p>
+          <h3 class="text-xl font-black text-slate-900">إرسال طلب إلى التاجر 🇪🇬</h3>
+          <p class="text-xs text-slate-500 font-readex">سيتواصل التاجر لتأكيد الطلب وطريقة الدفع؛ لا تُعالج أي دفعة هنا.</p>
         </div>
         <button onclick="closeCheckoutModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center font-bold">✕</button>
       </div>
@@ -1020,36 +1092,16 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
           <textarea id="cust-address" required placeholder="المدينة، الحي، اسم الشارع، رقم العمارة والشقة" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" rows="2"></textarea>
         </div>
 
-        <!-- Payment Method Selection -->
+        <!-- The prototype records an order request only; it must not direct a
+             customer to an unverified wallet or payment provider. -->
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-2">طريقة الدفع *</label>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold">
+          <label class="block text-xs font-bold text-slate-700 mb-2">حالة الدفع</label>
+          <div class="text-xs font-bold">
             <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
-              <input type="radio" name="pay_method" value="vodafone_cash" checked class="text-brand-500">
+              <input type="radio" name="pay_method" value="cash_on_delivery" checked class="text-brand-500">
               <div>
-                <div>فودافون كاش / كاش</div>
-                <div class="text-[10px] text-slate-400 font-normal">تحويل لمحفظة {html.escape(v_cash)}</div>
-              </div>
-            </label>
-            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
-              <input type="radio" name="pay_method" value="instapay" class="text-brand-500">
-              <div>
-                <div>إنستاباي (InstaPay)</div>
-                <div class="text-[10px] text-slate-400 font-normal">{html.escape(instapay)}</div>
-              </div>
-            </label>
-            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
-              <input type="radio" name="pay_method" value="fawry" class="text-brand-500">
-              <div>
-                <div>فوري باي (Fawry Pay)</div>
-                <div class="text-[10px] text-slate-400 font-normal">كود التاجر: {html.escape(fawry_code)}</div>
-              </div>
-            </label>
-            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
-              <input type="radio" name="pay_method" value="cod" class="text-brand-500">
-              <div>
-                <div>الدفع عند الاستلام</div>
-                <div class="text-[10px] text-slate-400 font-normal">كاش لمندوب التوصيل</div>
+                <div>بانتظار تأكيد التاجر</div>
+                <div class="text-[10px] text-slate-400 font-normal">سيحدد التاجر طريقة الدفع والتسليم بعد مراجعة الطلب.</div>
               </div>
             </label>
           </div>
@@ -1112,6 +1164,12 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     let cart = {{}}; // {{ id: qty }}
     let activeFilter = 'الكل';
 
+    function escapeProductHtml(value) {{
+      return String(value ?? '').replace(/[&<>"']/g, char => {{
+        return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[char];
+      }});
+    }}
+
     function renderProducts() {{
       const grid = document.getElementById('products-grid');
       const filtered = (activeFilter === 'الكل') 
@@ -1123,37 +1181,47 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         return;
       }}
 
-      grid.innerHTML = filtered.map(p => `
+      grid.innerHTML = filtered.map(p => {{
+        const id = Number(p.id);
+        if (!Number.isSafeInteger(id) || id < 1) return '';
+        const price = Number(p.price);
+        const safePrice = Number.isFinite(price) && price >= 0 ? price : 0;
+        const category = escapeProductHtml(p.category);
+        const badge = escapeProductHtml(p.badge);
+        const title = escapeProductHtml(p.title);
+        const description = escapeProductHtml(p.description || 'صنف عالي الجودة ومضمون تم اختياره بعناية.');
+        return `
         <div class="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1">
           <div>
             <div class="flex items-center justify-between mb-3">
               <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-readex">
-                ${{p.category}}
+                ${{category}}
               </span>
-              ${{p.badge ? `<span class="text-[11px] font-black px-2.5 py-1 rounded-full text-brand-600" style="background:${pal["badge_bg"]};color:${pal["badge_text"]}">★ ${{p.badge}}</span>` : ''}}
+              ${{badge ? `<span class="text-[11px] font-black px-2.5 py-1 rounded-full text-brand-600" style="background:${pal["badge_bg"]};color:${pal["badge_text"]}">★ ${{badge}}</span>` : ''}}
             </div>
             
             <h4 class="text-base font-black text-slate-900 mb-2 leading-snug group-hover:text-brand-600 transition">
-              ${{p.title}}
+              ${{title}}
             </h4>
             
             <p class="text-xs text-slate-500 font-readex leading-relaxed mb-6">
-              ${{p.description || 'صنف عالي الجودة ومضمون تم اختياره بعناية.'}}
+              ${{description}}
             </p>
           </div>
 
           <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
             <div>
               <span class="text-xs text-slate-400 font-bold">السعر:</span>
-              <div class="text-lg font-black text-slate-900">${{p.price}} <span class="text-xs font-bold text-slate-500">ج.م</span></div>
+              <div class="text-lg font-black text-slate-900">${{safePrice}} <span class="text-xs font-bold text-slate-500">ج.م</span></div>
             </div>
 
-            <button onclick="addToCart(${{p.id}})" class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-white text-xs shadow-md hover:shadow-lg transition active:scale-95" style="background:{primary}">
+            <button onclick="addToCart(${{id}})" class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-white text-xs shadow-md hover:shadow-lg transition active:scale-95" style="background:{primary}">
               <span>+ أضف للسلة</span>
             </button>
           </div>
         </div>
-      `).join('');
+      `;
+      }}).join('');
     }}
 
     function filterCategory(cat) {{
@@ -1227,13 +1295,16 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
       itemsContainer.innerHTML = ids.map(id => {{
         const p = PRODUCTS.find(prod => prod.id == id);
         if (!p) return '';
-        const lineTotal = p.price * cart[id];
+        const itemTitle = escapeProductHtml(p.title);
+        const rawPrice = Number(p.price);
+        const itemPrice = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
+        const lineTotal = itemPrice * cart[id];
         subtotal += lineTotal;
         return `
           <div class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
             <div class="flex-1 min-w-0 pr-2">
-              <h5 class="text-xs font-black text-slate-900 truncate">${{p.title}}</h5>
-              <div class="text-[11px] text-slate-500">${{p.price}} ج.م × ${{cart[id]}}</div>
+              <h5 class="text-xs font-black text-slate-900 truncate">${{itemTitle}}</h5>
+              <div class="text-[11px] text-slate-500">${{itemPrice}} ج.م × ${{cart[id]}}</div>
             </div>
             <div class="flex items-center gap-2">
               <button onclick="updateQty(${{id}}, -1)" class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-100">-</button>
@@ -1342,7 +1413,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
       const shipping = 20;
       const subtotal = cartItemsPayload.reduce((s, it) => s + it.price * it.quantity, 0);
       const total = subtotal + shipping;
-      const payMethod = document.querySelector('input[name="pay_method"]:checked')?.value || 'vodafone_cash';
+      const payMethod = document.querySelector('input[name="pay_method"]:checked')?.value || 'cash_on_delivery';
 
       const orderData = {{
         customer_name: document.getElementById('cust-name').value.trim(),
@@ -1356,32 +1427,21 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
       try {{
         const res = await fetch(`/api/sites/${{SITE_JOB_ID}}/orders`, {{
           method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
+          headers: {{ 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }},
           body: JSON.stringify(orderData)
         }});
         
-        let result;
-        if (res.ok) {{
-          result = await res.json();
-        }} else {{
-          result = {{
-            id: Math.floor(1000 + Math.random() * 9000),
-            total_egp: total,
-            payment_ref: payMethod === 'vodafone_cash' ? 'VF-' + Math.floor(100000 + Math.random() * 900000)
-                       : payMethod === 'fawry' ? 'FAWRY-' + Math.floor(10000000 + Math.random() * 90000000)
-                       : 'IP-' + Math.floor(100000 + Math.random() * 900000),
-            payment_method: payMethod
-          }};
+        const result = await res.json().catch(() => ({{}}));
+        if (!res.ok) {{
+          throw new Error(result.detail || 'Unable to submit the order request.');
         }}
 
         closeCheckoutModal();
         
         document.getElementById('res-order-id').textContent = '#' + (result.id || result.order_id || '2026');
-        document.getElementById('res-total').textContent = (result.total_egp || total) + ' ج.م';
-        document.getElementById('res-payment-method').textContent = payMethod === 'vodafone_cash' ? 'فودافون كاش'
-                                                               : payMethod === 'instapay' ? 'إنستاباي'
-                                                               : payMethod === 'fawry' ? 'فوري باي' : 'الدفع عند الاستلام';
-        document.getElementById('res-payment-ref').textContent = result.payment_ref || 'COD-CONFIRMED';
+        document.getElementById('res-total').textContent = (result.total_egp ?? total) + ' ج.م';
+        document.getElementById('res-payment-method').textContent = 'بانتظار تأكيد التاجر';
+        document.getElementById('res-payment-ref').textContent = result.payment_ref || 'ORDER-REQUESTED';
         
         const waLines = [
           "مرحباً " + STORE_NAME + " 👋",
@@ -1390,13 +1450,21 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
           "• الاسم: " + orderData.customer_name,
           "• الهاتف: " + orderData.customer_phone,
           "• العنوان: " + orderData.customer_address,
-          "• الإجمالي: " + (result.total_egp || total) + " ج.م",
+          "• الإجمالي: " + (result.total_egp ?? total) + " ج.م",
           "• طريقة الدفع: " + payMethod,
           "• المرجع: " + (result.payment_ref || ""),
           "برجاء تأكيد الموعد للتوصيل!"
         ];
         const waMsg = encodeURIComponent(waLines.join(String.fromCharCode(10)));
-        document.getElementById('res-whatsapp-link').href = `https://wa.me/${{WA_PHONE}}?text=${{waMsg}}`;
+        const confirmationLink = document.getElementById('res-whatsapp-link');
+        if (WA_PHONE) {{
+          confirmationLink.href = `https://wa.me/${{WA_PHONE}}?text=${{waMsg}}`;
+          confirmationLink.target = '_blank';
+        }} else {{
+          confirmationLink.href = '#contact';
+          confirmationLink.removeAttribute('target');
+          confirmationLink.textContent = 'بيانات التواصل قيد الإعداد';
+        }}
         
         document.getElementById('success-modal').classList.remove('hidden');
       }} catch (err) {{

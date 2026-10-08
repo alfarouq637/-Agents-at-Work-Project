@@ -74,9 +74,47 @@ Store-Backend/
 └── README.md                           # Exhaustive API docs & deployment guide
 """
 
+import html
 import json
+import math
 import re
 from typing import Dict, Any, List
+
+
+def _json_for_script(value: Any, *, indent: int = None) -> str:
+    """Serialize data safely when embedding it in a generated script block."""
+    return (
+        json.dumps(value, ensure_ascii=False, indent=indent)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
+def _safe_text(value: Any, fallback: str, max_length: int = 240) -> str:
+    """Normalize tenant text before it enters a generated artifact."""
+    text = str(value or "").strip()
+    return text[:max_length] if text else fallback
+
+
+def _safe_hex_color(value: Any, fallback: str) -> str:
+    """Allow only hex colours in generated CSS/JavaScript configuration."""
+    candidate = str(value or "").strip()
+    return candidate if re.fullmatch(r"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?(?:[0-9A-Fa-f]{2})?", candidate) else fallback
+
+
+def _safe_phone(value: Any, fallback: str = "") -> str:
+    """Keep generated contact settings free of markup and SQL delimiters."""
+    digits = re.sub(r"\D", "", str(value or ""))[:20]
+    return digits or fallback
+
+
+def _safe_identifier(value: str, fallback: str = "store") -> str:
+    """Create a portable deployment/email identifier from display text."""
+    identifier = re.sub(r"[^a-z0-9]+", "", value.lower())[:40]
+    return identifier or fallback
 
 def generate_enterprise_project(
     job_id: int,
@@ -92,13 +130,14 @@ def generate_enterprise_project(
     Returns a dictionary mapping relative file paths to their complete,
     production-ready file contents.
     """
-    clean_brand = brand_name or "المتجر المصري"
-    clean_slogan = slogan or "الجودة والتميز في كل طلب"
-    v_cash = settings.get("vodafone_cash") or "01023456789"
-    instapay = settings.get("instapay") or (clean_brand.replace(" ", "").lower() + "@instapay")
-    fawry_code = settings.get("fawry_code") or "88219"
-    phone = settings.get("phone") or "01000000000"
-    whatsapp = settings.get("whatsapp") or phone
+    settings = settings or {}
+    clean_brand = _safe_text(brand_name, "المتجر المصري", 120)
+    clean_slogan = _safe_text(slogan, "الجودة والتميز في كل طلب", 500)
+    primary_color = _safe_hex_color(primary_color, "#0284c7")
+    secondary_color = _safe_hex_color(secondary_color, "#38bdf8")
+    phone = _safe_phone(settings.get("phone"))
+    whatsapp = _safe_phone(settings.get("whatsapp"), phone)
+    brand_identifier = _safe_identifier(clean_brand)
 
     # Standardize catalog items
     catalog = []
@@ -114,8 +153,8 @@ def generate_enterprise_project(
             "category": cat,
             "badge": it.get("badge") or "جديد",
             "stock": 50,
-            "rating": 4.9,
-            "reviews_count": 12,
+            "rating": 0.0,
+            "reviews_count": 0,
             "description": it.get("description") or f"أعلى معايير الجودة والتصنيع الأصلي لـ {it.get('title')}",
             "image_url": it.get("image_url") or f"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80"
         })
@@ -130,8 +169,8 @@ def generate_enterprise_project(
                 "category": "منتجات مميزة",
                 "badge": "الأكثر مبيعاً",
                 "stock": 35,
-                "rating": 5.0,
-                "reviews_count": 28,
+                "rating": 0.0,
+                "reviews_count": 0,
                 "description": "منتج أصلي عالي الجودة مع ضمان استبدال وتوصيل سريع لكافة المحافظات.",
                 "image_url": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80"
             },
@@ -143,8 +182,8 @@ def generate_enterprise_project(
                 "category": "عروض خاصة",
                 "badge": "خصم 20%",
                 "stock": 20,
-                "rating": 4.8,
-                "reviews_count": 19,
+                "rating": 0.0,
+                "reviews_count": 0,
                 "description": "وفر أكثر مع الباقة الشاملة الأكثر طلباً في السوق المصري.",
                 "image_url": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80"
             }
@@ -189,21 +228,16 @@ def generate_enterprise_project(
     }, indent=2, ensure_ascii=False)
 
     # 2. .env.example & .env
-    env_content = f"""PORT=5000
+    files[".env.example"] = """PORT=5000
 NODE_ENV=development
-JWT_SECRET=autocorp_enterprise_jwt_secret_key_2026_xyz
+JWT_SECRET=  # set a unique 32+-character secret in the deployment secret manager
 JWT_EXPIRES_IN=7d
-CORS_ORIGIN=*
+CORS_ORIGIN=http://localhost:5000
+TRUST_PROXY_HOPS=0
 
-# Egyptian SME Payment Credentials
-VODAFONE_CASH_WALLET={v_cash}
-INSTAPAY_ADDRESS={instapay}
-FAWRY_MERCHANT_CODE={fawry_code}
-STORE_PHONE={phone}
-STORE_WHATSAPP={whatsapp}
+# Payment adapters are intentionally disabled until verified gateway webhooks
+# and reconciliation are implemented. Do not add payment credentials here.
 """
-    files[".env.example"] = env_content
-    files[".env"] = env_content
 
     # 3. .gitignore
     files[".gitignore"] = """node_modules/
@@ -214,7 +248,7 @@ STORE_WHATSAPP={whatsapp}
 
     # 4. server.js (Express Entrypoint)
     files["server.js"] = f"""/**
- * {clean_brand} Enterprise Server
+ * Generated AutoCorp Enterprise Server
  * Generated autonomously by AutoCorp AI Agency
  */
 require('dotenv').config();
@@ -224,7 +258,7 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {{
   console.log('====================================================');
-  console.log('🚀 [{clean_brand}] Enterprise Server Running!');
+  console.log('🚀 Enterprise Server Running!');
   console.log(`🌐 Local URL:     http://localhost:${{PORT}}`);
   console.log(`📊 Admin Portal:  http://localhost:${{PORT}}/admin.html`);
   console.log(`📑 REST API:      http://localhost:${{PORT}}/api/v1/products`);
@@ -233,55 +267,47 @@ app.listen(PORT, () => {{
 """
 
     # 5. src/config/env.js
-    files["src/config/env.js"] = """module.exports = {
+    files["src/config/env.js"] = """function requireEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be configured before startup`);
+  return value;
+}
+
+const nodeEnv = process.env.NODE_ENV || 'development';
+const jwtSecret = requireEnv('JWT_SECRET');
+if (jwtSecret.length < 32 || /replace|change|example|secret/i.test(jwtSecret)) {
+  throw new Error('JWT_SECRET must be a unique 32+-character deployment secret');
+}
+const corsOrigin = process.env.CORS_ORIGIN || (nodeEnv === 'production' ? '' : 'http://localhost:5000');
+if (nodeEnv === 'production' && !corsOrigin) {
+  throw new Error('CORS_ORIGIN must list approved HTTPS browser origins in production');
+}
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS || 0);
+if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 5) {
+  throw new Error('TRUST_PROXY_HOPS must be an integer from 0 to 5');
+}
+
+module.exports = {
   PORT: process.env.PORT || 5000,
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  JWT_SECRET: process.env.JWT_SECRET || 'autocorp_enterprise_secret_2026',
+  NODE_ENV: nodeEnv,
+  JWT_SECRET: jwtSecret,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
-  CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
-  VODAFONE_CASH: process.env.VODAFONE_CASH_WALLET || '01023456789',
-  INSTAPAY: process.env.INSTAPAY_ADDRESS || 'sme@instapay',
-  FAWRY_CODE: process.env.FAWRY_MERCHANT_CODE || '88219'
+  CORS_ORIGIN: corsOrigin,
+  TRUST_PROXY_HOPS: trustProxyHops
 };
 """
 
-    initial_users = [
-        {
-            "id": 1,
-            "name": "مدير المتجر العام",
-            "email": f"admin@{clean_brand.replace(' ', '').lower()}.com",
-            "passwordHash": "$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3",
-            "role": "admin",
-            "phone": phone,
-            "createdAt": "2026-10-01T00:00:00.000Z"
-        },
-        {
-            "id": 2,
-            "name": "عميل تجريبي",
-            "email": "customer@example.com",
-            "passwordHash": "$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3",
-            "role": "customer",
-            "phone": "01011112222",
-            "createdAt": "2026-10-01T00:00:00.000Z"
-        }
-    ]
-    initial_promo_codes = [
-        {"id": 1, "code": "WELCOME10", "discountPercent": 10, "minOrderEgp": 100, "active": True},
-        {"id": 2, "code": "EGYPT2026", "discountPercent": 15, "minOrderEgp": 300, "active": True},
-        {"id": 3, "code": "AUTOCORP", "discountPercent": 20, "minOrderEgp": 500, "active": True}
-    ]
-    initial_reviews = [
-        {"id": 1, "productId": 1, "author": "محمد السعيد", "rating": 5, "comment": "جودة ممتازة جداً وتوصيل أسرع مما توقعت، شكراً جزيلاً!", "date": "2026-10-01"},
-        {"id": 2, "productId": 1, "author": "سارة إبراهيم", "rating": 5, "comment": "التغليف فاخر والمنتج أصلي 100%، هطلب منكم تاني بالتأكيد.", "date": "2026-10-03"},
-        {"id": 3, "productId": 2, "author": "أحمد حسام", "rating": 4, "comment": "قيمة ممتازة مقابل السعر وخدمة عملاء محترمة.", "date": "2026-10-05"}
-    ]
+    # Exports never ship user accounts or predictable credentials. Provision
+    # the first administrator through a reviewed deployment workflow.
+    initial_users = []
+    # Promotions remain unavailable until checkout applies them server-side.
+    initial_promo_codes = []
+    # New exports start without fabricated customer reviews.
+    initial_reviews = []
     initial_settings = {
         "brand_name": clean_brand,
         "slogan": clean_slogan,
         "phone": phone,
-        "vodafone_cash": v_cash,
-        "instapay": instapay,
-        "fawry_code": fawry_code
     }
 
     initial_db_state = {
@@ -331,7 +357,7 @@ app.listen(PORT, () => {{
         "    image_url TEXT,",
         "    description TEXT,",
         "    stock INTEGER DEFAULT 100,",
-        "    rating REAL DEFAULT 5.0,",
+        "    rating REAL DEFAULT 0.0,",
         "    badge TEXT,",
         "    FOREIGN KEY (category_id) REFERENCES categories (id)",
         ");",
@@ -346,7 +372,7 @@ app.listen(PORT, () => {{
         "    total_price REAL NOT NULL,",
         "    payment_method TEXT NOT NULL,",
         "    payment_status TEXT DEFAULT 'pending',",
-        "    order_status TEXT DEFAULT 'confirmed',",
+        "    order_status TEXT DEFAULT 'pending_confirmation',",
         "    created_at TEXT NOT NULL",
         ");",
         "",
@@ -403,15 +429,7 @@ app.listen(PORT, () => {{
             f"VALUES ({p.get('id', i+1)}, '{esc_ar}', '{esc_en}', {p_price}, {p_orig}, {p_cat_id}, '{esc_img}', '{esc_desc}', 100, {p.get('rating', 5.0)}, '{esc_badge}');"
         )
 
-    clean_brand_slug = clean_brand.replace(' ', '').lower()
-    sql_lines.append("\n-- Seed Users")
-    sql_lines.append(f"INSERT OR IGNORE INTO users (id, name, email, password_hash, role, phone, created_at) VALUES (1, 'مدير المتجر العام', 'admin@{clean_brand_slug}.com', '$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3', 'admin', '{phone}', datetime('now'));")
-    sql_lines.append(f"INSERT OR IGNORE INTO users (id, name, email, password_hash, role, phone, created_at) VALUES (2, 'عميل تجريبي', 'customer@example.com', '$2a$10$wN9iL6F0L7p2E7Fv0k9M6eL3mZ7Q6fG4a0k8N8s1v5b3', 'customer', '01011112222', datetime('now'));")
-
     sql_lines.append("\n-- Seed Promo Codes")
-    sql_lines.append("INSERT OR IGNORE INTO promo_codes (id, code, discount_percent, min_order_egp, is_active) VALUES (1, 'WELCOME10', 10, 100, 1);")
-    sql_lines.append("INSERT OR IGNORE INTO promo_codes (id, code, discount_percent, min_order_egp, is_active) VALUES (2, 'EGYPT2026', 15, 300, 1);")
-    sql_lines.append("INSERT OR IGNORE INTO promo_codes (id, code, discount_percent, min_order_egp, is_active) VALUES (3, 'AUTOCORP', 20, 500, 1);")
 
     sql_lines.append("\n-- Seed Store Settings")
     esc_brand = clean_brand.replace("'", "''")
@@ -419,10 +437,8 @@ app.listen(PORT, () => {{
     sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('brand_name', '{esc_brand}');")
     sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('slogan', '{esc_slogan}');")
     sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('phone', '{phone}');")
-    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('vodafone_cash', '{v_cash}');")
-    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('instapay', '{instapay}');")
-    sql_lines.append(f"INSERT OR REPLACE INTO store_settings (key, value) VALUES ('fawry_code', '{fawry_code}');")
 
+    sql_lines.append("-- User accounts are provisioned after deployment; no default credentials are seeded.")
     schema_sql_content = "\n".join(sql_lines)
 
     # 6. schema.sql & src/config/schema.sql
@@ -482,7 +498,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DB_FILE = path.join(__dirname, '../../database.json');
-const INITIAL_STATE = {json.dumps(initial_db_state, ensure_ascii=False, indent=2)};
+const INITIAL_STATE = {_json_for_script(initial_db_state, indent=2)};
 
 let state = null;
 
@@ -562,7 +578,7 @@ const products = sqliteTable('products', {
   category: text('category').notNull(),
   badge: text('badge'),
   stock: integer('stock').default(50),
-  rating: real('rating').default(5.0),
+  rating: real('rating').default(0.0),
   reviewsCount: integer('reviews_count').default(0),
   description: text('description'),
   imageUrl: text('image_url')
@@ -577,7 +593,7 @@ const orders = sqliteTable('orders', {
   totalEgp: real('total_egp').notNull(),
   paymentMethod: text('payment_method').default('cash_on_delivery'),
   paymentRef: text('payment_ref'),
-  status: text('status').default('confirmed'),
+  status: text('status').default('pending_confirmation'),
   createdAt: text('created_at').notNull()
 });
 
@@ -676,14 +692,16 @@ exports.verifyToken = (token) => {
 """
 
     # 11. src/utils/sendVerificationEmail.js & sendResetPasswordEmail.js
-    files["src/utils/sendVerificationEmail.js"] = """module.exports = async function sendVerificationEmail(email, token) {
-  console.log(`[EMAIL DISPATCH] Verification email sent to ${email} with token: ${token}`);
-  return true;
+    files["src/utils/sendVerificationEmail.js"] = """const ApiError = require('./ApiError');
+
+module.exports = async function sendVerificationEmail() {
+  throw new ApiError(503, 'Email verification delivery is not configured.');
 };
 """
-    files["src/utils/sendResetPasswordEmail.js"] = """module.exports = async function sendResetPasswordEmail(email, token) {
-  console.log(`[EMAIL DISPATCH] Password reset link sent to ${email} with token: ${token}`);
-  return true;
+    files["src/utils/sendResetPasswordEmail.js"] = """const ApiError = require('./ApiError');
+
+module.exports = async function sendResetPasswordEmail() {
+  throw new ApiError(503, 'Password reset delivery is not configured.');
 };
 """
 
@@ -772,24 +790,32 @@ module.exports = (schema) => (req, res, next) => {
     # 17. src/middlewares/rateLimiter.middleware.js
     files["src/middlewares/rateLimiter.middleware.js"] = """const hits = new Map();
 
-module.exports = (max = 120, windowMs = 60000) => (req, res, next) => {
-  const ip = req.ip || req.connection.remoteAddress || '127.0.0.1';
+// Expire old keys so transient client addresses do not grow memory forever.
+const cleanup = setInterval(() => {
   const now = Date.now();
-  const client = hits.get(ip) || { count: 0, resetTime: now + windowMs };
-
-  if (now > client.resetTime) {
-    client.count = 1;
-    client.resetTime = now + windowMs;
-  } else {
-    client.count++;
+  for (const [key, client] of hits) {
+    if (client.resetTime <= now) hits.delete(key);
   }
+}, 60000);
+cleanup.unref();
 
-  hits.set(ip, client);
+module.exports = (max = 120, windowMs = 60000, scope = 'global') => (req, res, next) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const key = `${scope}:${ip}`;
+  const now = Date.now();
+  let client = hits.get(key);
+
+  if (!client || now >= client.resetTime) {
+    client = { count: 0, resetTime: now + windowMs };
+  }
+  client.count += 1;
+  hits.set(key, client);
 
   if (client.count > max) {
+    res.set('Retry-After', String(Math.max(1, Math.ceil((client.resetTime - now) / 1000))));
     return res.status(429).json({
       success: false,
-      message: 'تم تجاوز الحد المسموح من الطلبات، يرجى المحاولة لاحقاً (Rate Limit Exceeded)',
+      message: 'Rate limit exceeded. Please try again later.',
       timestamp: new Date().toISOString()
     });
   }
@@ -849,7 +875,19 @@ module.exports = {
   findById: (id) => db.get().products.find(p => p.id === Number(id)),
   create: (data) => {
     const s = db.get();
-    const newProd = { id: s.products.length + 1, ...data };
+    const newProd = {
+      id: s.products.length + 1,
+      title: data.title,
+      title_en: data.title_en,
+      price: data.price,
+      category: data.category,
+      badge: data.badge,
+      stock: 0,
+      rating: 0,
+      reviews_count: 0,
+      description: data.description,
+      image_url: data.image_url
+    };
     s.products.unshift(newProd);
     db.save();
     return newProd;
@@ -873,18 +911,20 @@ module.exports = {
 };
 """
 
-    files["src/models/order.model.js"] = """const db = require('../config/database');
+    files["src/models/order.model.js"] = """const crypto = require('crypto');
+const db = require('../config/database');
 
 module.exports = {
   findAll: () => db.get().orders,
   findById: (id) => db.get().orders.find(o => o.id === Number(id)),
+  findByIdempotencyKey: (keyHash) => db.get().orders.find(o => o.idempotencyKeyHash === keyHash),
   findByCustomerPhone: (phone) => db.get().orders.filter(o => o.customerPhone === phone),
   create: (orderData) => {
     const s = db.get();
     const newOrder = {
       id: s.orders.length + 1,
-      orderRef: 'ORD-' + Math.floor(100000 + Math.random() * 900000),
-      status: 'pending',
+      orderRef: 'ORD-' + crypto.randomUUID(),
+      status: 'pending_confirmation',
       createdAt: new Date().toISOString(),
       ...orderData
     };
@@ -961,16 +1001,29 @@ module.exports = {
     # 19. Modules: Auth
     files["src/modules/auth/auth.validation.js"] = """module.exports = {
   validateRegister: (body) => {
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
     const errors = [];
-    if (!body.name || body.name.length < 2) errors.push('الاسم مطلوب ويجب أن يكون حرفين على الأقل');
-    if (!body.email || !body.email.includes('@')) errors.push('البريد الإلكتروني غير صالح');
-    if (!body.password || body.password.length < 6) errors.push('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    const email = typeof input.email === 'string' ? input.email.trim() : '';
+    const password = input.password;
+    if (name.length < 2 || name.length > 100) errors.push('Name must be between 2 and 100 characters.');
+    if (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('Enter a valid email address.');
+    if (typeof password !== 'string' || password.length < 12 || Buffer.byteLength(password, 'utf8') > 72) {
+      errors.push('Password must be at least 12 characters and no more than 72 UTF-8 bytes.');
+    }
+    if (input.phone !== undefined && (typeof input.phone !== 'string' || input.phone.length > 30)) {
+      errors.push('Phone must be a string no longer than 30 characters.');
+    }
     return errors;
   },
   validateLogin: (body) => {
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
     const errors = [];
-    if (!body.email) errors.push('البريد الإلكتروني مطلوب');
-    if (!body.password) errors.push('كلمة المرور مطلوبة');
+    const email = typeof input.email === 'string' ? input.email.trim() : '';
+    if (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('Enter a valid email address.');
+    if (typeof input.password !== 'string' || input.password.length === 0 || Buffer.byteLength(input.password, 'utf8') > 72) {
+      errors.push('Password is required and must not exceed 72 UTF-8 bytes.');
+    }
     return errors;
   }
 };
@@ -982,17 +1035,20 @@ const ApiError = require('../../utils/ApiError');
 const { generateToken } = require('../../utils/jwt');
 
 exports.register = async (name, email, password, phone) => {
-  const existing = UserModel.findByEmail(email);
+  const normalizedName = name.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedPhone = typeof phone === 'string' ? phone.trim() : '';
+  const existing = UserModel.findByEmail(normalizedEmail);
   if (existing) throw new ApiError(409, 'البريد الإلكتروني مسجل بالفعل');
 
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash(password, salt);
 
   const newUser = UserModel.create({
-    name,
-    email,
+    name: normalizedName,
+    email: normalizedEmail,
     passwordHash,
-    phone: phone || '',
+    phone: normalizedPhone,
     role: 'customer'
   });
 
@@ -1001,11 +1057,10 @@ exports.register = async (name, email, password, phone) => {
 };
 
 exports.login = async (email, password) => {
-  const user = UserModel.findByEmail(email);
+  const user = UserModel.findByEmail(email.trim().toLowerCase());
   if (!user) throw new ApiError(401, 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
 
-  // If mock plain match or bcrypt
-  const isMatch = (password === 'admin123') || (await bcrypt.compare(password, user.passwordHash).catch(() => false));
+  const isMatch = await bcrypt.compare(password, user.passwordHash).catch(() => false);
   if (!isMatch) throw new ApiError(401, 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
 
   const token = generateToken({ id: user.id, role: user.role, email: user.email });
@@ -1019,7 +1074,8 @@ const { success } = require('../../utils/response');
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  path: '/',
   maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in ms
 };
 
@@ -1030,7 +1086,7 @@ exports.register = async (req, res, next) => {
     if (result && result.token) {
       res.cookie('jwt_token', result.token, COOKIE_OPTIONS);
     }
-    return success(res, 'تم إنشاء الحساب بنجاح وتأمينه بـ HttpOnly Cookie', result, 201);
+    return success(res, 'تم إنشاء الحساب بنجاح وتأمينه بـ HttpOnly Cookie', { user: result.user }, 201);
   } catch(err) {
     next(err);
   }
@@ -1043,14 +1099,19 @@ exports.login = async (req, res, next) => {
     if (result && result.token) {
       res.cookie('jwt_token', result.token, COOKIE_OPTIONS);
     }
-    return success(res, 'تم تسجيل الدخول بنجاح وتفعيل جلسة آمنة (HttpOnly Cookie)', result);
+    return success(res, 'تم تسجيل الدخول بنجاح وتفعيل جلسة آمنة (HttpOnly Cookie)', { user: result.user });
   } catch(err) {
     next(err);
   }
 };
 
 exports.logout = (req, res) => {
-  res.clearCookie('jwt_token');
+  res.clearCookie('jwt_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    path: '/'
+  });
   return success(res, 'تم تسجيل الخروج بنجاح ومسح الجلسة الآمنة');
 };
 
@@ -1062,9 +1123,15 @@ exports.getMe = (req, res) => {
     files["src/modules/auth/auth.routes.js"] = """const router = require('express').Router();
 const authController = require('./auth.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
+const rateLimiter = require('../../middlewares/rateLimiter.middleware');
+const validate = require('../../middlewares/validate.middleware');
+const authValidation = require('./auth.validation');
 
-router.post('/register', authController.register);
-router.post('/login', authController.login);
+const loginLimiter = rateLimiter(8, 15 * 60 * 1000, 'auth-login');
+const registrationLimiter = rateLimiter(5, 60 * 60 * 1000, 'auth-register');
+
+router.post('/register', registrationLimiter, validate(authValidation.validateRegister), authController.register);
+router.post('/login', loginLimiter, validate(authValidation.validateLogin), authController.login);
 router.post('/logout', authController.logout);
 router.get('/me', authMiddleware, authController.getMe);
 
@@ -1096,8 +1163,46 @@ exports.getProductById = (id) => {
   return p;
 };
 
+exports.normalizeProductInput = (data) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(400, 'Product details must be an object');
+  }
+  const allowed = new Set(['title', 'title_en', 'price', 'category', 'badge', 'description', 'image_url']);
+  if (Object.keys(data).some((key) => !allowed.has(key))) {
+    throw new ApiError(400, 'Unsupported product field');
+  }
+  const text = (value, field, maxLength, required = false) => {
+    if (value === undefined || value === null) value = '';
+    if (typeof value !== 'string') throw new ApiError(400, `${field} must be text`);
+    const normalized = value.trim();
+    if ((required && normalized.length === 0) || normalized.length > maxLength) {
+      throw new ApiError(400, `${field} is missing or too long`);
+    }
+    return normalized;
+  };
+  const title = text(data.title, 'Title', 120, true);
+  if (title.length < 2) throw new ApiError(400, 'Title must contain at least two characters');
+  const title_en = text(data.title_en, 'English title', 120);
+  const category = text(data.category, 'Category', 80, true);
+  const badge = text(data.badge, 'Badge', 40);
+  const description = text(data.description, 'Description', 2000);
+  const image_url = text(data.image_url, 'Image URL', 2048);
+  if (typeof data.price !== 'number' || !Number.isFinite(data.price) || data.price < 0 || data.price > 100000000 ||
+      Math.abs(data.price * 100 - Math.round(data.price * 100)) > 0.000001) {
+    throw new ApiError(400, 'Price must be a non-negative amount with at most two decimals');
+  }
+  if (image_url) {
+    let image;
+    try { image = new URL(image_url); } catch (_) { throw new ApiError(400, 'Image URL is invalid'); }
+    if (image.protocol !== 'https:' || image.username || image.password) {
+      throw new ApiError(400, 'Image URL must use HTTPS and cannot contain credentials');
+    }
+  }
+  return { title, title_en, price: Math.round(data.price * 100) / 100, category, badge, description, image_url };
+};
+
 exports.createProduct = (data) => {
-  return ProductModel.create(data);
+  return ProductModel.create(exports.normalizeProductInput(data));
 };
 """
 
@@ -1152,50 +1257,136 @@ module.exports = router;
 
     # 22. Modules: Orders
     files["src/modules/orders/order.service.js"] = f"""const OrderModel = require('../../models/order.model');
+const ProductModel = require('../../models/product.model');
+const crypto = require('crypto');
 const ApiError = require('../../utils/ApiError');
 
-exports.checkout = (body) => {{
+const ORDER_STATUS_TRANSITIONS = Object.freeze({{
+  pending_confirmation: ['confirmed', 'cancelled'],
+  confirmed: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['completed'],
+  completed: [],
+  cancelled: []
+}});
+
+exports.isAllowedStatusTransition = (current, next) =>
+  Object.prototype.hasOwnProperty.call(ORDER_STATUS_TRANSITIONS, current) &&
+  ORDER_STATUS_TRANSITIONS[current].includes(next);
+
+exports.checkout = (body, idempotencyKey) => {{
+  if (typeof idempotencyKey !== 'string' || !/^[0-9a-f]{{8}}-[0-9a-f]{{4}}-4[0-9a-f]{{3}}-[89ab][0-9a-f]{{3}}-[0-9a-f]{{12}}$/i.test(idempotencyKey)) {{
+    throw new ApiError(400, 'A valid Idempotency-Key UUID is required');
+  }}
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {{
+    throw new ApiError(400, 'Order details must be an object');
+  }}
+  const customerName = typeof body.customer_name === 'string' ? body.customer_name.trim() : '';
+  const customerPhone = typeof body.customer_phone === 'string' ? body.customer_phone.trim() : '';
+  const customerAddress = typeof body.customer_address === 'string' ? body.customer_address.trim() : '';
+  const phoneDigits = customerPhone.replace(/\\D/g, '');
+  if (customerName.length < 2 || customerName.length > 100) {{
+    throw new ApiError(400, 'Customer name must be between 2 and 100 characters');
+  }}
+  if (customerPhone.length > 30 || !/^[+0-9().\\s-]+$/.test(customerPhone) || phoneDigits.length < 7 || phoneDigits.length > 15) {{
+    throw new ApiError(400, 'Enter a valid customer phone number');
+  }}
+  if (customerAddress.length < 5 || customerAddress.length > 300) {{
+    throw new ApiError(400, 'Delivery address must be between 5 and 300 characters');
+  }}
+
   if (!body.customer_name || !body.customer_phone) {{
     throw new ApiError(400, 'الاسم ورقم الهاتف مطلوبين لتأكيد الطلب');
   }}
 
-  if (!body.items || body.items.length === 0) {{
+  if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > 50) {{
     throw new ApiError(400, 'سلة المشتريات فارغة');
   }}
 
-  const paymentMethod = body.payment_method || 'cod';
-  let paymentRef = '';
-
-  if (paymentMethod === 'vodafone_cash') {{
-    paymentRef = 'VCASH-' + Math.floor(10000000 + Math.random() * 90000000);
-  }} else if (paymentMethod === 'fawry') {{
-    paymentRef = 'FAWRY-' + Math.floor(10000000 + Math.random() * 90000000);
-  }} else if (paymentMethod === 'instapay') {{
-    paymentRef = 'INSTA-' + Math.floor(10000000 + Math.random() * 90000000);
-  }} else {{
-    paymentRef = 'COD-' + Math.floor(1000 + Math.random() * 9000);
+  const paymentMethod = String(body.payment_method || 'cod').toLowerCase();
+  const supportedMethods = new Set(['cod', 'cash', 'cash_on_delivery']);
+  if (!supportedMethods.has(paymentMethod)) {{
+    throw new ApiError(400, 'Unsupported payment method');
   }}
 
+  // Validate stable customer intent before looking up current prices.
+  const seenProductIds = new Set();
+  let totalQuantity = 0;
+  const requestedItems = body.items.map((line) => {{
+    if (!line || typeof line !== 'object' || Array.isArray(line)) {{
+      throw new ApiError(400, 'Each item must be an object');
+    }}
+    const productId = line.id;
+    const quantity = line.quantity;
+    if (!Number.isSafeInteger(productId) || productId < 1 || !Number.isInteger(quantity) || quantity < 1 || quantity > 50) {{
+      throw new ApiError(400, 'Each item needs a valid product ID and quantity');
+    }}
+    if (seenProductIds.has(productId)) {{
+      throw new ApiError(400, 'Each product may appear only once in an order');
+    }}
+    seenProductIds.add(productId);
+    totalQuantity += quantity;
+    if (totalQuantity > 100) {{
+      throw new ApiError(400, 'Total order quantity cannot exceed 100');
+    }}
+    return {{ productId, quantity }};
+  }});
+  const idempotencyKeyHash = crypto.createHash('sha256').update(idempotencyKey.toLowerCase()).digest('hex');
+  const idempotencyFingerprint = crypto.createHash('sha256').update(JSON.stringify({{
+    customerName, customerPhone, customerAddress, paymentMethod, requestedItems
+  }})).digest('hex');
+  const existingOrder = OrderModel.findByIdempotencyKey(idempotencyKeyHash);
+  if (existingOrder) {{
+    if (existingOrder.idempotencyFingerprint !== idempotencyFingerprint) {{
+      throw new ApiError(409, 'Idempotency-Key was already used for a different order');
+    }}
+    return {{
+      order: existingOrder,
+      duplicate: true,
+      paymentInstructions: 'This order request was already received.'
+    }};
+  }}
+
+  // A browser may suggest a cart but never determines its price. Resolve current
+  // catalog prices only for a new request and save the resulting price snapshot.
+  const items = requestedItems.map((requested) => {{
+    const product = ProductModel.findById(requested.productId);
+    const unitPrice = Number(product && product.price);
+    if (!product || !Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 100000000) {{
+      throw new ApiError(400, 'Product is unavailable for checkout');
+    }}
+    return {{
+      productId: product.id,
+      title: product.title || product.nameAr || product.name_ar,
+      unitPrice: Number(unitPrice.toFixed(2)),
+      quantity: requested.quantity
+    }};
+  }});
+  const totalCents = items.reduce((sum, item) => sum + Math.round(item.unitPrice * 100) * item.quantity, 0);
+  if (!Number.isSafeInteger(totalCents) || totalCents > 100000000000) {{
+    throw new ApiError(400, 'Order total exceeds the supported limit');
+  }}
+  const totalEgp = totalCents / 100;
+  const paymentRef = 'ORDER-' + crypto.randomUUID();
+
   const order = OrderModel.create({{
-    customerName: body.customer_name,
-    customerPhone: body.customer_phone,
-    customerAddress: body.customer_address || 'القاهرة، مصر',
-    items: body.items,
-    totalEgp: body.total_egp || 0,
-    discountApplied: body.discount || 0,
-    promoCode: body.promo_code || null,
+    customerName,
+    customerPhone,
+    customerAddress,
+    items,
+    totalEgp,
     paymentMethod,
     paymentRef,
+    idempotencyKeyHash,
+    idempotencyFingerprint,
+    paymentStatus: 'pending_confirmation',
+    status: 'pending_confirmation',
     storeBrand: "{clean_brand}"
   }});
 
   return {{
     order,
-    paymentInstructions: paymentMethod === 'vodafone_cash' 
-      ? `يرجى تحويل المبلغ لمحفظة فودافون كاش: {v_cash} واستخدام الكود: ${{paymentRef}}`
-      : paymentMethod === 'instapay'
-      ? `يرجى التحويل إلى عنوان إنستاباي: {instapay}`
-      : 'سيتم الدفع نقداً عند استلام الشحنة لباب بيتك.'
+    paymentInstructions: 'Order received. Payment remains pending until merchant confirmation.'
   }};
 }};
 
@@ -1204,7 +1395,21 @@ exports.getAllOrders = () => {{
 }};
 
 exports.updateOrderStatus = (id, status) => {{
-  const order = OrderModel.updateStatus(id, status);
+  const idText = String(id);
+  const orderId = Number(idText);
+  if (!/^[1-9][0-9]*$/.test(idText) || !Number.isSafeInteger(orderId)) {{
+    throw new ApiError(400, 'Order ID must be a positive integer');
+  }}
+  if (typeof status !== 'string' || !Object.values(ORDER_STATUS_TRANSITIONS).some((values) => values.includes(status))) {{
+    throw new ApiError(400, 'Unsupported order status');
+  }}
+  const currentOrder = OrderModel.findById(orderId);
+  if (!currentOrder) throw new ApiError(404, 'Order not found');
+  if (!exports.isAllowedStatusTransition(currentOrder.status, status)) {{
+    throw new ApiError(409, 'Order status transition is not allowed');
+  }}
+  // Payment state is deliberately untouched; fulfillment cannot mark an order paid.
+  const order = OrderModel.updateStatus(orderId, status);
   if (!order) throw new ApiError(404, 'الطلب غير موجود');
   return order;
 }};
@@ -1215,8 +1420,8 @@ const { success } = require('../../utils/response');
 
 exports.createOrder = (req, res, next) => {
   try {
-    const result = orderService.checkout(req.body);
-    return success(res, 'تم استلام وتأكيد طلبك بنجاح!', result, 201);
+    const result = orderService.checkout(req.body, req.get('Idempotency-Key'));
+    return success(res, 'Order request received; merchant confirmation is pending.', result, result.duplicate ? 200 : 201);
   } catch(e) { next(e); }
 };
 
@@ -1241,7 +1446,7 @@ const auth = require('../../middlewares/auth.middleware');
 const admin = require('../../middlewares/admin.middleware');
 
 router.post('/', orderController.createOrder);
-router.get('/', orderController.getOrders);
+router.get('/', auth, admin, orderController.getOrders);
 router.patch('/:id/status', auth, admin, orderController.updateStatus);
 
 module.exports = router;
@@ -1250,20 +1455,12 @@ module.exports = router;
     # 23. Modules: Promo Codes & Discounts
     files["src/modules/promoCodes/promo.routes.js"] = """const router = require('express').Router();
 const PromoModel = require('../../models/promoCode.model');
-const { success, error } = require('../../utils/response');
+const { success } = require('../../utils/response');
 
 router.post('/validate', (req, res) => {
-  const { code, total } = req.body;
-  const promo = PromoModel.findByCode(code);
-  if (!promo || !promo.active) {
-    return error(res, 'كود الخصم غير صالح أو منتهي الصلاحية', 400);
-  }
-  if (total && total < promo.minOrderEgp) {
-    return error(res, `الحد الأدنى لتطبيق هذا الكوبون هو ${promo.minOrderEgp} ج.م`, 400);
-  }
-  return success(res, `تم تطبيق كود الخصم بنجاح (${promo.discountPercent}%)`, {
-    code: promo.code,
-    discountPercent: promo.discountPercent
+  return res.status(503).json({
+    success: false,
+    message: 'Promotions are unavailable until checkout validates and applies them server-side.'
   });
 });
 
@@ -1284,9 +1481,10 @@ router.get('/:productId', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { productId, author, rating, comment } = req.body;
-  const r = ReviewModel.create({ productId: Number(productId), author: author || 'عميل موثوق', rating: Number(rating) || 5, comment });
-  return success(res, 'شكراً لمشاركتك رأيك!', r, 201);
+  return res.status(503).json({
+    success: false,
+    message: 'Reviews are unavailable until purchase verification and moderation are configured.'
+  });
 });
 
 module.exports = router;
@@ -1294,16 +1492,12 @@ module.exports = router;
 
     # 25. Modules: Newsletter
     files["src/modules/newsletter/newsletter.routes.js"] = """const router = require('express').Router();
-const SubModel = require('../../models/newsletterSubscriber.model');
-const { success } = require('../../utils/response');
 
 router.post('/subscribe', (req, res) => {
-  const email = (req.body.email || '').trim();
-  if (!email.includes('@')) {
-    return res.status(400).json({ success: false, message: 'البريد الإلكتروني غير صالح' });
-  }
-  SubModel.add(email);
-  return success(res, '🎉 تم اشتراكك في النشرة الإخبارية وستصلك أقوى العروض حصرياً!');
+  return res.status(503).json({
+    success: false,
+    message: 'Newsletter signup is unavailable until consent, unsubscribe, and delivery are configured.'
+  });
 });
 
 module.exports = router;
@@ -1314,19 +1508,23 @@ module.exports = router;
 const OrderModel = require('../../models/order.model');
 const ProductModel = require('../../models/product.model');
 const { success } = require('../../utils/response');
+const auth = require('../../middlewares/auth.middleware');
+const admin = require('../../middlewares/admin.middleware');
 
-router.get('/summary', (req, res) => {
+router.get('/summary', auth, admin, (req, res) => {
   const orders = OrderModel.findAll();
   const products = ProductModel.findAll();
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.totalEgp || 0), 0);
+  const totalRevenue = orders
+    .filter(o => o.paymentStatus === 'paid')
+    .reduce((sum, o) => sum + (o.totalEgp || 0), 0);
 
   return success(res, 'إحصائيات المنصة الشاملة', {
     totalRevenueEgp: totalRevenue,
     totalOrders: orders.length,
     totalProducts: products.length,
     activeCustomersCount: new Set(orders.map(o => o.customerPhone)).size,
-    pendingOrdersCount: orders.filter(o => o.status === 'pending').length,
-    confirmedOrdersCount: orders.filter(o => o.status === 'confirmed').length
+    pendingOrdersCount: orders.filter(o => o.status === 'pending_confirmation').length,
+    confirmedOrdersCount: orders.filter(o => o.paymentStatus === 'paid').length
   });
 });
 
@@ -1359,11 +1557,14 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const env = require('./config/env');
 const routes = require('./routes');
 const errorHandler = require('./middlewares/errorHandler.middleware');
 const rateLimiter = require('./middlewares/rateLimiter.middleware');
 
 const app = express();
+// Only trust explicitly configured proxies; forwarded IP headers affect rate limits.
+app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
 // Security & Parsing Middlewares (OWASP Top 10 Hardened)
 app.use(helmet({
@@ -1372,10 +1573,16 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
-const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000', 'http://localhost:5000'];
+const allowedOrigins = env.CORS_ORIGIN
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(origin => /^https?:\/\//.test(origin));
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    // Non-browser clients have no Origin header. Browser callers must be an
+    // explicitly configured first-party origin; wildcard CORS is unsafe with
+    // credentialed HttpOnly session cookies.
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Blocked by CORS policy'));
@@ -1385,10 +1592,16 @@ app.use(cors({
 }));
 
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '256kb', strict: true }));
+app.use(express.urlencoded({ extended: false, limit: '64kb', parameterLimit: 100 }));
 app.use(morgan('dev'));
 app.use(rateLimiter(150, 60000));
+
+// API responses can contain account and order data, never cache them in a browser.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 
 // Serve Frontend Static Client
 app.use(express.static(path.join(__dirname, '../public')));
@@ -1416,9 +1629,6 @@ module.exports = app;
         secondary_color=secondary_color or "#38bdf8",
         catalog=catalog,
         categories=list(categories),
-        v_cash=v_cash,
-        instapay=instapay,
-        fawry_code=fawry_code,
         phone=phone,
         whatsapp=whatsapp
     )
@@ -1433,17 +1643,27 @@ module.exports = app;
     files["Dockerfile"] = """FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --production
-COPY . .
+RUN npm install --omit=dev && addgroup -S app && adduser -S app -G app
+COPY --chown=app:app . .
+USER app
 EXPOSE 5000
 CMD ["npm", "start"]
+"""
+
+    files[".dockerignore"] = """node_modules
+.env
+.git
+npm-debug.log*
+coverage
+*.sqlite
+*.db
 """
 
     files["docker-compose.yml"] = f"""version: '3.8'
 services:
   web:
     build: .
-    container_name: {clean_brand.replace(' ', '_').lower()}_backend
+    container_name: {brand_identifier}_backend
     ports:
       - "5000:5000"
     environment:
@@ -1462,7 +1682,23 @@ services:
         "routes": [
             {"src": "/api/(.*)", "dest": "server.js"},
             {"src": "/(.*)", "dest": "/public/$1"}
-        ]
+        ],
+        # Vercel serves some paths directly, before Express and Helmet can add
+        # response headers. Keep this limited policy compatible with the
+        # generated inline client; a strict script-src needs a nonce refactor.
+        "headers": [{
+            "source": "/(.*)",
+            "headers": [
+                {"key": "X-Content-Type-Options", "value": "nosniff"},
+                {"key": "X-Frame-Options", "value": "DENY"},
+                {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"},
+                {"key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()"},
+                {"key": "Content-Security-Policy", "value": "base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"}
+            ]
+        }, {
+            "source": "/api/(.*)",
+            "headers": [{"key": "Cache-Control", "value": "no-store"}]
+        }]
     }, indent=2)
 
     # 33. README.md (Comprehensive Documentation)
@@ -1517,9 +1753,18 @@ Double-click `public/index.html` in your browser to immediately browse the store
 # 1. Install dependencies
 npm install
 
-# 2. Start server
+# 2. Create .env from .env.example and set a strong unique JWT_SECRET
+
+# 3. Start server
 npm start
 ```
+- The export intentionally contains no `.env`, user accounts, or default
+  passwords. Provision the first administrator through a reviewed deployment
+  process before exposing the service.
+- Keep `TRUST_PROXY_HOPS=0` unless the application is reachable only through a
+  known proxy chain. If a proxy is required, configure the exact trusted hop
+  count and prevent clients from bypassing that proxy; forwarded client IPs are
+  used by the per-process rate limits.
 - Storefront: [http://localhost:5000](http://localhost:5000)
 - Admin Portal: [http://localhost:5000/admin.html](http://localhost:5000/admin.html)
 
@@ -1542,14 +1787,18 @@ npm start
 - `POST /api/v1/products` — Add product (Admin only)
 
 ### Orders & Checkout
-- `POST /api/v1/orders` — Checkout order with Egyptian payment gateway:
-  - `vodafone_cash` (Wallet: `{v_cash}`)
-  - `instapay` (Address: `{instapay}`)
-  - `fawry` (Merchant: `{fawry_code}`)
-  - `cod` (Cash on delivery)
+- `POST /api/v1/orders` — Records an order request pending merchant confirmation.
+- Send a unique UUID v4 `Idempotency-Key` for each logical checkout and reuse it
+  unchanged for retries. Replays return the original order; a changed payload
+  with the same key returns `409 Conflict`.
+- Payment adapters, provider credentials, signed webhooks, and settlement are
+  intentionally out of scope for this generated prototype.
+- Idempotency is stored with the generated project data; multi-worker production
+  still requires a durable database uniqueness constraint and transaction.
 
 ### Discounts & Promo Codes
-- `POST /api/v1/promo-codes/validate` — Validate voucher (Try: `WELCOME10`, `EGYPT2026`, `AUTOCORP`)
+- Promo codes are disabled until validation and final order pricing are handled
+  together by the server-side checkout workflow.
 
 ### Authentication & JWT
 - `POST /api/v1/auth/register`
@@ -1565,10 +1814,80 @@ npm start
 const app = require('../src/app');
 
 describe('OWASP Top 10 Security & Access Control Suite', () => {
+  it('A04: Rejects JSON request bodies larger than the API limit', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .set('Idempotency-Key', '2f1c91b9-79c8-4f36-8581-dc1468d54c28')
+      .send({ padding: 'x'.repeat(300 * 1024) });
+    expect(res.status).toBe(413);
+  });
+
+  it('A09: Fails closed for email delivery without logging recovery tokens', async () => {
+    const sendVerificationEmail = require('../src/utils/sendVerificationEmail');
+    const sendResetPasswordEmail = require('../src/utils/sendResetPasswordEmail');
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await expect(sendVerificationEmail('user@example.test', 'verification-secret'))
+        .rejects.toMatchObject({ statusCode: 503 });
+      await expect(sendResetPasswordEmail('user@example.test', 'reset-secret'))
+        .rejects.toMatchObject({ statusCode: 503 });
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('A03: Accepts only bounded catalog fields and safe product prices/URLs', () => {
+    const products = require('../src/modules/products/product.service');
+    const normalized = products.normalizeProductInput({
+      title: ' Desk Lamp ', title_en: 'Desk Lamp', price: 24.99,
+      category: 'Lighting', image_url: 'https://images.example.test/lamp.png'
+    });
+    expect(normalized.title).toBe('Desk Lamp');
+    expect(normalized.price).toBe(24.99);
+    expect(() => products.normalizeProductInput({ title: 'Lamp', category: 'Lighting', price: -1 }))
+      .toThrow();
+    expect(() => products.normalizeProductInput({ title: 'Lamp', category: 'Lighting', price: 1, id: 1 }))
+      .toThrow();
+    expect(() => products.normalizeProductInput({
+      title: 'Lamp', category: 'Lighting', price: 1, image_url: 'javascript:alert(1)'
+    })).toThrow();
+  });
+
   it('A01: Rejects unauthenticated requests to protected endpoints (401)', async () => {
     const res = await request(app).get('/api/v1/dashboard/summary');
     expect([401, 403]).toContain(res.status);
     expect(res.body.success).toBe(false);
+  });
+
+  it('A01: Allows only forward fulfillment transitions, never payment-state promotion', () => {
+    const orders = require('../src/modules/orders/order.service');
+    expect(orders.isAllowedStatusTransition('pending_confirmation', 'confirmed')).toBe(true);
+    expect(orders.isAllowedStatusTransition('confirmed', 'processing')).toBe(true);
+    expect(orders.isAllowedStatusTransition('pending_confirmation', 'paid')).toBe(false);
+    expect(orders.isAllowedStatusTransition('shipped', 'processing')).toBe(false);
+    expect(orders.isAllowedStatusTransition('completed', 'cancelled')).toBe(false);
+  });
+
+  it('A04: Rejects malformed checkout data before creating an order', async () => {
+    const res = await request(app).post('/api/v1/orders')
+      .set('Idempotency-Key', '2f1c91b9-79c8-4f36-8581-dc1468d54c28')
+      .send({
+        customer_name: {}, customer_phone: 'bad', customer_address: '',
+        payment_method: 'cod', items: [{ id: 1, quantity: '1 item' }]
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('A07: Rejects malformed registration and login input before password handling', async () => {
+    const registration = await request(app)
+      .post('/api/v1/auth/register')
+      .send({ name: {}, email: 'not-an-email', password: 'short' });
+    const login = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: [], password: 'x'.repeat(73) });
+    expect(registration.status).toBe(400);
+    expect(login.status).toBe(400);
   });
 
   it('A03: Resists raw SQL injection payloads in search queries', async () => {
@@ -1600,6 +1919,7 @@ describe('OWASP Top 10 Security & Access Control Suite', () => {
 
     # 35. tests/api.test.js (Core REST API Test Suite)
     files["tests/api.test.js"] = """const request = require('supertest');
+const crypto = require('crypto');
 const app = require('../src/app');
 
 describe('Enterprise REST API Endpoints', () => {
@@ -1610,16 +1930,29 @@ describe('Enterprise REST API Endpoints', () => {
   });
 
   it('POST /api/v1/orders processes a new customer order', async () => {
+    const idempotencyKey = crypto.randomUUID();
     const orderData = {
-      customerName: 'فاروق إبراهيم',
-      customerPhone: '01000000000',
-      customerAddress: 'القاهرة، مصر',
-      items: [{ id: 1, quantity: 1, price: 150 }],
-      paymentMethod: 'vodafone_cash'
+      customer_name: 'Farouk Ibrahim',
+      customer_phone: '01000000000',
+      customer_address: 'Cairo, Egypt',
+      items: [{ id: 1, quantity: 1 }],
+      payment_method: 'cod'
     };
-    const res = await request(app).post('/api/v1/orders').send(orderData);
-    expect([200, 201]).toContain(res.status);
-    expect(res.body.success).toBe(true);
+    const first = await request(app).post('/api/v1/orders')
+      .set('Idempotency-Key', idempotencyKey).send(orderData);
+    expect(first.status).toBe(201);
+    expect(first.body.success).toBe(true);
+
+    const retry = await request(app).post('/api/v1/orders')
+      .set('Idempotency-Key', idempotencyKey).send(orderData);
+    expect(retry.status).toBe(200);
+    expect(retry.body.data.duplicate).toBe(true);
+    expect(retry.body.data.order.orderRef).toBe(first.body.data.order.orderRef);
+
+    const changedPayload = { ...orderData, items: [{ id: 1, quantity: 2 }] };
+    const conflict = await request(app).post('/api/v1/orders')
+      .set('Idempotency-Key', idempotencyKey).send(changedPayload);
+    expect(conflict.status).toBe(409);
   });
 });
 """
@@ -1635,22 +1968,25 @@ def generate_bilingual_spa_html(
     secondary_color: str,
     catalog: list,
     categories: list,
-    v_cash: str,
-    instapay: str,
-    fawry_code: str,
     phone: str,
     whatsapp: str
 ) -> str:
     """Produces the bilingual AR/EN and Dark/Light mode single-page application."""
-    catalog_json = json.dumps(catalog, ensure_ascii=False)
-    categories_json = json.dumps(categories, ensure_ascii=False)
+    brand_html = html.escape(_safe_text(brand_name, "المتجر المصري", 120))
+    slogan_html = html.escape(_safe_text(slogan, "الجودة والتميز في كل طلب", 500))
+    primary_color = _safe_hex_color(primary_color, "#0284c7")
+    secondary_color = _safe_hex_color(secondary_color, "#38bdf8")
+    phone = _safe_phone(phone)
+    whatsapp = _safe_phone(whatsapp, phone)
+    catalog_json = _json_for_script(catalog)
+    categories_json = _json_for_script(categories)
 
     return f"""<!doctype html>
 <html lang="ar" dir="rtl" class="scroll-smooth">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{brand_name} — المتجر الإلكتروني الرسمي | Official Store</title>
+  <title>{brand_html} — المتجر الإلكتروني الرسمي | Official Store</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Readex+Pro:wght@400;600;700&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -1684,12 +2020,13 @@ def generate_bilingual_spa_html(
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
+  <a href="#catalog" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-slate-950">تخطي إلى المحتوى الرئيسي / Skip to main content</a>
 
   <!-- Top Announcement Bar -->
   <div class="bg-slate-900 text-slate-200 text-xs py-2 px-4 text-center flex items-center justify-between border-b border-slate-800">
     <div class="flex items-center gap-2 mx-auto">
       <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-      <span id="txt-promo-bar">🎉 كود خصم ترحيبي 10%: <b>WELCOME10</b> | 🚚 توصيل لجميع المحافظات</span>
+      <span id="txt-promo-bar">استعرض المنتجات وأرسل طلبك لتأكيد المتجر</span>
     </div>
     <div class="flex items-center gap-3">
       <!-- Theme Switcher -->
@@ -1712,8 +2049,8 @@ def generate_bilingual_spa_html(
             ⚡
           </div>
           <div>
-            <h1 class="text-xl sm:text-2xl font-black leading-tight text-slate-900 dark:text-white" id="nav-brand">{brand_name}</h1>
-            <p class="text-xs text-slate-500 dark:text-slate-400 font-readex" id="nav-slogan">{slogan}</p>
+            <h1 class="text-xl sm:text-2xl font-black leading-tight text-slate-900 dark:text-white" id="nav-brand">{brand_html}</h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 font-readex" id="nav-slogan">{slogan_html}</p>
           </div>
         </a>
       </div>
@@ -1741,10 +2078,10 @@ def generate_bilingual_spa_html(
           🚀 تجربة تسوق استثنائية
         </span>
         <h2 class="text-3xl sm:text-5xl font-black leading-tight mb-4 text-white" id="hero-title">
-          {brand_name}
+          {brand_html}
         </h2>
         <p class="text-base sm:text-lg text-slate-300 leading-relaxed font-readex mb-8" id="hero-sub">
-          {slogan}
+          {slogan_html}
         </p>
         <div class="flex flex-wrap gap-4 justify-center md:justify-start">
           <a href="#catalog" class="px-6 py-3.5 rounded-xl font-black text-slate-950 bg-amber-400 hover:bg-amber-300 transition shadow-lg shadow-amber-400/25 text-sm" id="btn-browse">
@@ -1768,7 +2105,7 @@ def generate_bilingual_spa_html(
   </section>
 
   <!-- Filter & Catalog Section -->
-  <main id="catalog" class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+  <main id="catalog" tabindex="-1" class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
       <div>
         <h3 class="text-2xl font-black text-slate-900 dark:text-white" id="cat-title">قائمة المنتجات المميزة</h3>
@@ -1792,8 +2129,8 @@ def generate_bilingual_spa_html(
   <section class="py-12 bg-white dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-800">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-8">
-        <h4 class="text-xl font-black text-slate-900 dark:text-white" id="rev-title">⭐ آراء وتقييمات العملاء</h4>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-readex" id="rev-sub">تجارب حقيقية لعملاء وثقوا في خدماتنا ومنتجاتنا</p>
+        <h4 class="text-xl font-black text-slate-900 dark:text-white" id="rev-title">⭐ آراء العملاء</h4>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-readex" id="rev-sub">لا توجد تقييمات موثقة متاحة حتى الآن</p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="reviews-container"></div>
     </div>
@@ -1802,14 +2139,8 @@ def generate_bilingual_spa_html(
   <!-- Newsletter Section -->
   <section class="py-12 bg-brand-500 text-white">
     <div class="max-w-4xl mx-auto px-4 text-center">
-      <h4 class="text-2xl font-black mb-2" id="news-title">اشترك في النشرة البريدية واحصل على خصم فوري!</h4>
-      <p class="text-xs text-white/80 mb-6 font-readex" id="news-sub">سنرسل لك أحدث العروض الحصرية والخصومات فور انطلاقها</p>
-      <form onsubmit="handleNewsletter(event)" class="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-        <input type="email" id="news-email" required placeholder="أدخل بريدك الإلكتروني..." class="flex-1 px-4 py-3 rounded-xl text-slate-900 text-xs focus:outline-none">
-        <button type="submit" class="px-6 py-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-white font-black text-xs transition" id="news-btn">
-          اشتراك الآن
-        </button>
-      </form>
+      <h4 class="text-2xl font-black mb-2" id="news-title">التسجيل في النشرة البريدية غير متاح حالياً</h4>
+      <p class="text-xs text-white/80 mb-6 font-readex" id="news-sub">لا يتم جمع أو إرسال عناوين البريد الإلكتروني حالياً.</p>
     </div>
   </section>
 
@@ -1817,11 +2148,10 @@ def generate_bilingual_spa_html(
   <footer class="bg-slate-950 text-slate-400 py-8 text-xs border-t border-slate-800">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div>
-        <b class="text-white font-bold">{brand_name}</b> — جميع الحقوق محفوظة © 2026
+        <b class="text-white font-bold">{brand_html}</b> — جميع الحقوق محفوظة © 2026
       </div>
       <div class="flex items-center gap-4">
-        <span>فودافون كاش: <b>{v_cash}</b></span>
-        <span>إنستاباي: <b>{instapay}</b></span>
+        <span>الطلبات بانتظار تأكيد التاجر</span>
       </div>
     </div>
   </footer>
@@ -1838,11 +2168,7 @@ def generate_bilingual_spa_html(
     <div class="flex-1 overflow-y-auto p-4 space-y-3" id="cart-items-container"></div>
 
     <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 space-y-3">
-      <!-- Promo Code Input -->
-      <div class="flex gap-2">
-        <input type="text" id="promo-input" placeholder="كود الخصم (WELCOME10)" class="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs uppercase focus:outline-none">
-        <button onclick="applyPromoCode()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">تطبيق</button>
-      </div>
+      <p id="promo-unavailable" class="text-center text-[11px] text-slate-500" role="status">لا توجد خصومات مفعلة حالياً</p>
 
       <div class="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 font-readex">
         <div class="flex justify-between"><span>المجموع الفرعي:</span><b id="c-subtotal">0 ج.م</b></div>
@@ -1866,7 +2192,7 @@ def generate_bilingual_spa_html(
         <button onclick="closeCheckoutModal()" class="text-slate-400 hover:text-white">✕</button>
       </div>
 
-      <form onsubmit="submitCheckout(event)" class="space-y-4">
+      <form onsubmit="submitCheckout(event)" oninput="checkoutIdempotencyKey = null" onchange="checkoutIdempotencyKey = null" class="space-y-4">
         <div>
           <label class="block text-xs font-bold mb-1 text-slate-700 dark:text-slate-300">الاسم الكامل *</label>
           <input type="text" id="chk-name" required placeholder="محمد أحمد" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none">
@@ -1883,23 +2209,11 @@ def generate_bilingual_spa_html(
         </div>
 
         <div>
-          <label class="block text-xs font-bold mb-2 text-slate-700 dark:text-slate-300">طريقة الدفع المفضلة *</label>
-          <div class="grid grid-cols-2 gap-2 text-xs">
+          <label class="block text-xs font-bold mb-2 text-slate-700 dark:text-slate-300">حالة الدفع</label>
+          <div class="text-xs">
             <label class="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2 cursor-pointer hover:border-brand-500">
-              <input type="radio" name="pay-method" value="vodafone_cash" checked>
-              <span>📱 فودافون كاش</span>
-            </label>
-            <label class="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2 cursor-pointer hover:border-brand-500">
-              <input type="radio" name="pay-method" value="instapay">
-              <span>⚡ إنستاباي</span>
-            </label>
-            <label class="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2 cursor-pointer hover:border-brand-500">
-              <input type="radio" name="pay-method" value="fawry">
-              <span>🏢 كود فوري</span>
-            </label>
-            <label class="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2 cursor-pointer hover:border-brand-500">
-              <input type="radio" name="pay-method" value="cod">
-              <span>💵 عند الاستلام</span>
+              <input type="radio" name="pay-method" value="cash_on_delivery" checked>
+              <span>سيؤكد التاجر طريقة الدفع والتسليم بعد مراجعة الطلب.</span>
             </label>
           </div>
         </div>
@@ -1914,16 +2228,33 @@ def generate_bilingual_spa_html(
   <script>
     const CATALOG = {catalog_json};
     const CATEGORIES = {categories_json};
+    const escapeCatalogHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => (
+      {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[char]
+    ));
+    const safeCatalogPrice = (value) => {{
+      const price = Number(value);
+      return Number.isFinite(price) && price >= 0 ? price : 0;
+    }};
+    const safeCatalogImageUrl = (value) => {{
+      try {{
+        const url = new URL(String(value ?? ''), window.location.origin);
+        if (url.username || url.password) return '';
+        if (url.protocol === 'https:') return url.href;
+        if (url.origin === window.location.origin && /^\/static\/uploads\/[A-Za-z0-9_-]+[.](?:jpg|jpeg|png|webp)$/.test(url.pathname)) return url.href;
+      }} catch (_) {{}}
+      return '';
+    }};
     let currentLang = 'ar';
     let currentTheme = 'light';
     let cart = [];
-    let appliedDiscount = 0;
+    let checkoutIdempotencyKey = null;
     let selectedCategory = 'الكل';
 
     // Translations Dictionary
     const I18N = {{
       ar: {{
-        promoBar: "🎉 كود خصم ترحيبي 10%: WELCOME10 | 🚚 توصيل لجميع المحافظات",
+        promoBar: "استعرض المنتجات وأرسل طلبك لتأكيد المتجر",
+        promoUnavailable: "لا توجد خصومات مفعلة حالياً",
         cart: "السلة",
         admin: "لوحة المشرف",
         heroTag: "🚀 تجربة تسوق استثنائية",
@@ -1931,16 +2262,17 @@ def generate_bilingual_spa_html(
         wa: "تواصل عبر واتساب",
         catTitle: "قائمة المنتجات المميزة",
         catSub: "اختر المنتجات وأضفها إلى السلة للشراء الفوري",
-        revTitle: "⭐ آراء وتقييمات العملاء",
-        revSub: "تجارب حقيقية لعملاء وثقوا في خدماتنا ومنتجاتنا",
-        newsTitle: "اشترك في النشرة البريدية واحصل على خصم فوري!",
-        newsSub: "سنرسل لك أحدث العروض الحصرية والخصومات فور انطلاقها",
-        newsBtn: "اشتراك الآن",
+        revTitle: "⭐ آراء العملاء",
+        revSub: "لا توجد تقييمات موثقة متاحة حتى الآن",
+        unrated: "لا توجد تقييمات",
+        newsTitle: "التسجيل في النشرة البريدية غير متاح حالياً",
+        newsSub: "لا يتم جمع أو إرسال عناوين البريد الإلكتروني حالياً.",
         addCart: "أضف للسلة",
         currency: "ج.م"
       }},
       en: {{
-        promoBar: "🎉 10% Welcome Discount: WELCOME10 | 🚚 Fast Delivery Nationwide",
+        promoBar: "Browse products and send an order request for merchant confirmation",
+        promoUnavailable: "No discounts are currently active",
         cart: "Cart",
         admin: "Admin Portal",
         heroTag: "🚀 Exceptional Shopping Experience",
@@ -1948,11 +2280,11 @@ def generate_bilingual_spa_html(
         wa: "Contact on WhatsApp",
         catTitle: "Featured Products",
         catSub: "Select items and add to cart for instant checkout",
-        revTitle: "⭐ Customer Reviews & Ratings",
-        revSub: "Authentic verified reviews from our valued clients",
-        newsTitle: "Subscribe to our Newsletter for Instant Deals!",
-        newsSub: "Get exclusive seasonal discounts straight to your inbox",
-        newsBtn: "Subscribe Now",
+        revTitle: "⭐ Customer feedback",
+        revSub: "No verified customer reviews are available yet",
+        unrated: "No ratings yet",
+        newsTitle: "Newsletter signup is not available yet",
+        newsSub: "Email addresses are not collected or sent at this time.",
         addCart: "Add to Cart",
         currency: "EGP"
       }}
@@ -1981,6 +2313,7 @@ def generate_bilingual_spa_html(
     function applyTranslations() {{
       const d = I18N[currentLang];
       document.getElementById('txt-promo-bar').textContent = d.promoBar;
+      document.getElementById('promo-unavailable').textContent = d.promoUnavailable;
       document.getElementById('lbl-cart').textContent = d.cart;
       document.getElementById('btn-admin-lbl').textContent = d.admin;
       document.getElementById('hero-tag').textContent = d.heroTag;
@@ -1992,44 +2325,64 @@ def generate_bilingual_spa_html(
       document.getElementById('rev-sub').textContent = d.revSub;
       document.getElementById('news-title').textContent = d.newsTitle;
       document.getElementById('news-sub').textContent = d.newsSub;
-      document.getElementById('news-btn').textContent = d.newsBtn;
     }}
 
     function renderCatalog(items = CATALOG) {{
       const grid = document.getElementById('products-grid');
       const d = I18N[currentLang];
-      grid.innerHTML = items.map(p => `
+      const safeItems = Array.isArray(items) ? items.filter(p => p && typeof p === 'object') : [];
+      grid.innerHTML = safeItems.map(p => {{
+        const id = Number(p.id);
+        if (!Number.isSafeInteger(id) || id < 1) return '';
+        const title = escapeCatalogHtml(currentLang === 'en' ? (p.title_en || p.title) : p.title);
+        const category = escapeCatalogHtml(p.category);
+        const badge = escapeCatalogHtml(p.badge);
+        const description = escapeCatalogHtml(p.description);
+        const imageUrl = escapeCatalogHtml(safeCatalogImageUrl(p.image_url));
+        const price = safeCatalogPrice(p.price);
+        const rawRating = Number(p.rating);
+        const ratingCount = Number(p.reviews_count);
+        const hasVerifiedRating = Number.isFinite(rawRating) && rawRating > 0
+          && Number.isSafeInteger(ratingCount) && ratingCount > 0;
+        const rating = hasVerifiedRating
+          ? `★ ${{Math.min(5, Math.max(0, rawRating)).toFixed(1)}} (${{ratingCount}})`
+          : escapeCatalogHtml(d.unrated);
+        return `
         <div class="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:shadow-xl transition flex flex-col justify-between group">
           <div>
             <div class="relative h-48 rounded-2xl overflow-hidden mb-3 bg-slate-100 dark:bg-slate-800">
-              <img src="${{p.image_url}}" alt="${{p.title}}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-              <span class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">${{p.badge}}</span>
+              ${{imageUrl ? `<img src="${{imageUrl}}" alt="${{title}}" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">` : '<div aria-hidden="true" class="w-full h-full flex items-center justify-center text-4xl">📦</div>'}}
+              <span class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">${{badge}}</span>
             </div>
             <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span>${{p.category}}</span>
-              <span class="text-amber-400 font-bold">★ ${{p.rating || 5}}</span>
+              <span>${{category}}</span>
+              <span class="text-amber-400 font-bold">${{rating}}</span>
             </div>
-            <h4 class="font-bold text-sm text-slate-900 dark:text-white mb-1.5">${{currentLang === 'en' ? (p.title_en || p.title) : p.title}}</h4>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 font-readex line-clamp-2 mb-3">${{p.description}}</p>
+            <h4 class="font-bold text-sm text-slate-900 dark:text-white mb-1.5">${{title}}</h4>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 font-readex line-clamp-2 mb-3">${{description}}</p>
           </div>
           <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
-            <b class="text-base font-black text-brand-500">${{p.price}} ${{d.currency}}</b>
-            <button onclick="addToCart(${{p.id}})" class="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 font-bold text-xs transition">
+            <b class="text-base font-black text-brand-500">${{price}} ${{d.currency}}</b>
+            <button onclick="addToCart(${{id}})" class="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 font-bold text-xs transition">
               ${{d.addCart}}
             </button>
           </div>
         </div>
-      `).join('');
+      `;
+      }}).join('');
     }}
 
     function renderCategoryPills() {{
       const c = document.getElementById('cat-pills');
       const cats = ['الكل', ...CATEGORIES];
       c.innerHTML = cats.map(cat => `
-        <button onclick="filterCategory('${{cat}}')" class="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${{selectedCategory === cat ? 'bg-brand-500 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800'}}">
-          ${{cat}}
+        <button type="button" data-category="${{escapeCatalogHtml(cat)}}" class="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${{selectedCategory === cat ? 'bg-brand-500 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800'}}">
+          ${{escapeCatalogHtml(cat)}}
         </button>
       `).join('');
+      c.querySelectorAll('[data-category]').forEach(button => {{
+        button.addEventListener('click', () => filterCategory(button.dataset.category));
+      }});
     }}
 
     function filterCategory(cat) {{
@@ -2048,13 +2401,31 @@ def generate_bilingual_spa_html(
     }}
 
     function addToCart(id) {{
-      const p = CATALOG.find(x => x.id === id);
+      const safeId = Number(id);
+      if (!Number.isSafeInteger(safeId) || safeId < 1) return;
+      const p = CATALOG.find(x => Number(x.id) === safeId);
       if (!p) return;
-      const exist = cart.find(x => x.id === id);
+      const safeProduct = {{ ...p, id: safeId, price: safeCatalogPrice(p.price) }};
+      const exist = cart.find(x => x.id === safeId);
+      const itemCount = cart.reduce((sum, item) => sum + item.qty, 0);
+      if (itemCount >= 100) {{
+        alert('The order limit is 100 items.');
+        return;
+      }}
       if (exist) {{
+        if (exist.qty >= 50) {{
+          alert('A maximum of 50 units per product is allowed.');
+          return;
+        }}
+        checkoutIdempotencyKey = null;
         exist.qty++;
       }} else {{
-        cart.push({{ ...p, qty: 1 }});
+        if (cart.length >= 50) {{
+          alert('A maximum of 50 different products is allowed per order.');
+          return;
+        }}
+        checkoutIdempotencyKey = null;
+        cart.push({{ ...safeProduct, qty: 1 }});
       }}
       updateCartUI();
       toggleCart(true);
@@ -2069,24 +2440,31 @@ def generate_bilingual_spa_html(
       if (!cart.length) {{
         container.innerHTML = '<div class="text-center py-10 text-slate-400 text-xs font-readex">السلة فارغة حالياً</div>';
       }} else {{
-        container.innerHTML = cart.map(it => `
+        container.innerHTML = cart.map(it => {{
+          const id = Number(it.id);
+          if (!Number.isSafeInteger(id) || id < 1) return '';
+          const title = escapeCatalogHtml(it.title);
+          const price = safeCatalogPrice(it.price);
+          const qty = Number.isSafeInteger(Number(it.qty)) && Number(it.qty) > 0 ? Number(it.qty) : 1;
+          return `
           <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div>
-              <b class="text-xs text-slate-900 dark:text-white block">${{it.title}}</b>
-              <span class="text-[11px] text-brand-500 font-bold">${{it.price}} ج.م</span>
+              <b class="text-xs text-slate-900 dark:text-white block">${{title}}</b>
+              <span class="text-[11px] text-brand-500 font-bold">${{price}} ج.م</span>
             </div>
             <div class="flex items-center gap-2">
-              <button onclick="changeQty(${{it.id}}, -1)" class="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 text-xs font-bold">-</button>
-              <span class="text-xs font-bold">${{it.qty}}</span>
-              <button onclick="changeQty(${{it.id}}, 1)" class="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 text-xs font-bold">+</button>
+              <button onclick="changeQty(${{id}}, -1)" class="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 text-xs font-bold">-</button>
+              <span class="text-xs font-bold">${{qty}}</span>
+              <button onclick="changeQty(${{id}}, 1)" class="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 text-xs font-bold">+</button>
             </div>
           </div>
-        `).join('');
+        `;
+        }}).join('');
       }}
 
-      const subtotal = cart.reduce((s, x) => s + (x.price * x.qty), 0);
-      const discountVal = (subtotal * appliedDiscount) / 100;
-      const total = Math.max(0, subtotal - discountVal);
+      const subtotal = cart.reduce((s, x) => s + (safeCatalogPrice(x.price) * Math.max(0, Number(x.qty) || 0)), 0);
+      const discountVal = 0;
+      const total = subtotal;
 
       document.getElementById('c-subtotal').textContent = `${{subtotal.toFixed(0)}} ج.م`;
       document.getElementById('c-discount').textContent = `${{discountVal.toFixed(0)}} ج.م`;
@@ -2096,6 +2474,7 @@ def generate_bilingual_spa_html(
     function changeQty(id, delta) {{
       const it = cart.find(x => x.id === id);
       if (!it) return;
+      checkoutIdempotencyKey = null;
       it.qty += delta;
       if (it.qty <= 0) cart = cart.filter(x => x.id !== id);
       updateCartUI();
@@ -2108,19 +2487,6 @@ def generate_bilingual_spa_html(
       }} else {{
         d.classList.toggle('closed');
       }}
-    }}
-
-    function applyPromoCode() {{
-      const code = document.getElementById('promo-input').value.trim().toUpperCase();
-      if (code === 'WELCOME10') appliedDiscount = 10;
-      else if (code === 'EGYPT2026') appliedDiscount = 15;
-      else if (code === 'AUTOCORP') appliedDiscount = 20;
-      else {{
-        alert('كود الخصم غير صحيح');
-        return;
-      }}
-      alert(`🎉 تم تطبيق خصم ${{appliedDiscount}}%!`);
-      updateCartUI();
     }}
 
     function openCheckoutModal() {{
@@ -2143,55 +2509,37 @@ def generate_bilingual_spa_html(
         customer_phone: document.getElementById('chk-phone').value.trim(),
         customer_address: document.getElementById('chk-address').value.trim(),
         payment_method: document.querySelector('input[name="pay-method"]:checked')?.value || 'cod',
-        items: cart.map(x => ({{ title: x.title, price: x.price, quantity: x.qty }})),
-        total_egp: parseFloat(document.getElementById('c-total').textContent) || 0
+        items: cart.map(x => ({{ id: x.id, quantity: x.qty }}))
       }};
+      checkoutIdempotencyKey = checkoutIdempotencyKey || crypto.randomUUID();
 
       try {{
         const res = await fetch('/api/v1/orders', {{
           method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
+          headers: {{ 'Content-Type': 'application/json', 'Idempotency-Key': checkoutIdempotencyKey }},
           body: JSON.stringify(payload)
         }});
-        const d = await res.json();
-        alert('🎉 تم استلام وتأكيد طلبك بنجاح! رقم الطلب: ' + (d.data?.order?.orderRef || 'تم'));
+        const d = await res.json().catch(() => ({{}}));
+        if (!res.ok) throw new Error(d.message || 'Unable to submit the order request.');
+        alert('تم استلام طلبك وهو في انتظار تأكيد المتجر. رقم الطلب: ' + (d.data?.order?.orderRef || ''));
+        checkoutIdempotencyKey = null;
         cart = [];
         updateCartUI();
         closeCheckoutModal();
         toggleCart(false);
       }} catch(err) {{
-        alert('تم تأكيد الطلب بنجاح وسيتم التواصل معك هاتفياً!');
-        closeCheckoutModal();
+        alert('تعذر إرسال طلبك. يرجى المحاولة مرة أخرى.');
       }} finally {{
         btn.disabled = false;
         btn.textContent = '✅ تأكيد الأوردر وإرساله للمتجر';
       }}
     }}
 
-    function handleNewsletter(e) {{
-      e.preventDefault();
-      const email = document.getElementById('news-email').value;
-      alert(`🎉 شكراً لاشتراكك (${{email}})، تم إرسال كود خصم إضافي إلى بريدك!`);
-      document.getElementById('news-email').value = '';
-    }}
-
-    // Render sample reviews
+    // Do not publish testimonials unless verified customer feedback exists.
     function renderReviews() {{
       const c = document.getElementById('reviews-container');
-      const revs = [
-        {{ name: "أحمد عبد الله", rating: 5, text: "تجربة ممتازة ومنتجات بجودة عالية جداً، التوصيل تم في أقل من 24 ساعة." }},
-        {{ name: "مريم الشريف", rating: 5, text: "أفضل خدمة عملاء وتغليف فاخر، أنصح بشدة بالتعامل معهم." }},
-        {{ name: "كريم يوسف", rating: 5, text: "الدفع بإنستاباي وفودافون كاش سهل جداً وسريع، تجربة محترمة." }}
-      ];
-      c.innerHTML = revs.map(r => `
-        <div class="p-6 rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-          <div class="flex items-center justify-between mb-2">
-            <b class="text-xs text-slate-900 dark:text-white">${{r.name}}</b>
-            <span class="text-amber-400 text-xs">★★★★★</span>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-slate-400 font-readex leading-relaxed">${{r.text}}</p>
-        </div>
-      `).join('');
+      const message = escapeCatalogHtml(I18N[currentLang].revSub);
+      c.innerHTML = `<p class="col-span-full text-center py-8 text-sm text-slate-500 dark:text-slate-400">${{message}}</p>`;
     }}
 
     // Init
@@ -2205,30 +2553,50 @@ def generate_bilingual_spa_html(
 
 def generate_admin_portal_html(brand_name: str, job_id: int) -> str:
     """Produces the Executive Management & Operations Portal for the store."""
+    brand_html = html.escape(_safe_text(brand_name, "المتجر المصري", 120))
     return f"""<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>لوحة التحكم والإدارة — {brand_name}</title>
+  <title>لوحة التحكم والإدارة — {brand_html}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>body {{ font-family: 'Cairo', sans-serif; }}</style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
-  <div class="max-w-7xl mx-auto px-4 py-8">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-slate-950">Skip to main content</a>
+  <main id="main-content" tabindex="-1" class="max-w-7xl mx-auto px-4 py-8">
     <div class="flex items-center justify-between pb-6 border-b border-slate-800 mb-8">
       <div>
         <span class="text-xs font-mono text-cyan-400 font-bold uppercase tracking-wider">ENTERPRISE ADMIN PORTAL</span>
-        <h1 class="text-2xl font-black text-white">{brand_name} — لوحة العمليات المركزية</h1>
+        <h1 class="text-2xl font-black text-white">{brand_html} — لوحة العمليات المركزية</h1>
       </div>
+      <div class="flex items-center gap-2">
+      <button id="admin-logout" type="button" onclick="logoutAdmin()" class="hidden px-4 py-2 rounded-xl bg-rose-950 hover:bg-rose-900 text-xs font-bold text-rose-200">Sign out</button>
       <a href="/" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">
         🌐 العودة للمتجر
       </a>
+      </div>
     </div>
 
+    <section id="admin-login-panel" style="display:none" class="max-w-md mx-auto p-6 rounded-3xl bg-slate-900 border border-slate-800" aria-labelledby="admin-login-title">
+      <h2 id="admin-login-title" class="text-xl font-black text-white mb-2">Administrator sign in</h2>
+      <p class="text-sm text-slate-400 mb-5">Use a provisioned administrator account. Customer accounts cannot access this portal.</p>
+      <form onsubmit="loginAdmin(event)" class="space-y-4">
+        <label class="block text-sm text-slate-300">Email
+          <input id="admin-email" name="email" type="email" autocomplete="username" required maxlength="254" class="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-white">
+        </label>
+        <label class="block text-sm text-slate-300">Password
+          <input id="admin-password" name="password" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-white">
+        </label>
+        <button id="admin-login-submit" type="submit" class="w-full rounded-xl bg-cyan-700 hover:bg-cyan-600 px-4 py-2 font-bold text-white">Sign in</button>
+      </form>
+      <p id="admin-auth-message" class="mt-4 min-h-6 text-sm text-amber-300" role="status" aria-live="polite"></p>
+    </section>
+
     <!-- KPIs -->
-    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
+    <div id="admin-kpis" style="display:none" class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
       <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800">
         <span class="text-xs text-slate-400">إجمالي المبيعات المحققة</span>
         <div class="text-2xl font-black text-emerald-400 mt-1" id="kpi-rev">0 ج.م</div>
@@ -2248,14 +2616,14 @@ def generate_admin_portal_html(brand_name: str, job_id: int) -> str:
     </div>
 
     <!-- Orders Management Table -->
-    <div class="p-6 rounded-3xl bg-slate-900 border border-slate-800">
+    <div id="admin-orders-panel" style="display:none" class="p-6 rounded-3xl bg-slate-900 border border-slate-800">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-base text-white">📦 سجل أوردرات العملاء الواردة</h3>
         <button onclick="loadAdminOrders()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-bold text-slate-300 hover:text-white">🔄 تحديث</button>
       </div>
 
       <div class="overflow-x-auto">
-        <table class="w-full text-xs text-right">
+        <table aria-label="Customer orders" class="w-full text-xs text-right">
           <thead>
             <tr class="text-slate-400 border-b border-slate-800 pb-2">
               <th class="p-3">رقم الطلب</th>
@@ -2272,17 +2640,103 @@ def generate_admin_portal_html(brand_name: str, job_id: int) -> str:
         </table>
       </div>
     </div>
-  </div>
+  </main>
 
   <script>
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => (
+      {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[char]
+    ));
+
+    function showAdminPortal(isAdmin) {{
+      document.getElementById('admin-login-panel').style.display = isAdmin ? 'none' : 'block';
+      document.getElementById('admin-kpis').style.display = isAdmin ? 'grid' : 'none';
+      document.getElementById('admin-orders-panel').style.display = isAdmin ? 'block' : 'none';
+      document.getElementById('admin-logout').classList.toggle('hidden', !isAdmin);
+    }}
+
+    async function checkAdminSession() {{
+      const message = document.getElementById('admin-auth-message');
+      try {{
+        const response = await fetch('/api/v1/auth/me', {{ credentials: 'same-origin' }});
+        const result = await response.json();
+        const isAdmin = response.ok && result.data && result.data.role === 'admin';
+        showAdminPortal(isAdmin);
+        if (isAdmin) {{
+          loadAdminOrders();
+        }} else {{
+          message.textContent = response.ok ? 'An administrator account is required.' : 'Sign in with an administrator account to continue.';
+        }}
+      }} catch (_) {{
+        showAdminPortal(false);
+        message.textContent = 'Unable to verify your session. Please try again.';
+      }}
+    }}
+
+    async function loginAdmin(event) {{
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = document.getElementById('admin-login-submit');
+      const message = document.getElementById('admin-auth-message');
+      button.disabled = true;
+      message.textContent = 'Signing in...';
+      try {{
+        const response = await fetch('/api/v1/auth/login', {{
+          method: 'POST', credentials: 'same-origin',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{
+            email: document.getElementById('admin-email').value,
+            password: document.getElementById('admin-password').value
+          }})
+        }});
+        if (!response.ok) throw new Error('Sign-in failed. Check your credentials.');
+        const session = await fetch('/api/v1/auth/me', {{ credentials: 'same-origin' }});
+        const identity = await session.json();
+        if (!session.ok || !identity.data || identity.data.role !== 'admin') {{
+          await fetch('/api/v1/auth/logout', {{ method: 'POST', credentials: 'same-origin' }});
+          throw new Error('This account is not authorized for the admin portal.');
+        }}
+        form.reset();
+        message.textContent = '';
+        showAdminPortal(true);
+        await loadAdminOrders();
+      }} catch (error) {{
+        message.textContent = error.message || 'Unable to sign in. Please try again.';
+      }} finally {{
+        document.getElementById('admin-password').value = '';
+        button.disabled = false;
+      }}
+    }}
+
+    async function logoutAdmin() {{
+      try {{ await fetch('/api/v1/auth/logout', {{ method: 'POST', credentials: 'same-origin' }}); }} catch (_) {{}}
+      finally {{
+        showAdminPortal(false);
+        document.getElementById('admin-auth-message').textContent = 'You have been signed out.';
+        document.getElementById('orders-tbody').innerHTML = '';
+      }}
+    }}
+
     async function loadAdminOrders() {{
       try {{
-        const res = await fetch('/api/v1/orders');
+        const res = await fetch('/api/v1/orders', {{ credentials: 'same-origin' }});
+        if (res.status === 401 || res.status === 403) {{
+          showAdminPortal(false);
+          document.getElementById('admin-auth-message').textContent = 'Your administrator session is no longer valid. Please sign in again.';
+          return;
+        }}
+        if (!res.ok) throw new Error('Unable to load orders.');
         const d = await res.json();
-        const orders = d.data || [];
-        
+        const orders = Array.isArray(d.data) ? d.data : [];
+        for (const order of orders) {{
+          for (const key of ['orderRef', 'customerName', 'customerPhone', 'paymentMethod', 'status']) {{
+            order[key] = escapeHtml(order[key] ?? '');
+          }}
+          const total = Number(order.totalEgp);
+          order.totalEgp = Number.isFinite(total) ? total : 0;
+        }}
+
         document.getElementById('kpi-orders').textContent = orders.length;
-        const rev = orders.reduce((s, o) => s + (o.totalEgp || 0), 0);
+        const rev = orders.reduce((s, o) => s + (o.paymentStatus === 'paid' ? (o.totalEgp || 0) : 0), 0);
         document.getElementById('kpi-rev').textContent = `${{rev}} ج.م`;
         document.getElementById('kpi-pending').textContent = orders.filter(o => o.status === 'pending').length;
 
@@ -2294,14 +2748,14 @@ def generate_admin_portal_html(brand_name: str, job_id: int) -> str:
 
         tbody.innerHTML = orders.map(o => `
           <tr class="hover:bg-slate-800/50">
-            <td class="p-3 font-mono font-bold text-cyan-400">${{o.orderRef || '#' + o.id}}</td>
+            <td class="p-3 font-mono font-bold text-cyan-400">${{o.orderRef || '#' + escapeHtml(Number.isSafeInteger(Number(o.id)) ? Number(o.id) : '')}}</td>
             <td class="p-3 text-white font-bold">${{o.customerName || 'عميل'}}</td>
             <td class="p-3 font-mono">${{o.customerPhone || '-'}}</td>
             <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-bold">${{o.paymentMethod || 'COD'}}</span></td>
             <td class="p-3 font-bold text-emerald-400">${{o.totalEgp || 0}} ج.م</td>
             <td class="p-3">
-              <span class="px-2 py-0.5 rounded text-[11px] font-black ${{o.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}}">
-                ${{o.status || 'pending'}}
+              <span class="px-2 py-0.5 rounded text-[11px] font-black ${{o.paymentStatus === 'paid' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}}">
+                ${{o.status || 'pending_confirmation'}}
               </span>
             </td>
           </tr>
@@ -2310,7 +2764,7 @@ def generate_admin_portal_html(brand_name: str, job_id: int) -> str:
         document.getElementById('orders-tbody').innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-500">تعذر الاتصال بالـ API المحلي</td></tr>';
       }}
     }}
-    loadAdminOrders();
+    checkAdminSession();
   </script>
 </body>
 </html>"""

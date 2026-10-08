@@ -1,27 +1,34 @@
 # ⚡ AutoCorp — Autonomous AI Agency for Egyptian SMEs
 
-[![Live Demo](https://img.shields.io/badge/Live%20Platform-Vercel%20Production-success?style=for-the-badge&logo=vercel)](https://autocorp-ai-websits-builder.vercel.app/)
+[![Status](https://img.shields.io/badge/Status-security%20remediation%20in%20progress-orange?style=for-the-badge&logo=shield)](docs/ENTERPRISE_REMEDIATION_PLAN.md)
 [![Telegram Bot](https://img.shields.io/badge/Telegram%20Bot-@autocorp__Alfarouq__Ibrahim__bot-2CA5E0?style=for-the-badge&logo=telegram)](https://t.me/autocorp_Alfarouq_Ibrahim_bot)
-[![Security Grade](https://img.shields.io/badge/OWASP%20Top%2010-Grade%20A%2B%20%7C%20100%2F100-emerald?style=for-the-badge&logo=shield)](https://autocorp-ai-websits-builder.vercel.app/)
 [![Hackathon](https://img.shields.io/badge/Agents%20at%20Work-BrainsMingle%20%C3%97%20Wesam.ai-blue)](https://ai.untap.us/programs/aaw-1st-edition)
 [![Target](https://img.shields.io/badge/Target-Egyptian%20SMEs-gold)](#-measured-business-impact)
-[![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Node%20Express%205%20%7C%20Drizzle%20ORM%20%7C%20Turso%20libSQL-teal)](https://github.com/alfarouq637/-Agents-at-Work-Project)
+[![Stack](https://img.shields.io/badge/Stack-FastAPI%20prototype%20%7C%20SQLite%20%7C%20Turso-teal)](https://github.com/alfarouq637/-Agents-at-Work-Project)
 
-> 🚀 **Live Production Platform**: **[https://autocorp-ai-websits-builder.vercel.app/](https://autocorp-ai-websits-builder.vercel.app/)**  
-> 🤖 **Direct Telegram Bot**: **[t.me/autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot)**  
-> 🛡️ **OWASP Top 10 Security Audit API**: **[https://autocorp-ai-websits-builder.vercel.app/api/sites/1/security-audit](https://autocorp-ai-websits-builder.vercel.app/api/sites/1/security-audit)**
+> **Deployment notice:** do not treat any historical hosted URL or Telegram bot
+> as production-ready until credential rotation, deployment review, and the
+> Phase 0 exit criteria have been completed.
 
-> **AutoCorp** is an enterprise-grade, self-operating AI digital agency built specifically for Egyptian SMEs (Small & Medium Enterprises). It takes client briefs, plans multi-step projects, hires from a 70-role specialist roster, writes and enforces cryptographic contracts, runs strict QA inspection with financial penalties, and delivers **complete Full-Stack applications (Bilingual Frontend + Modular Express 5 Backend + Drizzle ORM Database + OWASP Top 10 Cybersecurity Reviewer + Egyptian Payment Gateways)**.
+> **AutoCorp** is a FastAPI prototype for Egyptian SMEs. It accepts site briefs,
+> produces responsive Arabic-first drafts, and is being evolved into a governed
+> multi-tenant platform. Its generated-project and security-review outputs are
+> development artifacts, not production or compliance attestations.
+
+> **Current status:** this is a prototype undergoing security remediation. It
+> must not be represented as an enterprise production service, payment
+> processor, independently verified OWASP implementation, or highly available
+> platform. The scoped remediation work is tracked in
+> [docs/ENTERPRISE_REMEDIATION_PLAN.md](docs/ENTERPRISE_REMEDIATION_PLAN.md).
 
 ---
 
 ## ⏱️ Quick Access & Live Links
 
-- 🌐 **Live Cloud Deployment (Vercel Production)**: **[https://autocorp-ai-websits-builder.vercel.app/](https://autocorp-ai-websits-builder.vercel.app/)**
-- 🤖 **Interactive Telegram AI Bot**: **[t.me/autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot)**
-- 👑 **Admin Supervisor Password**: `AlfarouqIbrahim` (Configurable via `ADMIN_PASSWORD` in `.env`)
+- 📋 **Architecture and remediation plan**: [docs/ENTERPRISE_REMEDIATION_PLAN.md](docs/ENTERPRISE_REMEDIATION_PLAN.md)
+- 👑 **Admin Supervisor Access**: configure a unique `ADMIN_PASSWORD` outside version control; it is never documented or displayed by the application.
 - 📡 **Subdomain Routing**: `http://{id}.localhost:8000/` or `http://{slug}.localhost:8000/`
-- 🛡️ **Live Security Audit API**: `GET /api/sites/{id}/security-audit` (Score 100/100, Grade A+)
+- 🛡️ **Security-audit endpoint**: prototype static analysis only; it is not OWASP certification.
 - 🗄️ **Tenant Database API**: `GET /api/sites/{id}/database` & `GET /api/sites/{id}/database/download`
 
 ---
@@ -35,8 +42,8 @@ Run AutoCorp locally in under 3 minutes with zero extra dependencies:
 git clone https://github.com/alfarouq637/-Agents-at-Work-Project.git
 cd -Agents-at-Work-Project
 
-# 2. Install dependencies (FastAPI, Uvicorn, HTTPX, PyPDF, Multipart)
-pip install -r requirements.txt
+# 2. Install the reviewed, hash-verified runtime dependency set
+pip install --require-hashes -r requirements.lock
 
 # 3. Configure environment variables (copy example and add your keys)
 cp .env.example .env
@@ -46,6 +53,12 @@ python run.py
 ```
 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
+For the regression suite, install the separately locked test set with
+`pip install --require-hashes -r requirements-dev.lock`, then run `pytest -q`.
+Regenerate either lock only through reviewed dependency updates using
+`pip-compile --strip-extras --generate-hashes --output-file requirements.lock requirements.txt`
+or `pip-compile --strip-extras --generate-hashes --output-file requirements-dev.lock requirements-dev.in`.
+
 ---
 
 ## 📈 Measured Business Impact for Egyptian SMEs
@@ -54,10 +67,10 @@ AutoCorp directly addresses the four hackathon judging criteria:
 
 | Hackathon Criterion | Measured Impact in AutoCorp |
 | :--- | :--- |
-| **1. Does it work?** | **End-to-End verified live system**. The CEO agent plans tasks, specialist agents write copy & design UI, frontend developers build code, Cybersecurity Reviewer audits against OWASP Top 10, QA reviewers inspect for errors, and the job delivers with cryptographically signed SHA-256 contracts. |
-| **2. Time Saved** | Traditional digital agencies in Egypt take **14 to 21 days** to deliver a custom full-stack storefront. AutoCorp produces a complete modular application with database and security audits in **under 2 minutes** (99.8% turnaround time reduction). |
-| **3. Cost Saved** | SME market rate for an enterprise full-stack website with backend & database in Egypt is **15,000 to 35,000 EGP**. AutoCorp's verified token cost is **48.87 EGP** per project (> **99.5% cost reduction** for the SME). |
-| **4. Revenue Generated** | Generated sites are not static mockups; they are live storefronts with real **Cart, Order Management, Drizzle ORM Databases, and Egyptian Payment Gateways (Vodafone Cash, Fawry, InstaPay)** that directly drive customer transactions. |
+| **1. Prototype capability** | Authenticated users can create a brief, manage a catalog, and receive a template-driven responsive site draft. |
+| **2. Current safety posture** | Sessions, ownership checks, uploads, audit events, order pricing, and Telegram webhooks have targeted regression coverage. |
+| **3. Remaining delivery work** | Durable workers, PostgreSQL/RLS, verified deployments, accessibility review, and operational observability remain roadmap work. |
+| **4. Payments** | Orders are requests pending merchant confirmation. No live provider integration or payment processing claim is made. |
 
 ---
 
@@ -112,35 +125,29 @@ AutoCorp directly addresses the four hackathon judging criteria:
   - `A08: Software & Data Integrity`: Verifies external CDNs and assets.
   - `A09: Logging & Monitoring`: Structured request logging via Morgan and tenant audit log.
   - `A10: SSRF Prevention`: Enforces isolated tenant scope with zero arbitrary outbound URL fetchers.
-- **Automated SAST Scanner**: Pure-engine static analysis running in <50ms without binary dependencies.
-- **Live Security Audit Studio**: Interactive modal in the UI (`#security-modal`) displaying glowing grade badge (**Grade A+ | 100/100**), compliance checklist, and on-demand rescan trigger.
+- **Automated static review**: a lightweight heuristic scans selected generated-file patterns. It is a development signal, not a penetration test, dependency audit, OWASP certification, or deployment approval.
+- **Current platform controls**: remediation has added revocable HttpOnly sessions, Argon2id local passwords, ownership checks, constrained uploads, audit records, origin controls, and targeted regression tests.
 
 ### 2. 🗄️ Multi-Tenant Database Engine & Drizzle ORM Abstraction
-- **Database-Per-Tenant Isolation**: Every generated store receives an independent relational database:
-  - Physical `database.sqlite` generated on disk.
-  - `schema.sql` (Full DDL with initial seeds).
-  - `database.json` for serverless state persistence.
-  - Master tenant virtualization registry in Turso libSQL cloud (`tenant_databases`, `tenant_records`, `tenant_queries_log`).
+- **Current tenancy boundary**: tenants share the prototype SQLite/Turso schema and are separated by authenticated ownership checks and `job_id` predicates. This is not physical isolation or database-enforced RLS.
+  - Downloadable starter artifacts such as `schema.sql` and `database.json`.
+  - Optional local `database.sqlite` development output; it is not a serverless persistence mechanism.
+  - Prototype metadata tables in the shared control-plane database.
 - **Drizzle ORM Relational Schema**:
   - `src/config/drizzle.js`: Type-safe SQLite connection via `better-sqlite3`.
   - `src/models/drizzle.schema.js`: Complete schema definitions for `users`, `categories`, `products`, `orders`, `promoCodes`, `reviews`, and `store_settings`.
-- **Tenant Database Studio (`#database-modal`)**: In-browser database studio featuring:
-  - Interactive Table Explorer with instant record browsing.
-  - Interactive SQL Runner console (`SELECT * FROM products ...`).
-  - 1-Click download of the physical `database.sqlite` file.
+- **Tenant database surfaces**: the SQL console and arbitrary file editor are disabled by default pending PostgreSQL migrations, RLS, versioned artifacts, and reviewed publishing workflows.
 
 ### 3. 🧠 4 Advanced Metaprompting Layers with Self-Correction
-AutoCorp enforces four sequential metaprompting layers to prevent hallucinations and guarantee enterprise-grade outputs:
-1. **Layer 1: Chain-of-Thought & Architectural Planning**: Forces agents to begin responses with a mandatory `<thinking>...</thinking>` block, mapping out requirements, atomic components, and threat models.
-2. **Layer 2: Architectural Constraints & Guardrails**: Enforces Tailwind CSS, Shadcn UI / Radix UI patterns, Cairo/Tajawal RTL fonts, Express 5, and Drizzle ORM.
-3. **Layer 3: Security System Prompt**: Equips the Cybersecurity Reviewer with strict OWASP Top 10 rules.
-4. **Layer 4: Self-Correction Loop & Automated Unit Tests**: If the reviewer or SAST detects any flaw, it outputs `[FIX REASON: line <num> - <issue>]` and triggers an automated healing loop back to the developer until `[APPROVED]` is achieved. Includes automated test suites (`tests/security.test.js`, `tests/api.test.js`).
+AutoCorp can generate template-driven drafts and run selected static checks; it does not guarantee factual correctness, accessibility conformance, security, or autonomous self-correction.
+1. **Planning direction**: generation uses constrained templates and application guardrails.
+2. **Design direction**: a component design system and localization are target architecture work, not enforced output guarantees.
+3. **Security direction**: generated artifacts receive limited static review and must later pass independent runtime and deployment checks.
+4. **Improvement direction**: production self-improvement must be offline-evaluated, approval-gated, canaried, and reversible.
 
 ### 4. 🎨 Front-End Excellence Layer (Atomic Components & RTL)
-- **Atomic Component Library**: Structured components (Buttons, Cards, Badges, Sheet Drawers, Dialog Modals, Input, Toast) following Shadcn UI / Radix UI design tokens.
-- **Native RTL & Egyptian Typography**: Out-of-the-box `dir="rtl"`, `lang="ar"` with Google Fonts (Cairo & Tajawal), and semantic ARIA accessibility attributes (`role="dialog"`, `aria-modal="true"`).
-- **Egyptian 3G/4G Network Speed**: Optimized asset delivery, lazy-loaded responsive WebP images, and lightweight SVG icons delivering <1 second page loads.
-- **Bilingual & Dark/Light Support**: Instant toggle between Arabic and English, and Light and Dark themes.
+- **Current output**: generated templates are Arabic-first, responsive drafts with basic viewport and safety validation.
+- **Not yet certified**: the legacy dashboard still needs componentization, WCAG 2.2 AA review, performance budgets, and device-matrix testing.
 
 ### 5. 📦 Enterprise Node.js / Express 5 Modular Architecture
 Generated projects follow a clean MVC modular architecture:
@@ -174,31 +181,31 @@ Store-Backend/
 └── README.md                    # Deployment & API guide
 ```
 
-### 6. 💳 Egyptian Payment Gateways Layer
-Every generated SME site supports localized payment options:
-- 📱 **فودافون كاش ومحافظ المحمول (Vodafone Cash & Mobile Wallets)**: Automated transfer reference generation and direct wallet linking.
-- 🏪 **فوري باي (Fawry Pay)**: 8-digit kiosk payment reference code valid for 48 hours.
-- ⚡ **إنستاباي (InstaPay)**: Direct IPA handle transfer support.
-- 💵 **الدفع عند الاستلام (Cash on Delivery)**.
+### 6. 💳 Payment status
+
+The prototype records an order request from server-side catalog prices and
+leaves it `pending_confirmation`. It does not initiate, verify, or settle a
+payment. Official provider adapters, signed webhooks, reconciliation, and a
+financial ledger are prerequisites for enabling live payments.
 
 ### 7. 🪄 Iterative Prompt Refinement & Multimodal Upload
 - **Natural Language Refinement (`/api/sites/{id}/refine`)**: Users can update their live store via natural language prompts (e.g. *"غير الثيم للون الأخضر وزود قسم للمشروبات الساخنة"*).
-- **Multimodal Document Intake**: Upload PDF price lists, Word documents, or product catalog photos. The backend extracts text and visual features to synthesize or update the storefront automatically.
-- **Visual Code & File Editor (`#file-editor-modal`)**: Edit any backend or frontend file directly in the browser with live syntax highlighting and instant save.
+- **Multimodal Document Intake**: Authenticated users can upload bounded PDF and image inputs; document text extraction is intentionally limited.
+- **Visual Code & File Editor**: Disabled pending a tenant-isolated, reviewed editing workflow.
 
 ### 8. 📢 AI Marketing Automation & Bot Bridging
 - **Autonomous Email Campaign Generator**: Drafts consent-based customer email marketing sequences with human-in-the-loop review.
 - **Social Media Case Study Publisher**: Drafts factual LinkedIn/Facebook announcements upon project completion.
-- **Telegram & WhatsApp Bot Bridge**: Step-by-step guidance and webhook configuration to link dedicated Telegram/WhatsApp customer service bots to each store.
+- **Telegram & WhatsApp Bot Bridge**: per-merchant credentials are disabled until encrypted secret storage, provider verification, consent, and scoped authorization are available.
 
 ### 9. 🤖 Dual-Channel Telegram Bot Integration
 - **Client Channel**: Clients send text briefs or photos of their products. The `Vision Analyst` parses the image and triggers project execution.
-- **Admin Channel**: Type `/admin <YOUR_PASSWORD>` to receive instant approval buttons (`[✅ موافقة] [❌ رفض]`) on your mobile. Configurable via `TELEGRAM_BOT_TOKEN` in `.env`.
+- **Admin Channel**: Password commands are disabled. Approval callbacks are restricted to the configured owner and webhook deliveries are authenticated and deduplicated.
 
 ### 10. 👑 Super Admin Governance & Cascading Control
 - Super Admin portal allows:
   - Real-time audit of all SME projects and files.
-  - Inline editing of generated code and database records.
+  - Arbitrary tenant code editing and tenant SQL remain disabled by default.
   - Cascading site deletion with confirmation dialog (removes files, database records, order history, and storage).
 
 ---
@@ -247,12 +254,18 @@ GROQ_API_KEY=your-groq-api-key
 
 # Admin Credentials
 ADMIN_PASSWORD=your_secure_admin_password
-ADMIN_KEY=your-custom-admin-secret-key
+AUTH_SECRET_KEY=your-random-session-signing-secret
 
 # Telegram Bot (Optional - for client intake & mobile approvals)
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 TELEGRAM_BOT_USERNAME=your_bot_username
 ```
+
+`AUTH_SECRET_KEY` and `ADMIN_PASSWORD` are mandatory for browser and
+administrator authentication. Generate distinct high-entropy values in the
+deployment secret manager; the application intentionally fails those flows
+closed when they are absent. See [Phase 0 containment status](docs/PHASE0_CONTAINMENT_STATUS.md)
+before exposing an environment publicly.
 
 ---
 
@@ -268,8 +281,8 @@ TELEGRAM_BOT_USERNAME=your_bot_username
 
 ## 🏆 Submission Deliverables Summary
 
-- **Live Production Platform**: [https://autocorp-ai-websits-builder.vercel.app/](https://autocorp-ai-websits-builder.vercel.app/)
-- **Telegram AI Bot**: [t.me/autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot)
+- **Historical demo deployment**: [https://autocorp-ai-websits-builder.vercel.app/](https://autocorp-ai-websits-builder.vercel.app/) — do not treat as a production service; it requires secret rotation and release-gate verification.
+- **Historical Telegram bot**: [t.me/autocorp_Alfarouq_Ibrahim_bot](https://t.me/autocorp_Alfarouq_Ibrahim_bot) — rotate its token and configure its signed webhook before use.
 - **GitHub Repository**: [https://github.com/alfarouq637/-Agents-at-Work-Project.git](https://github.com/alfarouq637/-Agents-at-Work-Project.git)
-- **Live OWASP Security Audit Endpoint**: [https://autocorp-ai-websits-builder.vercel.app/api/sites/1/security-audit](https://autocorp-ai-websits-builder.vercel.app/api/sites/1/security-audit)
+- **Security audit route**: prototype static review only; it is not an OWASP certification or a production security attestation.
 - **Hackathon Track**: Agents at Work 1st Edition — BrainsMingle × Wesam.ai (untap.us)

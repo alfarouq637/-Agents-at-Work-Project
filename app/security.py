@@ -297,32 +297,34 @@ def run_sast_security_scan(files: Dict[str, str], html: str = "") -> Dict[str, A
     score = 100 - (critical_count * 25 + high_count * 15 + med_count * 5 + low_count * 2)
     score = max(20, min(100, score))
 
-    if score >= 95:
-        grade = "A+"
-    elif score >= 90:
-        grade = "A"
-    elif score >= 80:
-        grade = "B+"
-    elif score >= 70:
-        grade = "B"
-    else:
-        grade = "C"
+    # A heuristic count must not become a security letter grade. Keep the
+    # numeric value for trend comparison, but label the result by its evidence.
+    grade = "STATIC_REVIEW"
 
-    # OWASP Top 10 Checklist Map
+    # This is evidence from a narrow static scan, not an OWASP certification.
+    # Start each category unverified and only report what this scan observed.
     owasp_checklist = {
-        "A01": {"title": "Broken Access Control", "status": "PASS", "details": "Enforced with JWT & Admin middlewares"},
-        "A02": {"title": "Cryptographic Failures", "status": "PASS", "details": "No hardcoded secrets, process.env verified"},
-        "A03": {"title": "Injection", "status": "PASS", "details": "Parameterized queries & Drizzle ORM models"},
-        "A04": {"title": "Insecure Design", "status": "PASS", "details": "Rate limiters and payload schemas active"},
-        "A05": {"title": "Security Misconfiguration", "status": "PASS", "details": "Helmet.js headers and strict CORS mounted"},
-        "A06": {"title": "Vulnerable Dependencies", "status": "PASS", "details": "Modern, maintained npm dependencies"},
-        "A07": {"title": "Authentication Failures", "status": "PASS", "details": "HttpOnly secure cookie JWT handling"},
-        "A08": {"title": "Software & Data Integrity", "status": "PASS", "details": "Trusted CDNs and verified assets"},
-        "A09": {"title": "Logging & Monitoring", "status": "PASS", "details": "Morgan HTTP logging & tenant audit log"},
-        "A10": {"title": "Server-Side Request Forgery", "status": "PASS", "details": "Isolated tenant scope, no unvetted HTTP client"}
+        "A01": {"title": "Broken Access Control", "status": "NOT_VERIFIED", "details": "Requires runtime and authorization testing."},
+        "A02": {"title": "Cryptographic Failures", "status": "NOT_VERIFIED", "details": "Requires secret-management and cryptography review."},
+        "A03": {"title": "Injection", "status": "NOT_VERIFIED", "details": "Requires runtime fuzzing and data-layer review."},
+        "A04": {"title": "Insecure Design", "status": "NOT_VERIFIED", "details": "Requires threat modeling and abuse-case testing."},
+        "A05": {"title": "Security Misconfiguration", "status": "NOT_VERIFIED", "details": "Requires deployed-environment inspection."},
+        "A06": {"title": "Vulnerable Components", "status": "NOT_VERIFIED", "details": "Requires dependency and SBOM scanning."},
+        "A07": {"title": "Authentication Failures", "status": "NOT_VERIFIED", "details": "Requires session and identity-flow testing."},
+        "A08": {"title": "Software and Data Integrity", "status": "NOT_VERIFIED", "details": "Requires build provenance and supply-chain review."},
+        "A09": {"title": "Security Logging and Monitoring", "status": "NOT_VERIFIED", "details": "Requires observability and incident-response review."},
+        "A10": {"title": "Server-Side Request Forgery", "status": "NOT_VERIFIED", "details": "Requires outbound-request and network controls review."}
     }
 
-    # If any finding matches a category, mark as WARNING or FAIL
+    # Passing a heuristic is useful signal, but not a verification claim.
+    for passed in passed_rules:
+        category = passed.get("category", "")
+        for key in owasp_checklist:
+            if key in category:
+                owasp_checklist[key]["status"] = "STATIC_CHECK_PASSED"
+                owasp_checklist[key]["details"] = passed.get("description", "")
+
+    # Findings take precedence over positive heuristic signals.
     for f in findings:
         cat = f.get("category", "")
         sev = f.get("severity", "medium")
@@ -334,7 +336,11 @@ def run_sast_security_scan(files: Dict[str, str], html: str = "") -> Dict[str, A
     return {
         "score": score,
         "grade": grade,
-        "status": "APPROVED" if score >= 85 else "NEEDS_REVISION",
+        "heuristic_score": score,
+        "assessment_type": "automated static review; not OWASP certification",
+        "status": "STATIC_REVIEW_PASSED" if not any(
+            finding.get("severity") in ("critical", "high") for finding in findings
+        ) else "NEEDS_REVISION",
         "audited_at": time.time(),
         "reviewer_agent": "Cybersecurity Reviewer (AutoCorp SecOps Team)",
         "checks_passed": len(passed_rules),
@@ -343,7 +349,8 @@ def run_sast_security_scan(files: Dict[str, str], html: str = "") -> Dict[str, A
         "passed_rules": passed_rules,
         "owasp_compliance": owasp_checklist,
         "summary": (
-            f"OWASP Top 10 Security Audit completed with score {score}/100 (Grade {grade}). "
-            f"{len(passed_rules)} checks passed, {len(findings)} findings detected."
+            f"Automated static review heuristic: {score}/100 (Grade {grade}). "
+            f"{len(passed_rules)} checks passed, {len(findings)} findings detected. "
+            "This result is not an OWASP compliance certification."
         )
     }

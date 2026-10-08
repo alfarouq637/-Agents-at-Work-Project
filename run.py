@@ -19,9 +19,9 @@ except Exception:
 
 import uvicorn
 from app.db import init
+from app.runtime import runtime_security_status
 
 if __name__ == "__main__":
-    admin_pwd = os.getenv("ADMIN_PASSWORD", "admin123")
     tg_bot = os.getenv("TELEGRAM_BOT_USERNAME", "")
     bot_info = f"t.me/{tg_bot}" if tg_bot else "Configure via TELEGRAM_BOT_TOKEN in .env"
     
@@ -29,11 +29,21 @@ if __name__ == "__main__":
     print("⚡ AutoCorp — Autonomous AI Agency for Egyptian SMEs")
     print("=" * 65)
     print("🌐 Dashboard URL:    http://localhost:8000")
-    print(f"👑 Admin Password:   {admin_pwd}")
+    print("👑 Admin access:     configured through ADMIN_PASSWORD (never printed)")
     print(f"🤖 Telegram Bot:     {bot_info}")
     print("📡 Subdomain Mode:   http://{id}.localhost:8000")
     print("=" * 65)
     
+    readiness = runtime_security_status()
+    if not readiness["ready"]:
+        print("WARNING: Browser/admin authentication is disabled until these settings are configured: " + ", ".join(readiness["missing_required_settings"]))
+    if readiness["missing_required_dependencies"]:
+        print("WARNING: Required security dependencies are unavailable: " + ", ".join(readiness["missing_required_dependencies"]))
+    if readiness["missing_serverless_storage_settings"]:
+        print("WARNING: Vercel requires durable Turso storage: " + ", ".join(readiness["missing_serverless_storage_settings"]))
+    if readiness["enabled_prototype_features"]:
+        print("WARNING: High-risk prototype flags enabled: " + ", ".join(readiness["enabled_prototype_features"]))
+
     # Initialize database
     try:
         init()

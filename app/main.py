@@ -9,27 +9,63 @@ Features:
 - Multi-tenant SQLite / Turso libSQL cloud support
 """
 import asyncio
+import hashlib
+import hmac
+import io
 import json
 import os
 import random
 import re
+import secrets
 import sys
 import time
+import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
+from http.cookies import SimpleCookie
+from pathlib import Path, PurePosixPath
 import shutil
 from typing import Optional, Dict, Any, List
+from urllib.parse import urlsplit
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Request, UploadFile, File, Form
+from fastapi import FastAPI, Header, HTTPException, Query, Request, UploadFile, File, Form
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, builder, corp, db, llm, roles, skills, tools, security
+from . import artifacts, audit, auth, builder, corp, db, llm, rate_limit, runtime, skills, tools, security
+from .body_limits import MAX_REQUEST_BODY_BYTES, RequestBodyLimitMiddleware
+from .routers.operations import router as operations_router
+from .schemas import (
+    AdminLoginRequest,
+    GitHubDeployRequest,
+    JobDecisionRequest,
+    LoginRequest,
+    MarketingEmailDraftRequest,
+    ProjectCreateRequest,
+    RegisterRequest,
+    SiteAutomationDecisionRequest,
+    SiteFileSaveRequest,
+    SiteItemCreateRequest,
+    SiteOrderCreateRequest,
+    SiteRefineRequest,
+    SiteSettingsPatchRequest,
+    SocialPostDraftRequest,
+    VisualSiteEditRequest,
+    VercelDeployRequest,
+)
+from .uploads import (
+    ALLOWED_UPLOADS,
+    IMAGE_MEDIA_TYPES_BY_EXTENSION,
+    MAX_EXTRACTED_TEXT_CHARS,
+    MAX_TELEGRAM_ATTACHMENT_BYTES,
+    MAX_UPLOAD_BYTES,
+    extract_pdf_text,
+    sanitize_image_upload,
+)
 
 IS_VERCEL = os.getenv("VERCEL", "0") == "1"
 BASE = os.path.dirname(os.path.dirname(__file__))
-
 # =========================================================
 # Security & Safety Guardrails
 # =========================================================
@@ -107,6 +143,83 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AutoCorp - AI agency for Egyptian SMEs", lifespan=lifespan)
+app.include_router(operations_router)
+app.add_middleware(RequestBodyLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
+
+
+def api_error_response(
+    request: Request,
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+    detail: Any = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> JSONResponse:
+    """Return a stable error envelope while preserving legacy `detail` clients."""
+    request_id = str(getattr(request.state, "request_id", ""))[:80]
+    content: Dict[str, Any] = {
+        "error": {"code": code, "message": message, "request_id": request_id},
+        "detail": detail if detail is not None else message,
+    }
+    response = JSONResponse(status_code=status_code, content=content, headers=headers)
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_envelope(request: Request, exc: HTTPException):
+    """Make expected API failures machine-readable without breaking legacy UI code."""
+    detail = exc.detail
+    message = detail if isinstance(detail, str) else "Request could not be completed"
+    return api_error_response(
+        request,
+        status_code=exc.status_code,
+        code=f"http_{exc.status_code}",
+        message=message,
+        detail=detail,
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_envelope(request: Request, exc: RequestValidationError):
+    """Expose validation locations, not an unstructured framework error response."""
+    problems = [
+        {
+            "location": list(error.get("loc", ())),
+            "message": error.get("msg", "Invalid value"),
+            "type": error.get("type", "validation_error"),
+        }
+        for error in exc.errors()
+    ]
+    return api_error_response(
+        request,
+        status_code=422,
+        code="validation_error",
+        message="Request validation failed",
+        detail=problems,
+    )
+
+
+@app.exception_handler(Exception)
+async def unexpected_exception_envelope(request: Request, exc: Exception):
+    """Avoid exposing implementation details from unexpected API failures."""
+    audit.record(
+        "api.unexpected_error",
+        actor_type="system",
+        target_type="request",
+        target_id=request.url.path[:240],
+        outcome="error",
+        metadata={"exception_type": type(exc).__name__},
+    )
+    return api_error_response(
+        request,
+        status_code=500,
+        code="internal_error",
+        message="An unexpected server error occurred",
+    )
 
 
 # =========================================================
@@ -115,6 +228,86 @@ app = FastAPI(title="AutoCorp - AI agency for Egyptian SMEs", lifespan=lifespan)
 @app.middleware("http")
 async def subdomain_middleware(request: Request, call_next):
     """Allows accessing sites via subdomain like 3.localhost:8000 or koshary.localhost:8000."""
+    # Browser sessions are HttpOnly cookies. Mirror the signed value into the
+    # existing internal header interface so legacy route handlers never need a
+    # browser-readable bearer token.
+    request_id = request.headers.get("x-request-id", "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{8,80}", request_id):
+        request_id = uuid.uuid4().hex
+    request.state.request_id = request_id
+    # This is an operator-controlled containment switch for incident response
+    # and credential rotation. Read-only pages and probes remain available, but
+    # no API, Telegram, webhook, or generated-site write can change data.
+    if (
+        os.getenv("MAINTENANCE_MODE", "0") == "1"
+        and request.method not in {"GET", "HEAD", "OPTIONS"}
+    ):
+        response = api_error_response(
+            request,
+            status_code=503,
+            code="maintenance_mode",
+            message="Service is temporarily in read-only maintenance mode",
+        )
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Retry-After"] = "3600"
+        response.headers["X-Request-ID"] = request_id
+        return response
+    raw_headers = list(request.scope.get("headers", []))
+    raw_cookie = next((value for name, value in raw_headers if name.lower() == b"cookie"), b"")
+    cookies = SimpleCookie()
+    cookies.load(raw_cookie.decode("latin-1", "ignore"))
+    session_cookie = cookies.get("autocorp_session")
+    session = session_cookie.value.strip() if session_cookie else ""
+    # Cookie-authenticated browser writes must originate from this deployment or
+    # an explicitly configured first-party origin. Requests without an Origin
+    # header remain available to non-browser integrations authenticated by key.
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path.startswith("/api/"):
+        # Origin is absent on some browser navigations and can also be absent
+        # from non-browser callers. Fetch Metadata closes the browser case
+        # without breaking signed webhooks and server-to-server integrations.
+        if request.headers.get("sec-fetch-site", "").lower() == "cross-site":
+            return api_error_response(
+                request,
+                status_code=403,
+                code="cross_site_write_rejected",
+                message="Cross-site state-changing request rejected",
+            )
+        origin = request.headers.get("origin", "").rstrip("/")
+        if origin:
+            public_url = os.getenv("PUBLIC_URL", "").rstrip("/")
+            configured = {
+                value.strip().rstrip("/")
+                for value in os.getenv("TRUSTED_ORIGINS", "").split(",")
+                if value.strip()
+            }
+            allowed_origins = configured | ({public_url} if public_url else set())
+            # Host is supplied by the client. Only use it as a same-origin
+            # fallback on local development hosts; deployed environments must
+            # declare PUBLIC_URL or TRUSTED_ORIGINS explicitly.
+            host_name = request.headers.get("host", "").split(":", 1)[0].lower()
+            if not public_url and host_name in {"localhost", "127.0.0.1", "testserver"}:
+                allowed_origins.add(
+                    f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
+                )
+            if origin not in allowed_origins:
+                return api_error_response(
+                    request,
+                    status_code=403,
+                    code="cross_origin_write_rejected",
+                    message="Cross-origin state-changing request rejected",
+                )
+    # Existing clients may still send an empty legacy header. It must not block
+    # the HttpOnly session cookie from authenticating the request.
+    has_user_header = any(
+        name.lower() == b"x-user-token" and value.strip()
+        for name, value in raw_headers
+    )
+    if session and not has_user_header:
+        headers = raw_headers
+        headers.append((b"x-user-token", session.encode("latin-1", "ignore")))
+        headers.append((b"x-admin-key", session.encode("latin-1", "ignore")))
+        request.scope["headers"] = headers
+
     host = request.headers.get("host", "").split(":")[0].lower()
     parts = host.split(".")
     # If host has subdomain e.g. 'site-3' or 'koshary'
@@ -128,7 +321,37 @@ async def subdomain_middleware(request: Request, call_next):
             if row:
                 jid = row["job_id"]
                 request.scope["path"] = f"/sites/{jid}" + request.url.path
-    response = await call_next(request)
+    audit_context = audit.bind_request_id(request_id)
+    try:
+        response = await call_next(request)
+    finally:
+        # Audit events use task-local context and must never bleed into a
+        # concurrently handled request.
+        audit.reset_request_id(audit_context)
+    # A compact defence-in-depth baseline. The dashboard still relies on inline
+    # scripts and handlers, so it cannot honestly enforce script-src yet. These
+    # directives protect framing, plugin content, document bases, and form posts
+    # without weakening the future nonce-based script policy.
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'",
+    )
+    # A deployment that declares an HTTPS canonical public origin should never
+    # permit clients to silently downgrade future visits. Local HTTP work stays
+    # usable because it has no HTTPS PUBLIC_URL.
+    if os.getenv("PUBLIC_URL", "").strip().lower().startswith("https://"):
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+        )
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("X-Request-ID", request_id)
     return response
 
 
@@ -149,7 +372,37 @@ async def upload_file(
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
-    """Uploads logos, images, or PDF documents with PyMuPDF / pypdf text extraction."""
+    """Accept a small allow-list of authenticated image/PDF uploads safely."""
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    if not user:
+        raise HTTPException(401, "Authentication is required to upload a file")
+    if job_id is not None:
+        require_site_access(job_id, x_user_token, x_admin_key, authorization)
+    if not rate_limit.upload_limiter.allow(f"user:{user['id']}"):
+        raise HTTPException(
+            429,
+            "Upload limit reached. Try again later.",
+            headers={"Retry-After": "3600"},
+        )
+
+    raw_filename = file.filename or "upload"
+    ext = os.path.splitext(raw_filename)[1].lower()
+    if ext not in ALLOWED_UPLOADS:
+        raise HTTPException(415, "Only JPG, PNG, WEBP, and PDF files are allowed")
+    content_bytes = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not content_bytes or len(content_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Upload must be between 1 byte and 10 MB")
+    file_type, signature = ALLOWED_UPLOADS[ext]
+    if not content_bytes.startswith(signature):
+        raise HTTPException(415, "File content does not match its declared type")
+    if file_type == "image":
+        try:
+            content_bytes = sanitize_image_upload(content_bytes, ext)
+        except ValueError as exc:
+            raise HTTPException(415, str(exc)) from exc
+        if len(content_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Sanitized image exceeds the 10 MB limit")
+
     if IS_VERCEL:
         upload_dir = "/tmp/uploads"
     else:
@@ -163,13 +416,10 @@ async def upload_file(
     else:
         api_upload_dir = None
 
-    raw_filename = file.filename or "upload"
-    ext = os.path.splitext(raw_filename)[1].lower()
     clean_base = re.sub(r'[^a-zA-Z0-9_\-]', '_', os.path.splitext(raw_filename)[0])
-    safe_filename = f"{int(time.time())}_{clean_base[:30]}{ext}"
+    safe_filename = f"{secrets.token_urlsafe(18)}_{clean_base[:30]}{ext}"
     target_path = os.path.join(upload_dir, safe_filename)
 
-    content_bytes = await file.read()
     with open(target_path, "wb") as f:
         f.write(content_bytes)
 
@@ -181,32 +431,17 @@ async def upload_file(
             pass
 
     extracted_text = ""
-    file_type = "image" if ext in (".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif") else "pdf" if ext == ".pdf" else "document"
-
     if ext == ".pdf":
-        try:
-            import fitz
-            doc = fitz.open(stream=content_bytes, filetype="pdf")
-            pages_text = []
-            for page in doc:
-                t = page.get_text()
-                if t:
-                    pages_text.append(t)
-            extracted_text = "\n".join(pages_text).strip()
-        except Exception:
-            try:
-                import io, pypdf
-                reader = pypdf.PdfReader(io.BytesIO(content_bytes))
-                extracted_text = "\n".join([p.extract_text() or "" for p in reader.pages]).strip()
-            except Exception as e:
-                extracted_text = f"(تعذر استخراج النص من PDF: {e})"
-    elif ext in (".txt", ".md", ".json", ".csv"):
-        try:
-            extracted_text = content_bytes.decode("utf-8", errors="ignore")[:10000]
-        except Exception:
-            pass
-
-    file_url = f"/static/uploads/{safe_filename}"
+        extracted_text = extract_pdf_text(content_bytes)
+    # Brief PDFs are transient input, not public static assets. Images remain
+    # public because generated sites intentionally reference them.
+    if ext == ".pdf":
+        for stored_path in (target_path, os.path.join(api_upload_dir, safe_filename) if api_upload_dir else ""):
+            if stored_path and os.path.exists(stored_path):
+                os.remove(stored_path)
+        file_url = ""
+    else:
+        file_url = f"/static/uploads/{safe_filename}"
     if job_id:
         try:
             db.x(
@@ -230,16 +465,34 @@ async def upload_file(
 @app.get("/static/uploads/{filename}")
 @app.get("/uploads/{filename}")
 async def serve_uploaded_file(filename: str):
-    """Serves uploaded media and PDF documents."""
+    """Serve sanitized public site images, never arbitrary legacy upload files."""
     fn = os.path.basename(filename)
+    ext = os.path.splitext(fn)[1].lower()
+    # Only the random, portable image names created by the upload handlers are
+    # public. PDF briefs are transient, and old files must not become executable
+    # same-origin content merely because they remain on disk.
+    if (
+        fn != filename
+        or ext not in IMAGE_MEDIA_TYPES_BY_EXTENSION
+        or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}\.(?:jpg|jpeg|png|webp)", fn, re.IGNORECASE)
+    ):
+        raise HTTPException(404, "Uploaded image not found")
     candidates = [
         os.path.join(BASE, "static", "uploads", fn),
         os.path.join(BASE, "api", "static", "uploads", fn),
         os.path.join("/tmp", "uploads", fn)
     ]
     for p in candidates:
-        if os.path.exists(p):
-            return FileResponse(p)
+        if os.path.isfile(p):
+            return FileResponse(
+                p,
+                media_type=IMAGE_MEDIA_TYPES_BY_EXTENSION[ext],
+                headers={
+                    "Content-Disposition": f'inline; filename="{fn}"',
+                    "X-Content-Type-Options": "nosniff",
+                    "Cross-Origin-Resource-Policy": "same-site",
+                },
+            )
     raise HTTPException(404, "الملف غير موجود")
 
 
@@ -250,15 +503,46 @@ async def serve_uploaded_file(filename: str):
 # =========================================================
 def guard(env_names, key):
     need = next((os.getenv(n) for n in env_names if os.getenv(n)), "")
-    if need and key != need:
+    if not need:
+        raise HTTPException(503, "Required service credential is not configured")
+    if not hmac.compare_digest(str(key or ""), need):
         raise HTTPException(401, "Unauthorized: bad key")
 
+def require_security_feature(name: str, safe_replacement: str) -> None:
+    """Keep high-risk prototype features off until their safe replacement ships."""
+    if os.getenv(name, "0") != "1":
+        raise HTTPException(503, f"This prototype feature is disabled pending {safe_replacement}.")
+
+
 def admin(key):
-    admin_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
-    admin_key = os.getenv("ADMIN_KEY", "autocorp-admin-secret-2026")
-    if key in (admin_pwd, admin_key):
+    user = auth.get_active_user(str(key or ""))
+    if user and user.get("is_admin"):
         return
-    guard(["ADMIN_KEY"], key)
+    raise HTTPException(401, "Administrator session required")
+
+
+def session_response(payload: dict, token: str) -> JSONResponse:
+    """Issue a browser session without exposing the signed token to JavaScript."""
+    response = JSONResponse(payload)
+    configured_secure = os.getenv("COOKIE_SECURE", "").strip()
+    # Explicit configuration is useful for local HTTPS testing. Otherwise, an
+    # HTTPS canonical origin is enough evidence that browsers must never send
+    # the session on a cleartext connection.
+    secure_cookie = (
+        configured_secure == "1"
+        if configured_secure
+        else IS_VERCEL or os.getenv("PUBLIC_URL", "").strip().lower().startswith("https://")
+    )
+    response.set_cookie(
+        key="autocorp_session",
+        value=token,
+        max_age=auth.TOKEN_TTL_SECONDS,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 def get_user_from_headers(x_user_token: str = "", x_admin_key: str = "", authorization: str = "") -> Optional[dict]:
     token = x_user_token or x_admin_key
@@ -267,13 +551,28 @@ def get_user_from_headers(x_user_token: str = "", x_admin_key: str = "", authori
     if token:
         import urllib.parse
         token = urllib.parse.unquote(str(token).strip())
-    return auth.decode_token(token)
+    return auth.get_active_user(token)
 
 def require_site_access(jid: int, x_user_token: str = "", x_admin_key: str = "", authorization: str = "") -> dict:
     user = get_user_from_headers(x_user_token, x_admin_key, authorization)
     if not auth.verify_site_ownership(jid, user):
         raise HTTPException(403, "غير مصرح لك بالوصول لإعدادات أو تحميل هذا المتجر. يرجى تسجيل الدخول بحساب مالك المتجر أو المشرف العام.")
     return user or {}
+
+
+def safe_site_filename(filename: str) -> str:
+    """Accept only a portable relative path inside one tenant's artifact tree."""
+    name = str(filename or "").strip()
+    if not name or len(name) > 240 or "\\" in name or ":" in name or "\x00" in name:
+        raise HTTPException(400, "Invalid artifact filename")
+    # Check raw components before pathlib normalizes away dot and empty parts.
+    raw_parts = name.split("/")
+    if any(part in {"", ".", ".."} for part in raw_parts):
+        raise HTTPException(400, "Invalid artifact filename")
+    path = PurePosixPath(name)
+    if path.is_absolute() or any(part == ".." for part in path.parts):
+        raise HTTPException(400, "Invalid artifact filename")
+    return path.as_posix()
 
 
 ARABIC_TO_ENGLISH_WORDS = {
@@ -426,26 +725,64 @@ def is_store_creation_intent(text: str) -> bool:
 # Authentication APIs (Client & Admin)
 # =========================================================
 @app.post("/api/auth/register")
-def api_register(body: dict):
-    uname = (body.get("username") or "").strip()
-    pwd = (body.get("password") or "").strip()
-    phone = (body.get("phone") or "").strip()
+def api_register(body: RegisterRequest):
+    uname = body.username.strip()
+    pwd = body.password.strip()
+    phone = body.phone.strip()
     try:
         user = auth.register_user(uname, pwd, phone)
-        return {"ok": True, "user": user}
+        token = user.pop("token")
+        audit.record("identity.user_registered", actor_id=user["id"], target_type="user", target_id=str(user["id"]))
+        return session_response({"ok": True, "user": user}, token)
+    except RuntimeError:
+        raise HTTPException(503, "Authentication is not configured")
     except ValueError as e:
         raise HTTPException(400, str(e))
 
 
 @app.post("/api/auth/login")
-def api_login(body: dict):
-    uname = (body.get("username") or "").strip()
-    pwd = (body.get("password") or "").strip()
+def api_login(body: LoginRequest, request: Request):
+    uname = body.username.strip()
+    pwd = body.password.strip()
+    client_host = request.client.host if request.client else "unknown"
+    throttle_key = f"{client_host}:{uname.lower()[:80]}"
+    if not rate_limit.login_limiter.allow(throttle_key):
+        raise HTTPException(429, "Too many login attempts. Please try again later.")
     try:
         user = auth.login_user(uname, pwd)
-        return {"ok": True, "user": user}
+        token = user.pop("token")
+        rate_limit.login_limiter.reset(throttle_key)
+        audit.record("identity.login_succeeded", actor_id=user["id"], target_type="user", target_id=str(user["id"]))
+        return session_response({"ok": True, "user": user}, token)
+    except RuntimeError:
+        raise HTTPException(503, "Authentication is not configured")
     except ValueError as e:
+        audit.record("identity.login_failed", actor_type="anonymous", target_type="session", outcome="denied")
         raise HTTPException(401, str(e))
+
+
+@app.post("/api/auth/logout")
+def api_logout(
+    x_user_token: str = Header(default=""),
+    x_admin_key: str = Header(default=""),
+    authorization: str = Header(default=""),
+):
+    """Revoke the current session and clear its browser cookie."""
+    token = x_user_token or x_admin_key
+    if not token and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    if token:
+        user = auth.get_active_user(token)
+        if user and auth.revoke_token(token):
+            audit.record(
+                "identity.logout_succeeded",
+                actor_id=user.get("id"),
+                actor_type="administrator" if user.get("is_admin") else "user",
+                target_type="session",
+            )
+    response = JSONResponse({"ok": True})
+    response.delete_cookie("autocorp_session", path="/")
+    return response
 
 
 @app.get("/api/auth/me")
@@ -468,35 +805,57 @@ def api_me(
 
 
 @app.post("/api/admin/login")
-def admin_login(body: dict):
+def admin_login(body: AdminLoginRequest, request: Request):
     """Admin login verifying ADMIN_PASSWORD from environment."""
-    pwd = (body.get("password") or "").strip()
-    correct_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
-    admin_key = os.getenv("ADMIN_KEY", "autocorp-admin-secret-2026")
-    if pwd in (correct_pwd, admin_key):
-        return {
+    pwd = body.password.strip()
+    client_host = request.client.host if request.client else "unknown"
+    throttle_key = f"{client_host}:admin"
+    if not rate_limit.admin_login_limiter.allow(throttle_key):
+        raise HTTPException(429, "Too many administrator login attempts. Please try again later.")
+    try:
+        correct_pwd = auth.admin_password()
+    except RuntimeError:
+        raise HTTPException(503, "Administrator authentication is not configured")
+    if hmac.compare_digest(pwd, correct_pwd):
+        token = auth.generate_token(0, "admin", "admin")
+        rate_limit.admin_login_limiter.reset(throttle_key)
+        audit.record("identity.admin_login_succeeded", actor_id=0, actor_type="administrator", target_type="session")
+        return session_response({
             "ok": True,
-            "token": admin_key,
             "username": os.getenv("ADMIN_NAME", "المدير العام المشرف"),
             "role": "Super Admin & Agency Director"
-        }
+        }, token)
+    audit.record("identity.admin_login_failed", actor_type="anonymous", target_type="administrator", outcome="denied")
     raise HTTPException(401, "كلمة مرور المشرف غير صحيحة")
 
 
 # =========================================================
 # Job Creation & Planning
 # =========================================================
-def make_job(client, request, user_id=None, sync=False):
+def make_job(client, request, user_id=None, sync=False, idempotency_key=None, request_hash=None, defer_start=False):
     check_guardrails(request)
-    jid = db.x(
-        "insert into jobs(client,request,status,user_id,created_at) values(?,?,?,?,strftime('%s','now'))",
-        ((client or "web-client")[:80], request[:4000], "created", user_id)
-    )
-    if sync or IS_VERCEL:
-        return jid
+    try:
+        jid = db.x(
+            "INSERT INTO jobs(client, request, status, user_id, created_at, idempotency_key, request_hash) "
+            "VALUES (?, ?, ?, ?, strftime('%s','now'), ?, ?)",
+            ((client or "web-client")[:80], request[:4000], "created", user_id, idempotency_key, request_hash)
+        )
+    except Exception:
+        if idempotency_key:
+            existing = db.one(
+                "SELECT id, request_hash FROM jobs WHERE user_id=? AND idempotency_key=?",
+                (user_id, idempotency_key),
+            )
+            if existing:
+                if not hmac.compare_digest(existing.get("request_hash") or "", request_hash or ""):
+                    raise HTTPException(409, "Idempotency-Key was already used with a different request")
+                return existing["id"], False
+        raise
+    if sync or IS_VERCEL or defer_start:
+        return jid, True
     else:
         corp.spawn(corp.plan_job(jid))
-        return jid
+        return jid, True
 
 
 @app.get("/")
@@ -515,6 +874,21 @@ def home():
     return HTMLResponse("<h1>AutoCorp AI Agency</h1><p>Running on Vercel</p>", media_type="text/html")
 
 
+@app.get("/api/healthz")
+def healthz():
+    """Secret-free readiness probe for load balancers and deployment checks."""
+    status = runtime.runtime_security_status()
+    try:
+        db.one("SELECT 1 AS ready")
+        status["database_ready"] = True
+    except Exception:
+        # Keep database failures distinct from configuration failures and never
+        # return a connection string or backend exception through this route.
+        status["database_ready"] = False
+        status["ready"] = False
+    return JSONResponse(status, status_code=200 if status["ready"] else 503)
+
+
 @app.get("/bot_avatar.jpg")
 def bot_avatar():
     candidates = [
@@ -530,11 +904,14 @@ def bot_avatar():
 
 @app.post("/api/jobs")
 async def new_job(
-    body: dict,
+    body: ProjectCreateRequest,
+    request: Request,
+    idempotency_key: str = Header(default="", alias="Idempotency-Key"),
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
+    body_data = body.model_dump(exclude_unset=True)
     user = get_user_from_headers(x_user_token, x_admin_key, authorization)
     if not user:
         raise HTTPException(401, "يرجى تسجيل الدخول أو إنشاء حساب أولاً قبل إطلاق وبناء المتجر.")
@@ -544,10 +921,10 @@ async def new_job(
         auth.check_user_limit(user)
     except ValueError as e:
         raise HTTPException(403, str(e))
-    req = (body.get("request") or "").strip()
-    brand_name = (body.get("brand_name") or body.get("client") or "").strip()
-    category = (body.get("category") or "").strip()
-    slogan = (body.get("slogan") or "").strip()
+    req = (body_data.get("request") or "").strip()
+    brand_name = (body_data.get("brand_name") or body_data.get("client") or "").strip()
+    category = (body_data.get("category") or "").strip()
+    slogan = (body_data.get("slogan") or "").strip()
     
     # Build a structured request if user used the visual wizard
     full_req = req
@@ -559,11 +936,11 @@ async def new_job(
             parts.append(f"الشعار التسويقي: {slogan}")
         if req:
             parts.append(f"تفاصيل الطلب: {req}")
-        if body.get("extracted_text"):
-            parts.append(f"\n[مستند/كتالوج/منيو مرفق من العميل]:\n{body.get('extracted_text')[:3500]}")
+        if body_data.get("extracted_text"):
+            parts.append(f"\n[مستند/كتالوج/منيو مرفق من العميل]:\n{body_data['extracted_text'][:3500]}")
         
         # AI answers
-        ai_answers = body.get("ai_answers") or []
+        ai_answers = body_data.get("ai_answers") or []
         for ans in ai_answers:
             if ans.get("a"):
                 parts.append(f"- {ans.get('label', 'ملاحظة')}: {ans.get('a')}")
@@ -572,10 +949,52 @@ async def new_job(
     if not full_req:
         raise HTTPException(400, "طلب المشروع أو بيانات المتجر مطلوبة")
     check_guardrails(full_req)
-    
-    sync = body.get("sync", False) or IS_VERCEL
-    client_name = brand_name or body.get("client") or user.get("username") or "عميل-AutoCorp"
-    jid = make_job(client_name, full_req, user_id=user.get("id"), sync=sync)
+
+    idempotency_key = idempotency_key.strip()
+    idempotency_scope = f"job-create:{user['id']}"
+    request_hash = ""
+    if idempotency_key:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", idempotency_key):
+            raise HTTPException(400, "Invalid Idempotency-Key format")
+        request_hash = hashlib.sha256(
+            json.dumps(await request.json(), sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        existing = db.one(
+            "SELECT request_hash, job_id FROM idempotency_records WHERE scope=? AND idempotency_key=?",
+            (idempotency_scope, idempotency_key),
+        )
+        if existing:
+            if not hmac.compare_digest(existing["request_hash"], request_hash):
+                raise HTTPException(409, "Idempotency-Key was already used with a different request")
+            if existing.get("job_id"):
+                return {"id": existing["job_id"], "duplicate": True, "message": "Duplicate request reused the original project."}
+            raise HTTPException(409, "An equivalent project request is already being processed")
+
+        existing_job = db.one(
+            "SELECT id, request_hash FROM jobs WHERE user_id=? AND idempotency_key=?",
+            (user["id"], idempotency_key),
+        )
+        if existing_job:
+            if not hmac.compare_digest(existing_job.get("request_hash") or "", request_hash):
+                raise HTTPException(409, "Idempotency-Key was already used with a different request")
+            return {"id": existing_job["id"], "duplicate": True, "message": "Duplicate request reused the original project."}
+
+    # Never let a browser select synchronous generation or trigger expensive
+    # model work inline; serverless hosting decides its supported path.
+    sync = IS_VERCEL
+    client_name = brand_name or body_data.get("client") or user.get("username") or "عميل-AutoCorp"
+    jid, created = make_job(
+        client_name,
+        full_req,
+        user_id=user.get("id"),
+        sync=sync,
+        idempotency_key=idempotency_key or None,
+        request_hash=request_hash or None,
+        defer_start=True,
+    )
+    if not created:
+        return {"id": jid, "duplicate": True, "message": "Duplicate request reused the original project."}
+    audit.record("site.job_created", actor_id=user["id"], target_type="job", target_id=str(jid))
     
     # Save site settings
     db.x("""
@@ -585,30 +1004,30 @@ async def new_job(
             cod_enabled, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        jid, brand_name, category, body.get("custom_domain") or "",
-        body.get("color_primary") or "", body.get("color_secondary") or "",
-        body.get("logo_url") or "", body.get("phone") or "", body.get("whatsapp") or "",
-        body.get("address") or "", body.get("vodafone_cash") or "", body.get("instapay") or "",
-        body.get("fawry_code") or "", 1 if body.get("cod_enabled", True) else 0,
+        jid, brand_name, category, body_data.get("custom_domain") or "",
+        body_data.get("color_primary") or "", body_data.get("color_secondary") or "",
+        body_data.get("logo_url") or "", body_data.get("phone") or "", body_data.get("whatsapp") or "",
+        body_data.get("address") or "", body_data.get("vodafone_cash") or "", body_data.get("instapay") or "",
+        body_data.get("fawry_code") or "", 1 if body_data.get("cod_enabled", True) else 0,
         time.time()
     ))
 
     # Record uploaded logo and document into site_files
-    if body.get("logo_url"):
+    if body_data.get("logo_url"):
         try:
             db.x("INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, ?, 'image', 'شعار المتجر', ?, ?)",
-                 (jid, os.path.basename(body.get("logo_url")), body.get("logo_url"), time.time()))
+                 (jid, os.path.basename(body_data.get("logo_url")), body_data.get("logo_url"), time.time()))
         except Exception:
             pass
-    if body.get("extracted_text"):
+    if body_data.get("extracted_text"):
         try:
             db.x("INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, 'document.pdf', 'pdf', ?, '', ?)",
-                 (jid, body.get("extracted_text")[:4000], time.time()))
+                 (jid, body_data.get("extracted_text")[:4000], time.time()))
         except Exception:
             pass
     
     # Save manual items if provided
-    items = body.get("items") or []
+    items = body_data.get("items") or []
     for it in items:
         if it.get("title"):
             db.x("""
@@ -618,6 +1037,11 @@ async def new_job(
                 jid, it.get("title"), float(it.get("price") or 0), it.get("category") or "عام",
                 it.get("description") or "", it.get("badge") or "", it.get("image_url") or "", time.time()
             ))
+
+    # Do not let planning race ahead of the wizard's settings, files, and
+    # catalog writes. Persist the complete initial brief before starting work.
+    if not sync:
+        corp.spawn(corp.plan_job(jid))
             
     if sync:
         try:
@@ -632,12 +1056,12 @@ async def new_job(
 
 @app.post("/api/hooks/job")
 async def hook_job(body: dict, x_hook_key: str = Header(default="")):
-    guard(["HOOK_KEY", "ADMIN_KEY"], x_hook_key)
+    guard(["HOOK_KEY"], x_hook_key)
     req = (body.get("request") or "").strip()
     if not req:
         raise HTTPException(400, "طلب المشروع مطلوب")
     check_guardrails(req)
-    jid = make_job(body.get("client") or "webhook", req, sync=IS_VERCEL)
+    jid, _created = make_job(body.get("client") or "webhook", req, sync=IS_VERCEL)
     if IS_VERCEL:
         try:
             await corp.plan_job(jid)
@@ -648,25 +1072,53 @@ async def hook_job(body: dict, x_hook_key: str = Header(default="")):
 
 @app.get("/api/jobs")
 def get_jobs(
+    limit: int = Query(default=40, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
     user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    if not user:
+        raise HTTPException(401, "Authentication is required")
+    where = ""
+    args: tuple = ()
+    if not user.get("is_admin"):
+        where = "WHERE j.user_id = ?"
+        args = (user["id"],)
+    total_row = db.one("SELECT COUNT(*) AS total FROM jobs j " + where, args)
+    total = int((total_row or {}).get("total") or 0)
     rows = db.q("""
         SELECT j.*, 
                s.brand_name,
                (select count(*) from site_orders where job_id = j.id) as orders_count 
         FROM jobs j 
         LEFT JOIN site_settings s ON s.job_id = j.id
-        ORDER BY j.id desc limit 40
-    """)
+        """ + where + """
+        ORDER BY j.id desc LIMIT ? OFFSET ?
+    """, args + (limit, offset))
+    page_headers = {
+        "X-Total-Count": str(total),
+        "X-Page-Limit": str(limit),
+    }
+    next_offset = offset + len(rows)
+    if next_offset < total:
+        page_headers["X-Next-Offset"] = str(next_offset)
     if not rows:
-        return []
+        return JSONResponse(content=[], headers=page_headers)
         
     jids = [j["id"] for j in rows]
     placeholders = ",".join("?" for _ in jids)
-    events_raw = db.q(f"select job_id, msg from events where job_id in ({placeholders}) order by id desc", tuple(jids))
+    events_raw = db.q(f"""
+        SELECT job_id, msg FROM (
+            SELECT job_id, msg,
+                   ROW_NUMBER() OVER (PARTITION BY job_id ORDER BY id DESC) AS event_rank
+            FROM events
+            WHERE job_id IN ({placeholders})
+        ) recent_events
+        WHERE event_rank <= 8
+        ORDER BY job_id, event_rank
+    """, tuple(jids))
     
     events_by_job = {}
     for ev in events_raw:
@@ -694,7 +1146,7 @@ def get_jobs(
         j["orders_count"] = int(j.get("orders_count") or 0)
         j["is_paid"] = bool(j.get("is_paid", 0))
         j["can_manage"] = auth.verify_site_ownership(j_id, user)
-    return rows
+    return JSONResponse(content=rows, headers=page_headers)
 
 
 @app.get("/api/jobs/{jid}")
@@ -708,6 +1160,8 @@ def get_job_detail(
     j = db.one("select * from jobs where id=?", (jid,))
     if not j:
         raise HTTPException(404, "المشروع غير موجود")
+    if not auth.verify_site_ownership(jid, user):
+        raise HTTPException(403, "You are not authorized to view this project")
     j["events"] = db.q("select ts,msg from events where job_id=? order by id", (jid,))
     j["contracts"] = db.q("select from_agent,to_agent,sha256,preview from contracts where job_id=? order by id", (jid,))
     slug = make_site_slug(jid, j.get("client") or "")
@@ -724,10 +1178,9 @@ def get_job_detail(
 
 
 @app.post("/api/jobs/{jid}/decision")
-async def job_decision(jid: int, body: dict, x_admin_key: str = Header(default="")):
+async def job_decision(jid: int, body: JobDecisionRequest, x_admin_key: str = Header(default="")):
     admin(x_admin_key)
-    decision = body.get("decision", "approve")
-    return await corp.decide(jid, decision)
+    return await corp.decide(jid, body.decision)
 
 
 # =========================================================
@@ -766,7 +1219,7 @@ async def serve_site(slug_or_id: str):
 
 @app.get("/api/sites/{slug_or_id}/info")
 def site_backend_info(slug_or_id: str):
-    """Backend API: Returns site metadata, active routes, and gateway status."""
+    """Return public site metadata without exposing integration configuration."""
     jid = resolve_job_id(slug_or_id)
     job = db.one("select * from jobs where id=?", (jid,))
     if not job:
@@ -786,20 +1239,17 @@ def site_backend_info(slug_or_id: str):
         "backend_routes": [
             {"method": "GET", "path": f"/api/sites/{jid}/info", "desc": "معلومات الموقع والباك إند"},
             {"method": "GET", "path": f"/api/sites/{jid}/items", "desc": "قائمة المنتجات والمنيو"},
-            {"method": "POST", "path": f"/api/sites/{jid}/orders", "desc": "إنشاء طلب جديد ودفع إلكتروني"},
+            {"method": "POST", "path": f"/api/sites/{jid}/orders", "desc": "إنشاء طلب بانتظار تأكيد التاجر"},
             {"method": "GET", "path": f"/api/sites/{jid}/orders", "desc": "عرض طلبات العملاء"}
         ],
         "stats": {
             "total_orders": orders_c,
             "catalog_items": items_c
         },
-        "payment_gateways": {
-            "vodafone_cash": os.getenv("VODAFONE_CASH_WALLET", "01023456789"),
-            "fawry": os.getenv("FAWRY_MERCHANT_CODE", "10101"),
-            "instapay": os.getenv("INSTAPAY_ADDRESS", "sme.egypt@instapay"),
-            "paymob_card": bool(os.getenv("PAYMOB_API_KEY")),
-            "cash_on_delivery": True
-        }
+        "payment_processing": {
+            "enabled": False,
+            "status": "pending_verified_gateway_integration",
+        },
     }
 
 
@@ -818,32 +1268,143 @@ def site_backend_items(slug_or_id: str):
 
 
 @app.post("/api/sites/{slug_or_id}/orders")
-async def site_backend_place_order(slug_or_id: str, body: dict):
-    """Backend API: Processes real orders and bookings submitted from the generated frontend."""
+async def site_backend_place_order(
+    slug_or_id: str,
+    body: SiteOrderCreateRequest,
+    request: Request,
+    idempotency_key: str = Header(default="", alias="Idempotency-Key"),
+):
+    """Record a public order request; this endpoint never confirms a payment."""
     jid = resolve_job_id(slug_or_id)
-    cust_name = str(body.get("customer_name") or "عميل كريم")[:100]
-    cust_phone = str(body.get("customer_phone") or "")[:30]
-    cust_addr = str(body.get("customer_address") or "استلام من الفرع")[:200]
-    items = body.get("items") or []
-    total_egp = float(body.get("total_egp") or 0.0)
-    pay_method = str(body.get("payment_method") or "cash")[:30]
-    
-    if pay_method.lower() in ("fawry", "fawry_pay"):
-        ref_code = f"FAWRY-{random.randint(10000000, 99999999)}"
-        pay_note = f"ادفع برقم فوري {ref_code} خلال 48 ساعة"
-    elif "vodafone" in pay_method.lower() or "wallet" in pay_method.lower():
-        ref_code = f"VF-{random.randint(100000, 999999)}"
-        pay_note = f"تم التحويل لمحفظة {os.getenv('VODAFONE_CASH_WALLET', '01023456789')}"
-    elif "instapay" in pay_method.lower():
-        ref_code = f"IP-{random.randint(100000, 999999)}"
-        pay_note = f"تحويل إنستاباي إلى {os.getenv('INSTAPAY_ADDRESS', 'sme.egypt@instapay')}"
-    else:
-        ref_code = f"COD-{random.randint(1000, 9999)}"
-        pay_note = "الدفع نقداً عند استلام الأوردر"
+    client_host = request.client.host if request.client else "unknown"
+    if not rate_limit.public_order_limiter.allow(f"{client_host}:{jid}"):
+        raise HTTPException(429, "Too many order submissions. Please try again later.")
 
-    order_id = db.x(
-        "insert into site_orders(job_id, customer_name, customer_phone, customer_address, items_json, total_egp, payment_method, payment_ref, status, created_at) values(?,?,?,?,?,?,?,?,?,?)",
-        (jid, cust_name, cust_phone, cust_addr, json.dumps(items, ensure_ascii=False), total_egp, pay_method, ref_code, "confirmed", time.time())
+    submitted_items = body.items
+    if not isinstance(submitted_items, list) or not submitted_items or len(submitted_items) > 20:
+        raise HTTPException(422, "At least one and at most twenty order items are required")
+    pay_method = body.payment_method.strip().lower()
+    supported_methods = {
+        "cash", "cash_on_delivery", "cod", "fawry", "fawry_pay",
+        "vodafone_cash", "wallet", "instapay", "contract_invoice",
+    }
+    if pay_method not in supported_methods:
+        raise HTTPException(422, "Unsupported payment method")
+    catalog = db.q("SELECT id, title, price FROM site_items WHERE job_id=?", (jid,))
+    is_quote_request = not catalog and pay_method == "contract_invoice"
+    if not catalog and not is_quote_request:
+        raise HTTPException(422, "This site has no active catalog")
+    by_id = {str(item["id"]): item for item in catalog}
+    by_title = {str(item.get("title") or "").strip(): item for item in catalog}
+    validated_items = []
+    server_total = 0.0
+    for submitted in submitted_items:
+        submitted = submitted.model_dump(exclude_none=True)
+        if is_quote_request:
+            title = str(submitted.get("title") or "").strip()
+            if not 2 <= len(title) <= 200:
+                raise HTTPException(422, "Each requested service needs a title")
+            validated_items.append({"title": title, "unit_price": None, "quantity": 1})
+            continue
+        item = by_id.get(str(submitted.get("id") or "")) or by_title.get(str(submitted.get("title") or "").strip())
+        try:
+            quantity = int(submitted.get("quantity") or 0)
+        except (TypeError, ValueError):
+            quantity = 0
+        if not item or quantity < 1 or quantity > 50:
+            raise HTTPException(422, "Each item must reference the active catalog with quantity 1-50")
+        unit_price = round(float(item.get("price") or 0), 2)
+        server_total += unit_price * quantity
+        validated_items.append({"id": item["id"], "title": item["title"], "unit_price": unit_price, "quantity": quantity})
+    cust_name = body.customer_name.strip()
+    cust_phone = body.customer_phone.strip()
+    cust_addr = body.customer_address.strip() or "استلام من الفرع"
+    if len(cust_name.strip()) < 2 or len(cust_phone.strip()) < 6:
+        raise HTTPException(422, "A customer name and phone number are required")
+
+    idempotency_key = idempotency_key.strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", idempotency_key):
+        raise HTTPException(400, "A valid Idempotency-Key header is required")
+    idempotency_scope = f"public-order:{jid}"
+    request_hash = hashlib.sha256(
+        json.dumps(await request.json(), sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    # Read legacy reservations written before the order row carried its own key.
+    legacy_record = db.one(
+        "SELECT request_hash, order_id FROM idempotency_records WHERE scope=? AND idempotency_key=?",
+        (idempotency_scope, idempotency_key),
+    )
+    if legacy_record:
+        if not hmac.compare_digest(legacy_record["request_hash"], request_hash):
+            raise HTTPException(409, "Idempotency-Key was already used with a different request")
+        if legacy_record.get("order_id"):
+            order = db.one("SELECT id, total_egp, payment_method, payment_ref, status FROM site_orders WHERE id=?", (legacy_record["order_id"],))
+            if order:
+                return {
+                    "success": True, "duplicate": True, "order_id": order["id"],
+                    "total_egp": order["total_egp"], "payment_method": order["payment_method"],
+                    "payment_ref": order["payment_ref"], "status": order["status"],
+                    "payment_processed": False, "merchant_confirmation_required": True,
+                }
+        raise HTTPException(409, "An equivalent order request is already being processed")
+
+    # The durable unique key and order data now live in the same row. A single
+    # insert makes retries safe without a vulnerable reserve-then-update gap.
+    existing = db.one(
+        "SELECT id, request_hash, total_egp, payment_method, payment_ref, status "
+        "FROM site_orders WHERE job_id=? AND idempotency_key=?",
+        (jid, idempotency_key),
+    )
+    if existing:
+        if not hmac.compare_digest(existing.get("request_hash") or "", request_hash):
+            raise HTTPException(409, "Idempotency-Key was already used with a different request")
+        return {
+            "success": True, "duplicate": True, "order_id": existing["id"],
+            "total_egp": existing["total_egp"], "payment_method": existing["payment_method"],
+            "payment_ref": existing["payment_ref"], "status": existing["status"],
+            "payment_processed": False, "merchant_confirmation_required": True,
+        }
+    # Prices and line items always come from the tenant catalog. The browser's
+    # total is intentionally ignored because it is not an authority on price.
+    # Quote requests carry no price until a merchant supplies one.
+    items = validated_items
+    total_egp = 0.0 if is_quote_request else round(server_total, 2)
+    ref_code = f"ORDER-{secrets.token_urlsafe(8).upper()}"
+    pay_note = "Order received. Payment and fulfilment require merchant confirmation."
+
+    try:
+        order_id = db.x(
+            "INSERT INTO site_orders(job_id, customer_name, customer_phone, customer_address, "
+            "items_json, total_egp, payment_method, payment_ref, status, created_at, idempotency_key, request_hash) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                jid, cust_name, cust_phone, cust_addr, json.dumps(items, ensure_ascii=False),
+                total_egp, pay_method, ref_code, "pending_confirmation", time.time(), idempotency_key, request_hash,
+            ),
+        )
+    except Exception:
+        # Another worker may have committed the same key after our lookup.
+        existing = db.one(
+            "SELECT id, request_hash, total_egp, payment_method, payment_ref, status "
+            "FROM site_orders WHERE job_id=? AND idempotency_key=?",
+            (jid, idempotency_key),
+        )
+        if existing:
+            if not hmac.compare_digest(existing.get("request_hash") or "", request_hash):
+                raise HTTPException(409, "Idempotency-Key was already used with a different request")
+            return {
+                "success": True, "duplicate": True, "order_id": existing["id"],
+                "total_egp": existing["total_egp"], "payment_method": existing["payment_method"],
+                "payment_ref": existing["payment_ref"], "status": existing["status"],
+                "payment_processed": False, "merchant_confirmation_required": True,
+            }
+        raise
+    audit.record(
+        "commerce.order_received",
+        actor_type="public_customer",
+        target_type="order",
+        target_id=str(order_id),
+        metadata={"job_id": jid, "payment_method": pay_method, "item_count": len(items)},
     )
     
     corp.log(jid, f"📦 أوردر جديد #{order_id} من {cust_name} بمبلغ {total_egp} ج.م ({pay_method}) - كود: {ref_code}")
@@ -856,8 +1417,11 @@ async def site_backend_place_order(slug_or_id: str, body: dict):
         "payment_method": pay_method,
         "payment_ref": ref_code,
         "payment_note": pay_note,
-        "status": "confirmed",
-        "message": "تم استلام وتأكيد طلبك بنجاح وجاري تجهيزه للتسليم!"
+        "status": "pending_confirmation",
+        "payment_processed": False,
+        "merchant_confirmation_required": True,
+        "quote_required": is_quote_request,
+        "message": "Your order request was received and awaits merchant confirmation."
     }
 
 
@@ -888,13 +1452,33 @@ def get_site_settings(
 @app.post("/api/sites/{slug_or_id}/settings")
 def update_site_settings(
     slug_or_id: str,
-    body: dict,
+    body: SiteSettingsPatchRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    patch = body.model_dump(exclude_unset=True)
+    if not patch:
+        raise HTTPException(400, "At least one site setting must be provided")
+    current = db.one("select * from site_settings where job_id=?", (jid,)) or {}
+    merged = {
+        key: current.get(key)
+        for key in (
+            "brand_name", "category", "custom_domain", "color_primary", "color_secondary",
+            "logo_url", "phone", "whatsapp", "address", "vodafone_cash", "instapay",
+            "fawry_code", "cod_enabled",
+        )
+    }
+    for key, value in patch.items():
+        # Null clears text settings; omission preserves them. Boolean null is
+        # treated as omitted so it cannot accidentally disable checkout.
+        if value is not None:
+            merged[key] = value
+        elif key != "cod_enabled":
+            merged[key] = ""
+
     db.x("""
         INSERT OR REPLACE INTO site_settings (
             job_id, brand_name, category, custom_domain, color_primary, color_secondary,
@@ -902,15 +1486,15 @@ def update_site_settings(
             cod_enabled, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        jid, body.get("brand_name"), body.get("category"), body.get("custom_domain"),
-        body.get("color_primary"), body.get("color_secondary"), body.get("logo_url"),
-        body.get("phone"), body.get("whatsapp"), body.get("address"), body.get("vodafone_cash"),
-        body.get("instapay"), body.get("fawry_code"), 1 if body.get("cod_enabled", True) else 0,
+        jid, merged.get("brand_name"), merged.get("category"), merged.get("custom_domain"),
+        merged.get("color_primary"), merged.get("color_secondary"), merged.get("logo_url"),
+        merged.get("phone"), merged.get("whatsapp"), merged.get("address"), merged.get("vodafone_cash"),
+        merged.get("instapay"), merged.get("fawry_code"), 1 if merged.get("cod_enabled", True) else 0,
         time.time()
     ))
     job_row = db.one("select * from jobs where id=?", (jid,)) or {}
     items_rows = db.q("select * from site_items where job_id=?", (jid,))
-    new_html = builder.build_site_html(jid, job_row.get("client") or "", job_row.get("request") or "", settings=body, items=items_rows)
+    new_html = builder.build_site_html(jid, job_row.get("client") or "", job_row.get("request") or "", settings=merged, items=items_rows)
     db.x("update site_pages set html=? where job_id=?", (new_html, jid))
     d = os.path.join(corp.SITES, str(jid))
     if os.path.exists(d):
@@ -975,7 +1559,7 @@ def export_site_zip(
 @app.post("/api/sites/{slug_or_id}/deploy-github")
 async def deploy_site_github(
     slug_or_id: str,
-    body: dict,
+    body: GitHubDeployRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
@@ -984,14 +1568,18 @@ async def deploy_site_github(
     import base64
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    require_security_feature(
+        "ENABLE_DIRECT_DEPLOYMENT",
+        "a server-side deployment integration with short-lived OAuth credentials",
+    )
     
-    token = (body.get("github_token") or "").strip()
+    token = body.github_token.strip()
     if not token:
         raise HTTPException(400, "يرجى إدخال رمز الوصول الشخصي (GitHub Personal Access Token)")
         
-    repo_name = (body.get("repo_name") or f"autocorp-site-{jid}").strip()
+    repo_name = (body.repo_name or f"autocorp-site-{jid}").strip()
     repo_name = re.sub(r'[^a-zA-Z0-9\-_]', '-', repo_name).strip('-')
-    is_private = bool(body.get("is_private", False))
+    is_private = body.is_private
 
     row = db.one("select * from site_pages where job_id=?", (jid,))
     if not row or not row.get("html"):
@@ -1079,7 +1667,7 @@ async def deploy_site_github(
 @app.post("/api/sites/{slug_or_id}/deploy-vercel")
 async def deploy_site_vercel(
     slug_or_id: str,
-    body: dict,
+    body: VercelDeployRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
@@ -1087,10 +1675,14 @@ async def deploy_site_vercel(
     """Deploys the site directly to Vercel using Deploy Hook or Vercel Token."""
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    require_security_feature(
+        "ENABLE_DIRECT_DEPLOYMENT",
+        "a server-side deployment integration with short-lived OAuth credentials",
+    )
     
-    deploy_hook = (body.get("deploy_hook") or "").strip()
-    vercel_token = (body.get("vercel_token") or "").strip()
-    project_name = (body.get("project_name") or f"autocorp-site-{jid}").strip().lower()
+    deploy_hook = body.deploy_hook.strip()
+    vercel_token = body.vercel_token.strip()
+    project_name = (body.project_name or f"autocorp-site-{jid}").strip().lower()
     project_name = re.sub(r'[^a-z0-9\-]', '-', project_name).strip('-')
 
     row = db.one("select * from site_pages where job_id=?", (jid,))
@@ -1154,27 +1746,25 @@ async def deploy_site_vercel(
 @app.get("/api/sites/{slug_or_id}/deploy-status")
 async def get_vercel_deploy_status(
     slug_or_id: str,
-    deployment_id: str,
-    vercel_token: str,
+    request: Request,
+    deployment_id: str = Query(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$"),
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
-    
-    headers = {"Authorization": f"Bearer {vercel_token}"}
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        r = await client.get(f"https://api.vercel.com/v13/deployments/{deployment_id}", headers=headers)
-        if r.status_code == 200:
-            d = r.json()
-            return {
-                "ok": True,
-                "status": d.get("readyState"),
-                "url": "https://" + d.get("url") if d.get("url") else None,
-                "error": d.get("error")
-            }
-        return {"ok": False, "status": "UNKNOWN"}
+    if "vercel_token" in request.query_params:
+        raise HTTPException(400, "Do not send provider credentials in query strings")
+    require_security_feature(
+        "ENABLE_DIRECT_DEPLOYMENT",
+        "a server-side deployment integration that never accepts a token in a URL",
+    )
+
+    # Status lookup needs a server-managed provider installation bound to this
+    # site. Keep it unavailable until that integration and deployment record
+    # exist; a caller-provided token is never accepted here.
+    raise HTTPException(503, "Deployment status is unavailable until a server-side provider integration is configured")
 
 
 @app.post("/api/sites/{slug_or_id}/activate-payment")
@@ -1187,6 +1777,10 @@ def activate_site_payment(
 ):
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    require_security_feature(
+        "ENABLE_DEMO_PAYMENT_ACTIVATION",
+        "a verified payment gateway adapter, signed webhooks, and an immutable payment ledger",
+    )
     method = (body.get("payment_method") or "vodafone_cash").strip()
     ref = (body.get("payment_ref") or "DIRECT_PAY").strip()
     amount = float(body.get("amount") or 299.0)
@@ -1207,6 +1801,78 @@ def activate_site_payment(
 # =========================================================
 # Project Lifecycle: Super Admin Deletion & Cleanup
 # =========================================================
+def cleanup_tenant_uploads(job_id: int) -> None:
+    """Remove local upload copies belonging only to the tenant being deleted."""
+    try:
+        files = db.q(
+            "SELECT filename, file_url FROM site_files WHERE job_id=?", (job_id,)
+        )
+        for file_record in files:
+            file_url = str(file_record.get("file_url") or "")
+            prefix = "/static/uploads/"
+            if not file_url.startswith(prefix):
+                continue
+
+            filename = file_url[len(prefix):]
+            # The database must never select a path outside the upload directory.
+            if not filename or filename != os.path.basename(filename):
+                continue
+            if filename != str(file_record.get("filename") or ""):
+                continue
+
+            shared = db.one(
+                "SELECT id FROM site_files WHERE job_id != ? AND file_url=? LIMIT 1",
+                (job_id, file_url),
+            )
+            if shared:
+                continue
+
+            upload_dirs = (
+                os.path.join(BASE, "static", "uploads"),
+                os.path.join(BASE, "api", "static", "uploads"),
+                os.path.join("/tmp", "uploads"),
+            )
+            for upload_dir in upload_dirs:
+                candidate = os.path.join(upload_dir, filename)
+                try:
+                    if os.path.isfile(candidate):
+                        os.remove(candidate)
+                except OSError:
+                    # Database deletion should not fail because an optional local
+                    # replica is already gone or is read-only in serverless hosting.
+                    continue
+    except Exception as exc:
+        print(f"[TENANT UPLOAD CLEANUP ERR] {type(exc).__name__}")
+
+
+def delete_tenant_records(job_id: int) -> None:
+    """Delete a tenant's operational data without erasing audit evidence."""
+    order_rows = db.q("SELECT id FROM site_orders WHERE job_id=?", (job_id,))
+    cleanup_tenant_uploads(job_id)
+    for table_name in (
+        "site_pages",
+        "site_items",
+        "site_orders",
+        "site_settings",
+        "site_files",
+        "site_automations",
+        "site_bot_configs",
+        "tenant_databases",
+        "tenant_records",
+        "tenant_queries_log",
+        "site_security_audits",
+        "events",
+        "contracts",
+        "ledger",
+        "posts",
+    ):
+        db.x(f"DELETE FROM {table_name} WHERE job_id=?", (job_id,))
+    db.x("DELETE FROM idempotency_records WHERE job_id=?", (job_id,))
+    for order in order_rows:
+        db.x("DELETE FROM idempotency_records WHERE order_id=?", (order["id"],))
+    db.x("DELETE FROM jobs WHERE id=?", (job_id,))
+
+
 @app.delete("/api/sites/{slug_or_id}")
 async def delete_site(
     slug_or_id: str,
@@ -1216,23 +1882,17 @@ async def delete_site(
 ):
     """Deletes a site completely across all tables and on-disk files."""
     jid = resolve_job_id(slug_or_id)
-    require_site_access(jid, x_user_token, x_admin_key, authorization)
+    actor = require_site_access(jid, x_user_token, x_admin_key, authorization)
+    audit.record(
+        "site.deletion_requested",
+        actor_id=actor.get("id"),
+        actor_type="administrator" if actor.get("is_admin") else "user",
+        target_type="job",
+        target_id=str(jid),
+    )
 
-    # 1. Delete DB records across all tables
-    db.x("DELETE FROM jobs WHERE id=?", (jid,))
-    db.x("DELETE FROM site_pages WHERE job_id=?", (jid,))
-    db.x("DELETE FROM site_items WHERE job_id=?", (jid,))
-    db.x("DELETE FROM site_orders WHERE job_id=?", (jid,))
-    db.x("DELETE FROM site_settings WHERE job_id=?", (jid,))
-    db.x("DELETE FROM site_files WHERE job_id=?", (jid,))
-    db.x("DELETE FROM site_automations WHERE job_id=?", (jid,))
-    db.x("DELETE FROM site_bot_configs WHERE job_id=?", (jid,))
-    db.x("DELETE FROM tenant_databases WHERE job_id=?", (jid,))
-    db.x("DELETE FROM tenant_records WHERE job_id=?", (jid,))
-    db.x("DELETE FROM tenant_queries_log WHERE job_id=?", (jid,))
-    db.x("DELETE FROM events WHERE job_id=?", (jid,))
-    db.x("DELETE FROM contracts WHERE job_id=?", (jid,))
-    db.x("DELETE FROM ledger WHERE job_id=?", (jid,))
+    # 1. Delete operational tenant records while retaining the audit event above.
+    delete_tenant_records(jid)
 
     # 2. Delete local directory if exists
     site_dir = os.path.join(corp.SITES, str(jid))
@@ -1305,6 +1965,7 @@ def get_site_file_content(
     """Fetches the content of a specific file for editing."""
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    filename = safe_site_filename(filename)
 
     if filename == "index.html":
         page = db.one("select html from site_pages where job_id=?", (jid,))
@@ -1346,7 +2007,7 @@ def get_site_file_content(
 def save_site_file_content(
     slug_or_id: str,
     filename: str,
-    body: dict,
+    body: SiteFileSaveRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
@@ -1354,8 +2015,13 @@ def save_site_file_content(
     """Saves updated content of a file."""
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    filename = safe_site_filename(filename)
+    require_security_feature(
+        "ENABLE_TENANT_FILE_EDITOR",
+        "versioned artifacts, content validation, and a reviewed publishing workflow",
+    )
 
-    content = body.get("content", "")
+    content = body.content
     if filename == "index.html":
         db.x("UPDATE site_pages SET html=? WHERE job_id=?", (content, jid))
         d = os.path.join(corp.SITES, str(jid))
@@ -1500,15 +2166,36 @@ def execute_site_database_query(
     """Runs a safe SQL query against the tenant database."""
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    require_security_feature(
+        "ENABLE_TENANT_SQL_CONSOLE",
+        "a read-only, allow-listed reporting API with database-enforced tenant isolation",
+    )
 
-    raw_query = (body.get("query") or "").strip()
+    raw_query = body.get("query")
+    if not isinstance(raw_query, str):
+        raise HTTPException(400, "A SQL query string is required")
+    raw_query = raw_query.strip()
     if not raw_query:
         raise HTTPException(400, "يرجى إرسال استعلام SQL صالح")
 
-    # Guardrails: Block dangerous DDL
+    # This temporary console is read-only even when explicitly enabled. Its
+    # eventual replacement is a purpose-built reporting API, not a SQL proxy.
     lower_q = raw_query.lower()
-    if any(k in lower_q for k in ["drop table", "truncate", "delete from site_pages", "alter table jobs"]):
-        raise HTTPException(400, "غير مسموح بهذا الاستعلام لأسباب أمنية")
+    if (
+        not re.match(r"^\s*select\s+", raw_query, re.IGNORECASE)
+        or ";" in raw_query
+        or "--" in raw_query
+        or "/*" in raw_query
+        or "*/" in raw_query
+    ):
+        raise HTTPException(400, "Only one read-only SELECT query is allowed")
+    if len(raw_query) > 2000:
+        raise HTTPException(400, "Reporting query is too long")
+    table_match = re.search(r"\bfrom\s+([a-zA-Z0-9_]+)\b", lower_q)
+    table_name = table_match.group(1) if table_match else ""
+    allowed_tables = {"products", "orders", "categories", "site_items", "site_orders"}
+    if table_name not in allowed_tables:
+        raise HTTPException(400, "This reporting table is not allow-listed")
 
     t_start = time.time()
 
@@ -1517,23 +2204,51 @@ def execute_site_database_query(
     if os.path.exists(local_db_path):
         import sqlite3
         try:
+            # Check every table access, including JOINs and nested SELECTs.
             conn = sqlite3.connect(local_db_path)
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA query_only = ON")
+
+            def authorize(action, arg1, _arg2, _database, _trigger):
+                if action == sqlite3.SQLITE_SELECT:
+                    return sqlite3.SQLITE_OK
+                if action == sqlite3.SQLITE_READ and str(arg1).lower() in allowed_tables:
+                    return sqlite3.SQLITE_OK
+                return sqlite3.SQLITE_DENY
+
+            conn.set_authorizer(authorize)
+            query_started = time.monotonic()
+
+            def stop_expensive_query():
+                # SQLite invokes this every 1,000 virtual-machine instructions.
+                return int(time.monotonic() - query_started > 0.25)
+
+            conn.set_progress_handler(stop_expensive_query, 1000)
             cursor = conn.cursor()
             cursor.execute(raw_query)
             col_names = [d[0] for d in cursor.description] if cursor.description else []
-            rows = [dict(r) for r in cursor.fetchall()[:100]]
+            rows = [dict(r) for r in cursor.fetchmany(101)[:100]]
             conn.close()
             ms = round((time.time() - t_start) * 1000, 2)
             db.x("INSERT INTO tenant_queries_log (job_id, tenant_id, query_sql, rows_affected, execution_ms, executed_at) VALUES (?, ?, ?, ?, ?, ?)",
                  (jid, f"tenant_db_{jid}", raw_query, len(rows), ms, time.time()))
             return {"success": True, "columns": col_names, "rows": rows, "count": len(rows), "execution_ms": ms}
-        except Exception as e:
-            raise HTTPException(400, f"خطأ في تنفيذ SQL: {e}")
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            audit.record(
+                "tenant.reporting_query_failed",
+                actor_type="user",
+                target_type="job",
+                target_id=str(jid),
+                outcome="failure",
+                metadata={"table": table_name},
+            )
+            raise HTTPException(400, "The reporting query could not be completed")
 
     # Fallback to query virtualized tables
-    m = re.search(r'from\s+([a-zA-Z0-9_]+)', lower_q)
-    table_name = m.group(1) if m else "products"
     if table_name == "products":
         rows = db.q("SELECT id, title as name, price, category, badge FROM site_items WHERE job_id=? LIMIT 50", (jid,))
     elif table_name == "orders":
@@ -1673,7 +2388,7 @@ def execute_live_sast_scan(jid: int):
 @app.post("/api/sites/{slug_or_id}/refine")
 async def refine_site(
     slug_or_id: str,
-    body: dict,
+    body: SiteRefineRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
@@ -1682,14 +2397,14 @@ async def refine_site(
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
 
-    prompt = (body.get("prompt") or "").strip()
+    prompt = body.prompt.strip()
     if not prompt:
         raise HTTPException(400, "يرجى كتابة تعليمات التعديل والتطوير")
 
     check_guardrails(prompt)
 
-    doc_text = (body.get("extracted_text") or "").strip()
-    file_url = (body.get("file_url") or "").strip()
+    doc_text = body.extracted_text.strip()
+    file_url = body.file_url.strip()
 
     page = db.one("SELECT html FROM site_pages WHERE job_id=?", (jid,))
     current_html = (page.get("html") or "") if page else ""
@@ -1733,6 +2448,13 @@ async def refine_site(
     if "<!DOCTYPE html>" not in new_html and "<html" not in new_html:
         new_html = current_html
 
+    artifact_issues = artifacts.validate_site_html(new_html)
+    if artifact_issues:
+        raise HTTPException(
+            422,
+            "Generated content did not meet the safe, responsive artifact baseline: " + "; ".join(artifact_issues),
+        )
+
     db.x("UPDATE site_pages SET html=? WHERE job_id=?", (new_html, jid))
     d = os.path.join(corp.SITES, str(jid))
     if os.path.exists(d):
@@ -1759,7 +2481,7 @@ async def refine_site(
 @app.post("/api/sites/{slug_or_id}/visual-edit")
 async def visual_edit_site(
     slug_or_id: str,
-    body: dict,
+    body: VisualSiteEditRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
@@ -1767,17 +2489,18 @@ async def visual_edit_site(
     """Visual content editor: edit title, slogan, colors, contact numbers, and toggle sections."""
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    body_data = body.model_dump(exclude_unset=True)
 
-    brand = body.get("brand_name")
-    slogan = body.get("slogan")
-    color_primary = body.get("color_primary")
-    color_secondary = body.get("color_secondary")
-    logo_url = body.get("logo_url")
-    phone = body.get("phone")
-    whatsapp = body.get("whatsapp")
-    vodafone_cash = body.get("vodafone_cash")
-    instapay = body.get("instapay")
-    theme = body.get("theme", "dark")
+    brand = body_data.get("brand_name")
+    slogan = body_data.get("slogan")
+    color_primary = body_data.get("color_primary")
+    color_secondary = body_data.get("color_secondary")
+    logo_url = body_data.get("logo_url")
+    phone = body_data.get("phone")
+    whatsapp = body_data.get("whatsapp")
+    vodafone_cash = body_data.get("vodafone_cash")
+    instapay = body_data.get("instapay")
+    theme = body_data.get("theme", "dark")
 
     # Fetch current settings
     curr = db.one("select * from site_settings where job_id=?", (jid,)) or {}
@@ -1793,7 +2516,7 @@ async def visual_edit_site(
     """, (
         jid,
         brand or curr.get("brand_name") or f"site_{jid}",
-        body.get("category") or curr.get("category") or "general",
+        body_data.get("category") or curr.get("category") or "general",
         curr.get("custom_domain"),
         color_primary or curr.get("color_primary"),
         color_secondary or curr.get("color_secondary"),
@@ -1812,8 +2535,8 @@ async def visual_edit_site(
     active_settings = db.one("select * from site_settings where job_id=?", (jid,)) or {}
 
     for flag in ["enable_faq", "enable_testimonials", "enable_gallery", "enable_reviews", "enable_promo"]:
-        if flag in body:
-            active_settings[flag] = body[flag]
+        if flag in body_data:
+            active_settings[flag] = body_data[flag]
     if slogan:
         active_settings["slogan"] = slogan
     if theme:
@@ -1846,7 +2569,7 @@ async def visual_edit_site(
 @app.post("/api/sites/{slug_or_id}/items")
 def add_site_item(
     slug_or_id: str,
-    body: dict,
+    body: SiteItemCreateRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
@@ -1855,16 +2578,36 @@ def add_site_item(
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
 
-    title = (body.get("title") or "منتج جديد").strip()
-    price = float(body.get("price") or 0.0)
-    category = (body.get("category") or "عام").strip()
-    desc = (body.get("description") or "").strip()
-    badge = (body.get("badge") or "").strip()
-    image_url = (body.get("image_url") or "").strip()
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(422, "Product title must not be blank")
+    price = float(body.price)
+    category = body.category.strip() or "عام"
+    desc = body.description.strip()
+    badge = body.badge.strip()
+    image_url = body.image_url.strip()
+    if image_url:
+        try:
+            parsed_image_url = urlsplit(image_url)
+            parsed_image_url.port  # Reject malformed ports before storing URLs.
+        except ValueError as exc:
+            raise HTTPException(422, "Image URL is invalid") from exc
+        is_uploaded_image = re.fullmatch(
+            r"/static/uploads/[A-Za-z0-9_-]{1,120}\.(?:jpg|jpeg|png|webp)",
+            image_url,
+        ) is not None
+        is_secure_remote_image = (
+            parsed_image_url.scheme == "https"
+            and bool(parsed_image_url.hostname)
+            and not parsed_image_url.username
+            and not parsed_image_url.password
+        )
+        if not (is_uploaded_image or is_secure_remote_image):
+            raise HTTPException(422, "Image URL must be HTTPS or a sanitized uploaded image")
 
     item_id = db.x(
-        "INSERT INTO site_items (job_id, title, price, category, description, badge, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (jid, title, price, category, desc, badge, time.time())
+        "INSERT INTO site_items (job_id, title, price, category, description, badge, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (jid, title, price, category, desc, badge, image_url, time.time())
     )
 
     job_row = db.one("select * from jobs where id=?", (jid,)) or {}
@@ -1930,10 +2673,14 @@ def get_site_integrations(
         "3. الصق التوكن هنا لتفعيل الرد التلقائي وإشعارات الأوردرات الفورية."
     ]
 
+    safe_config = {key: value for key, value in cfg.items() if key != "bot_token"}
+    if cfg.get("bot_token"):
+        safe_config["has_bot_token"] = True
+
     return {
         "job_id": jid,
         "brand_name": brand,
-        "config": cfg,
+        "config": safe_config,
         "guide_telegram": guide_telegram,
         "guide_whatsapp": guide_whatsapp,
         "suggested_prompt": f"أنت المساعد الذكي والممثل الرسمي لمتجر {brand}. مهمتك الترحيب بالزبائن، الإجابة عن مواصفات المنتجات والأسعار، ومساعدتهم في إتمام الطلبات وتأكيد الدفع عبر فودافون كاش وإنستاباي والدفع عند الاستلام بأسلوب مصري راقٍ وودود."
@@ -1951,6 +2698,10 @@ def save_site_bot_config(
     """Saves Telegram / WhatsApp bot credentials and system prompt."""
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
+    require_security_feature(
+        "ENABLE_TENANT_BOT_CREDENTIALS",
+        "per-tenant encrypted secret storage and provider OAuth/webhook verification",
+    )
 
     platform = body.get("bot_platform", "telegram")
     token = (body.get("bot_token") or "").strip()
@@ -1986,7 +2737,7 @@ def get_site_automations(
 @app.post("/api/sites/{slug_or_id}/automations/generate-email")
 async def generate_marketing_email(
     slug_or_id: str,
-    body: dict,
+    body: MarketingEmailDraftRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
@@ -1995,8 +2746,10 @@ async def generate_marketing_email(
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
 
-    goal = body.get("goal") or "عرض ترويجي وتنشيط مبيعات"
-    audience = body.get("target_audience") or "العملاء المسجلين والزبائن الجدد"
+    goal = body.goal.strip() or "عرض ترويجي وتنشيط مبيعات"
+    audience = body.target_audience.strip() or "العملاء المسجلين والزبائن الجدد"
+    check_guardrails(goal)
+    check_guardrails(audience)
 
     settings = db.one("SELECT * FROM site_settings WHERE job_id=?", (jid,)) or {}
     items = db.q("SELECT title, price FROM site_items WHERE job_id=? LIMIT 5", (jid,))
@@ -2061,20 +2814,36 @@ async def generate_marketing_email(
 @app.post("/api/sites/{slug_or_id}/automations/approve-email")
 async def approve_marketing_email(
     slug_or_id: str,
-    body: dict,
+    body: SiteAutomationDecisionRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
 ):
     """Owner Approval step: Approves and marks campaign for dispatch."""
     jid = resolve_job_id(slug_or_id)
-    require_site_access(jid, x_user_token, x_admin_key, authorization)
-
-    auto_id = int(body.get("automation_id") or 0)
-    decision = body.get("decision", "approve")
+    actor = require_site_access(jid, x_user_token, x_admin_key, authorization)
+    auto_id = body.automation_id
+    decision = body.decision
+    pending = db.one(
+        "SELECT id FROM site_automations WHERE id=? AND job_id=? AND status='pending_approval'",
+        (auto_id, jid),
+    )
+    if not pending:
+        raise HTTPException(409, "This campaign is not awaiting a decision")
 
     status = "approved" if decision == "approve" else "rejected"
-    db.x("UPDATE site_automations SET status=? WHERE id=? AND job_id=?", (status, auto_id, jid))
+    db.x(
+        "UPDATE site_automations SET status=? WHERE id=? AND job_id=? AND status='pending_approval'",
+        (status, auto_id, jid),
+    )
+    audit.record(
+        "marketing.email_decision",
+        actor_id=actor.get("id"),
+        actor_type="administrator" if actor.get("is_admin") else "user",
+        target_type="automation",
+        target_id=str(auto_id),
+        metadata={"decision": decision},
+    )
 
     corp.log(jid, f"✅ تم اعتماد ونشر الحملة التسويقية #{auto_id} ({status})")
     return {
@@ -2088,7 +2857,7 @@ async def approve_marketing_email(
 @app.post("/api/sites/{slug_or_id}/automations/generate-social")
 async def generate_social_post(
     slug_or_id: str,
-    body: dict,
+    body: SocialPostDraftRequest,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default="")
@@ -2097,8 +2866,9 @@ async def generate_social_post(
     jid = resolve_job_id(slug_or_id)
     require_site_access(jid, x_user_token, x_admin_key, authorization)
 
-    platform = body.get("platform") or "facebook"
-    theme = body.get("theme") or "تخفيضات وبوست تفاعلي"
+    platform = body.platform
+    theme = body.theme.strip() or "تخفيضات وبوست تفاعلي"
+    check_guardrails(theme)
 
     settings = db.one("SELECT * FROM site_settings WHERE job_id=?", (jid,)) or {}
     brand = settings.get("brand_name") or f"متجر #{jid}"
@@ -2171,87 +2941,13 @@ def get_discovery_questions(body: dict):
 def favicon():
     return HTMLResponse("", status_code=204)
 
-@app.get("/api/posts")
-def get_posts():
-    return db.q("select * from posts order by id desc limit 15")
-
-@app.post("/api/posts/{pid}/decision")
-async def post_decision(pid: int, body: dict, x_admin_key: str = Header(default="")):
-    admin(x_admin_key)
-    decision = body.get("decision", "approve")
-    return await corp.decide_post(pid, decision)
-
-@app.get("/api/proposals")
-def get_proposals():
-    return db.q("select id,kind,target,reason,status,substr(content,1,600) content from proposals order by id desc limit 15")
-
-@app.post("/api/proposals/{pid}/decision")
-async def proposal_decision(pid: int, body: dict, x_admin_key: str = Header(default="")):
-    admin(x_admin_key)
-    d = body.get("decision", "approve")
-    return await (corp.rollback_proposal(pid) if d == "rollback" else corp.decide_proposal(pid, d))
-
-
 # =========================================================
 # Company Introspection & Financial Summary
 # =========================================================
-@app.get("/api/summary")
-def get_summary():
-    row = db.one("""
-        select 
-            coalesce((select sum(delta) from ledger where account='client_payment'), 0) as rev,
-            coalesce((select sum(delta) from ledger where account like 'payroll:%'), 0) as pay,
-            (select count(*) from site_orders) as total_orders,
-            (select count(*) from site_pages) as total_sites,
-            (select count(*) from agents) as hired_agents,
-            (select count(*) from jobs) as total_jobs
-    """) or {}
-    
-    rev_v = float(row.get("rev", 0) or 0)
-    pay_v = -float(row.get("pay", 0) or 0)
-    
-    return {
-        "revenue_egp": round(rev_v, 2),
-        "payroll_egp": round(pay_v, 3),
-        "profit_egp": round(rev_v - pay_v, 2),
-        "margin_percent": round(((rev_v - pay_v) / rev_v * 100), 1) if rev_v > 0 else 0,
-        "hired_agents": int(row.get("hired_agents", 0) or 0),
-        "roster_roles": len(roles.all_names()),
-        "jobs": int(row.get("total_jobs", 0) or 0),
-        "generated_sites": int(row.get("total_sites", 0) or 0),
-        "total_store_orders": int(row.get("total_orders", 0) or 0)
-    }
-
-
-@app.get("/api/ledger")
-def get_ledger(x_admin_key: str = Header(default="")):
-    return db.q("select id, ts, account, delta, memo, job_id from ledger order by id desc limit 40")
-
-
-@app.get("/api/agents")
-def get_agents():
-    return db.q("select name,department,origin,uses,round(balance,3) balance from agents order by uses desc, name")
-
-
-@app.get("/api/roster")
-def get_roster():
-    return {"total": len(roles.all_names()), "departments": {d: list(r) for d, r in roles.DEPARTMENTS.items()}}
-
-
-@app.get("/api/providers")
-def get_providers():
-    return llm.status()
-
-
-@app.post("/api/providers/test")
-async def test_providers(x_admin_key: str = Header(default="")):
-    admin(x_admin_key)
-    return await llm.test_all()
-
-
 @app.api_route("/api/tick", methods=["GET", "POST"])
-async def trigger_tick(x_cron_key: str = Header(default=""), key: str = ""):
-    guard(["CRON_KEY", "ADMIN_KEY"], x_cron_key or key)
+async def trigger_tick(x_cron_key: str = Header(default="")):
+    """Run a scheduled operation using a header-only secret, never a URL key."""
+    guard(["CRON_KEY"], x_cron_key)
     return await corp.tick()
 
 
@@ -2325,13 +3021,15 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
 async def handle_telegram_update(u: dict):
     """Processes incoming Telegram message or approval callback query."""
     owner_id = os.getenv("TELEGRAM_OWNER_CHAT_ID", "")
-    admin_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
     
     cb = u.get("callback_query")
     if cb:
         cb_id = cb["id"]
         from_id = str(cb["from"]["id"])
         data = cb.get("data", "")
+        if not owner_id or not hmac.compare_digest(from_id, owner_id):
+            await corp.tg_send(from_id, "This approval action is restricted to the configured owner.")
+            return
         
         # Approve / Reject actions
         if ":" in data:
@@ -2351,23 +3049,36 @@ async def handle_telegram_update(u: dict):
     chat_id = str(msg["chat"]["id"])
     msg_id = msg.get("message_id")
     text = (msg.get("text") or msg.get("caption") or "").strip()
-    
-    # Message Deduplication: Prevent handling duplicate Telegram deliveries
+
+    # The primary key is the durable deduplication lock. A read-then-write
+    # sequence is racy when Telegram retries reach concurrent workers.
     if msg_id:
         try:
-            seen_msg = db.one("SELECT status FROM telegram_messages WHERE chat_id = ? AND message_id = ?", (chat_id, msg_id))
-            if seen_msg:
-                print(f"[TG DEDUP] Message #{msg_id} in chat {chat_id} already processed. Skipping duplicate.")
-                return
-            db.x("INSERT OR REPLACE INTO telegram_messages (chat_id, message_id, status, created_at) VALUES (?, ?, 'processing', ?)", (chat_id, msg_id, time.time()))
-        except Exception as e:
-            print(f"[TG MSG DEDUP ERR] {e}")
+            db.x(
+                "INSERT INTO telegram_messages (chat_id, message_id, status, created_at) VALUES (?, ?, 'processing', ?)",
+                (chat_id, msg_id, time.time()),
+            )
+        except Exception:
+            # Fail closed: without a durable lock, repeating a side effect is
+            # worse than asking Telegram to retry the update later.
+            return
+
+    # Telegram chat is not an acceptable password transport. Account linking
+    # will move to a short-lived, browser-based verification flow in Phase 1.
+    if text.startswith(("/register", "/login", "/admin")):
+        await corp.tg_send(
+            chat_id,
+            "Password commands are disabled for security. Create or sign in to your account through the web dashboard.",
+        )
+        return
 
     # Check if this telegram user is linked to an account
     linked_user = db.one("SELECT id, username, role FROM users WHERE telegram_id = ? ORDER BY id DESC LIMIT 1", (chat_id,))
     user_id = linked_user["id"] if linked_user else None
     user_name = linked_user["username"] if linked_user else f"tg:{chat_id}"
-    is_user_admin = (linked_user and linked_user.get("role") == "admin") or (os.getenv("TELEGRAM_OWNER_CHAT_ID") == chat_id) or (user_name.lower() in ("admin", "alfarouq", "alfarouqibrahim", "alfarouq123"))
+    is_user_admin = bool(linked_user and linked_user.get("role") == "admin") or (
+        bool(owner_id) and hmac.compare_digest(owner_id, chat_id)
+    )
 
     # 1. /start command
     if text.startswith("/start"):
@@ -2375,14 +3086,13 @@ async def handle_telegram_update(u: dict):
             chat_id,
             "مرحباً بك في AutoCorp 🤖🇪🇬\n"
             "وكالة الذكاء الاصطناعي ذاتية التشغيل للمتاجر والشركات والمحترفين في مصر.\n\n"
-            "✨ يسعدني التحدث معك ومساعدتك في إطلاق موقع متكامل بالفرونت والباك إند وبوابات الدفع المصرية في أقل من دقيقة!\n\n"
+            "✨ يسعدني مساعدتك في إعداد مسودة موقع متجاوب وإدارة طلبات المتجر بانتظار تأكيد التاجر.\n\n"
             "📋 الأوامر المتاحة:\n"
-            "• /register <اسم_المستخدم> <كلمة_المرور> — إنشاء حساب جديد\n"
-            "• /login <اسم_المستخدم> <كلمة_المرور> — تسجيل الدخول\n"
+            "• الحسابات وتسجيل الدخول يتمان عبر لوحة التحكم الآمنة على الويب\n"
             "• /my_sites — عرض مواقعك ومتاجرك المنشورة وروابطها\n"
             "• /build <وصف الموقع أو المتجر> — إطلاق وبرمجة موقعك فوراً\n"
             "• /help — دليل استخدام الوكالة والخدمات المتاحة\n"
-            "• /admin <كلمة_المرور> — تسجيل دخول المدير المشرف\n\n"
+            "• الموافقات الإدارية محصورة بحساب المالك المهيأ مسبقاً\n\n"
             "💡 أو ببساطة: اكتب فكرة موقعك (مثال: 'عايز اعمل بورتفوليو لواحد اسمه ياسين احمد في السايبر سيكيورتي' أو 'متجر بيع عسل') وسأنفذه فوراً!"
         )
         return
@@ -2393,10 +3103,10 @@ async def handle_telegram_update(u: dict):
             chat_id,
             "📖 دليل استخدام مستشار AutoCorp الذكي:\n\n"
             "1️⃣ بناء المواقع والمتاجر: اكتب تفاصيل نشاطك (مثال: 'بورتفوليو أمن سيبراني لـ ياسين أحمد' أو 'متجر عسل سدر فاخر' أو 'مطعم مشويات') أو أرسل صورة المنيو/البضاعة.\n"
-            "2️⃣ بوابات الدفع والحجز: كل موقع يتم تجهيزه تلقائياً بروابط فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام أو فواتير التعاقد.\n"
+            "2️⃣ الطلبات والحجوزات: الطلبات تُسجّل بانتظار تأكيد التاجر ولا تُعالج أي دفعة عبر البوت.\n"
             "3️⃣ باقة البداية المجانية: تتيح لك تجربة بناء حتى (موقعين) مجاناً.\n"
             "4️⃣ استضافة هوستينجر وGitHub: يمكنك تحميل كود الإنتاج كاملاً بملف ZIP أو النشر المباشر على GitHub و Vercel.\n\n"
-            "لربط حسابك: اكتب /login اسم_المستخدم كلمة_المرور"
+            "لربط حسابك: استخدم لوحة التحكم الآمنة على الويب."
         )
         return
 
@@ -2411,9 +3121,6 @@ async def handle_telegram_update(u: dict):
             res = auth.register_user(u_name, u_pass)
             db.x("UPDATE users SET telegram_id = NULL WHERE telegram_id = ?", (chat_id,))
             db.x("UPDATE users SET telegram_id = ? WHERE id = ?", (chat_id, res["id"]))
-            if u_name.lower() in ("admin", "alfarouq", "alfarouqibrahim", "alfarouq123") or u_pass == os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim"):
-                os.environ["TELEGRAM_OWNER_CHAT_ID"] = chat_id
-                db.x("UPDATE users SET role = 'admin' WHERE id = ?", (res["id"],))
             await corp.tg_send(
                 chat_id,
                 f"🎉 تم إنشاء حسابك بنجاح ({u_name}) وربطه بـ Telegram!\n"
@@ -2435,10 +3142,6 @@ async def handle_telegram_update(u: dict):
             if res.get("id"):
                 db.x("UPDATE users SET telegram_id = NULL WHERE telegram_id = ?", (chat_id,))
                 db.x("UPDATE users SET telegram_id = ? WHERE id = ?", (chat_id, res["id"]))
-            if res.get("is_admin") or u_name.lower() in ("admin", "alfarouq", "alfarouqibrahim", "alfarouq123") or u_pass == os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim"):
-                os.environ["TELEGRAM_OWNER_CHAT_ID"] = chat_id
-                if res.get("id"):
-                    db.x("UPDATE users SET role = 'admin' WHERE id = ?", (res["id"],))
             await corp.tg_send(
                 chat_id,
                 f"✅ تم تسجيل دخولك بنجاح كـ ({u_name})!\n"
@@ -2473,18 +3176,11 @@ async def handle_telegram_update(u: dict):
 
     # 6. /admin login command
     if text.startswith("/admin"):
-        parts = text.split(maxsplit=1)
-        admin_pwd = os.getenv("ADMIN_PASSWORD", "AlfarouqIbrahim")
-        if len(parts) > 1 and parts[1].strip() == admin_pwd:
-            os.environ["TELEGRAM_OWNER_CHAT_ID"] = chat_id
-            admin_name = os.getenv("ADMIN_NAME", "Alfarouq Ibrahim")
-            await corp.tg_send(
-                chat_id,
-                f"👑 أهلاً بك ({admin_name})! تم تسجيلك كمدير مشرف على AutoCorp بنجاح.\n"
-                "ستصلك قرارات التسعير واعتمادات التسليم هنا لتوافق عليها بضغطة زر."
-            )
-        else:
-            await corp.tg_send(chat_id, "❌ كلمة المرور غير صحيحة.")
+        await corp.tg_send(
+            chat_id,
+            "Administrator login by Telegram password is disabled. Use the web console; "
+            "approvals are sent only to the preconfigured owner chat."
+        )
         return
 
     # 6.1 /delete command: delete site by ID
@@ -2498,11 +3194,14 @@ async def handle_telegram_update(u: dict):
                 return
             can_del = is_user_admin or (user_id and target_job.get("user_id") == user_id) or str(target_job.get("client")) == f"tg:{chat_id}"
             if can_del:
-                for tbl in ["jobs", "site_pages", "site_items", "site_orders", "site_settings", "site_files", "site_automations", "site_bot_configs", "events", "contracts", "ledger"]:
-                    try:
-                        db.x(f"DELETE FROM {tbl} WHERE {'id' if tbl=='jobs' else 'job_id'}=?", (target_jid,))
-                    except Exception:
-                        pass
+                audit.record(
+                    "site.deletion_requested",
+                    actor_id=user_id,
+                    actor_type="administrator" if is_user_admin else "telegram_user",
+                    target_type="job",
+                    target_id=str(target_jid),
+                )
+                delete_tenant_records(target_jid)
                 shutil.rmtree(os.path.join(corp.SITES, str(target_jid)), ignore_errors=True)
                 await corp.tg_send(chat_id, f"🗑️ تم حذف المشروع #{target_jid} وكافة ملفاته وبياناته نهائياً بنجاح!")
             else:
@@ -2523,31 +3222,36 @@ async def handle_telegram_update(u: dict):
         file_name = doc.get("file_name", "document.pdf")
         mime = doc.get("mime_type", "")
         token = os.getenv("TELEGRAM_BOT_TOKEN")
-        if file_id and token:
+        file_size = int(doc.get("file_size") or 0)
+        is_pdf = file_name.lower().endswith(".pdf") or mime == "application/pdf"
+        if file_size > MAX_TELEGRAM_ATTACHMENT_BYTES:
+            await corp.tg_send(chat_id, "The attached document exceeds the 10 MB limit and was not processed.")
+        elif not is_pdf:
+            await corp.tg_send(chat_id, "Only PDF documents are accepted for secure processing.")
+        elif file_id and token:
             try:
                 async with httpx.AsyncClient(timeout=40) as cl:
                     f_info = (await cl.get(f"https://api.telegram.org/bot{token}/getFile", params={"file_id": file_id})).json()
                     f_path = f_info.get("result", {}).get("file_path")
                     if f_path:
-                        raw_bytes = (await cl.get(f"https://api.telegram.org/file/bot{token}/{f_path}")).content
-                        clean_fn = f"{int(time.time())}_{re.sub(r'[^a-zA-Z0-9_.-]', '_', file_name)}"
+                        download = await cl.get(f"https://api.telegram.org/file/bot{token}/{f_path}")
+                        download.raise_for_status()
+                        raw_bytes = download.content
+                        if len(raw_bytes) > MAX_TELEGRAM_ATTACHMENT_BYTES or not raw_bytes.startswith(b"%PDF-"):
+                            raise ValueError("Telegram document did not meet the PDF attachment policy")
+                        # This name is internal metadata only. PDFs are never
+                        # retained at a public URL after text extraction.
+                        clean_fn = f"{secrets.token_urlsafe(18)}_{re.sub(r'[^a-zA-Z0-9_.-]', '_', file_name)[:60]}"
                         up_dir = "/tmp/uploads" if IS_VERCEL else os.path.join(BASE, "static", "uploads")
                         os.makedirs(up_dir, exist_ok=True)
                         up_path = os.path.join(up_dir, clean_fn)
                         with open(up_path, "wb") as f:
                             f.write(raw_bytes)
                         if file_name.lower().endswith(".pdf") or "pdf" in mime:
-                            try:
-                                import fitz
-                                d_doc = fitz.open(stream=raw_bytes, filetype="pdf")
-                                uploaded_doc_text = "\n".join(page.get_text() for page in d_doc).strip()
-                            except Exception:
-                                try:
-                                    import io, pypdf
-                                    reader = pypdf.PdfReader(io.BytesIO(raw_bytes))
-                                    uploaded_doc_text = "\n".join([p.extract_text() or "" for p in reader.pages]).strip()
-                                except Exception as ex:
-                                    uploaded_doc_text = f"Error extracting PDF: {ex}"
+                            uploaded_doc_text = extract_pdf_text(raw_bytes)
+                        # Brief PDFs are transient input, not public static assets.
+                        if os.path.exists(up_path):
+                            os.remove(up_path)
                         uploaded_doc_name = clean_fn
                         text = f"{text}\n\n[مستند مرفق من العميل: {file_name}]:\n{uploaded_doc_text[:3500]}".strip()
             except Exception as e:
@@ -2564,8 +3268,15 @@ async def handle_telegram_update(u: dict):
                     f_info = (await cl.get(f"https://api.telegram.org/bot{token}/getFile", params={"file_id": photo_id})).json()
                     f_path = f_info.get("result", {}).get("file_path")
                     if f_path:
-                        raw_bytes = (await cl.get(f"https://api.telegram.org/file/bot{token}/{f_path}")).content
-                        clean_fn = f"{int(time.time())}_tg_photo.jpg"
+                        download = await cl.get(f"https://api.telegram.org/file/bot{token}/{f_path}")
+                        download.raise_for_status()
+                        raw_bytes = download.content
+                        if len(raw_bytes) > MAX_TELEGRAM_ATTACHMENT_BYTES or not raw_bytes.startswith(b"\xff\xd8\xff"):
+                            raise ValueError("Telegram photo did not meet the JPEG attachment policy")
+                        raw_bytes = sanitize_image_upload(raw_bytes, ".jpg")
+                        if len(raw_bytes) > MAX_TELEGRAM_ATTACHMENT_BYTES:
+                            raise ValueError("Telegram photo exceeds the 10 MB limit after sanitization")
+                        clean_fn = f"{secrets.token_urlsafe(18)}_tg_photo.jpg"
                         up_dir = "/tmp/uploads" if IS_VERCEL else os.path.join(BASE, "static", "uploads")
                         os.makedirs(up_dir, exist_ok=True)
                         up_path = os.path.join(up_dir, clean_fn)
@@ -2595,13 +3306,13 @@ async def handle_telegram_update(u: dict):
                 chat_id,
                 "أهلاً بك يا فندم! 🤖🇪🇬\n"
                 "أنا المستشار الذكي لوكالة AutoCorp لبناء وتطوير المواقع والمتاجر للشركات والمحترفين في مصر.\n\n"
-                "مهمتي أساعدك في إطلاق موقع أو متجر إلكتروني متكامل لنشاطك التجاري أو بورتفوليو شخصي في أقل من دقيقة، "
-                "مع بوابات الدفع المصرية (فودافون كاش، إنستاباي، فوري) وتصميم متجاوب بالكامل.\n\n"
+                "مهمتي أساعدك في إعداد مسودة موقع أو متجر إلكتروني متجاوب لنشاطك التجاري أو بورتفوليو شخصي. "
+                "الطلبات تحتاج تأكيد التاجر، ولا تتوفر معالجة دفع عبر البوت.\n\n"
                 "💡 كيف تحب نبدأ؟\n"
                 "• لبدء البناء فوراً: اكتب تفاصيل نشاطك (مثال: 'عايز اعمل بورتفوليو لواحد اسمه ياسين احمد في السايبر سيكيورتي' أو 'متجر عسل').\n"
                 "• يمكنك أيضاً إرسال ملف PDF (كتالوج أو منيو) أو صورة اللوجو وسأقوم ببناء الموقع بناءً عليها فوراً!\n"
-                "• لتسجيل الدخول: اكتب /login اسم_المستخدم كلمة_المرور\n"
-                "• أو اسألني أي سؤال حول الميزات والأسعار وبوابات الدفع!"
+                "• لتسجيل الدخول: استخدم لوحة التحكم الآمنة على الويب.\n"
+                "• أو اسألني أي سؤال حول الميزات والأسعار والطلبات!"
             )
             return
         is_store_request = bool(msg.get("photo")) or bool(msg.get("document")) or is_store_creation_intent(text)
@@ -2667,11 +3378,11 @@ async def handle_telegram_update(u: dict):
             "color_primary": pal["primary"],
             "color_secondary": pal["secondary"],
             "logo_url": uploaded_photo_url,
-            "phone": "01000000000",
-            "whatsapp": "01000000000",
-            "vodafone_cash": "01000000000",
-            "instapay": f"{arabic_to_english_slug(brand)[:15]}@instapay",
-            "fawry_code": "88219",
+            "phone": "",
+            "whatsapp": "",
+            "vodafone_cash": "",
+            "instapay": "",
+            "fawry_code": "",
             "cod_enabled": 1
         }
         db.x("""
@@ -2690,7 +3401,7 @@ async def handle_telegram_update(u: dict):
             try:
                 db.x(
                     "INSERT INTO site_files (job_id, filename, file_type, content, file_url, created_at) VALUES (?, ?, 'pdf', ?, ?, ?)",
-                    (jid, uploaded_doc_name, uploaded_doc_text[:4000], f"/static/uploads/{uploaded_doc_name}", time.time())
+                    (jid, uploaded_doc_name, uploaded_doc_text[:4000], "", time.time())
                 )
             except Exception:
                 pass
@@ -2742,7 +3453,7 @@ async def handle_telegram_update(u: dict):
                 f"🏷️ اسم المتجر: {brand}\n"
                 f"🛒 نوع النشاط: {niche}\n"
                 f"🎨 الهوية: تم تفعيل باليت ألوان عصرية متناسقة ({pal_key})\n"
-                f"💳 بوابات الدفع المفعلة: فودافون كاش، إنستاباي، فوري، والدفع عند الاستلام\n\n"
+                f"💳 الطلبات ستبقى بانتظار تأكيد التاجر؛ لم تتم معالجة أي دفعة.\n\n"
                 f"🌐 رابط متجرك المباشر:\n{site_link}\n\n"
                 f"💡 يمكنك فتح المتجر، تجربة إضافة المنتجات للسلة، أو تسجيل الدخول على لوحة التحكم وإدارته بحسابك ({user_name})!"
             )
@@ -2756,7 +3467,7 @@ async def handle_telegram_update(u: dict):
     sys_prompt = (
         "You are AutoCorp's friendly, highly knowledgeable Egyptian AI consultant for businesses, professionals, and freelancers. "
         "AutoCorp is an autonomous digital agency that builds and deploys full-stack e-commerce stores, menus, "
-        "cybersecurity and developer portfolios, medical clinics, and corporate websites with Egyptian payment gateways in seconds. "
+        "cybersecurity and developer portfolios, medical clinics, and corporate websites. Payment processing is not available. "
         "STRICT POLICY: If the user asks about harmful, illegal, or completely unrelated political/gaming trivia, "
         "politely guide them back to website and business development. "
         "If the user asks about professional fields (cybersecurity, software, engineering, medicine, consulting, retail, restaurants), "
@@ -2783,27 +3494,31 @@ PROCESSED_TG_UPDATES = set()
 
 @app.post("/telegram")
 async def telegram_webhook(req: Request):
-    secret = os.getenv("TELEGRAM_SECRET")
-    if secret and req.headers.get("x-telegram-bot-api-secret-token") != secret:
-        raise HTTPException(401)
+    secret = os.getenv("TELEGRAM_SECRET", "").strip()
+    supplied_secret = req.headers.get("x-telegram-bot-api-secret-token", "")
+    # A public webhook must fail closed when Telegram authentication is absent.
+    if not secret or not hmac.compare_digest(supplied_secret, secret):
+        raise HTTPException(401, "Telegram webhook authentication failed")
     u = await req.json()
     
-    # Deduplication by update_id in-memory and in Turso Cloud
+    # A durable unique insert provides cross-worker idempotency; the in-memory
+    # set only saves a database round trip for immediate local retries.
     up_id = str(u.get("update_id") or "").strip()
     if up_id:
         if up_id in PROCESSED_TG_UPDATES:
             return {"ok": True, "duplicate": True}
+        try:
+            db.x("INSERT INTO telegram_updates (update_id, created_at) VALUES (?, ?)", (up_id, time.time()))
+        except Exception:
+            # Treat an existing durable record as a duplicate. If the lookup
+            # itself fails, return a retryable error instead of processing an
+            # operation without idempotency protection.
+            if db.one("SELECT update_id FROM telegram_updates WHERE update_id = ?", (up_id,)):
+                return {"ok": True, "duplicate": True}
+            raise HTTPException(503, "Telegram deduplication storage is unavailable")
         PROCESSED_TG_UPDATES.add(up_id)
         if len(PROCESSED_TG_UPDATES) > 1000:
             PROCESSED_TG_UPDATES.clear()
-            
-        try:
-            existing = db.one("SELECT update_id FROM telegram_updates WHERE update_id = ?", (up_id,))
-            if existing:
-                return {"ok": True, "duplicate": True}
-            db.x("INSERT OR REPLACE INTO telegram_updates (update_id, created_at) VALUES (?, ?)", (up_id, time.time()))
-        except Exception as e:
-            print(f"[TG DEDUP DB ERR] {e}")
 
     await handle_telegram_update(u)
     return {"ok": True}

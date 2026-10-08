@@ -54,9 +54,10 @@ LLM_TIER_VISION="nvidia,mistral,openrouter"
 # ==========================================
 # 3. AGENCY & SECURITY SETTINGS
 # ==========================================
-ADMIN_KEY="autocorp-admin-secret-2026"
-HOOK_KEY="autocorp-webhook-secret-2026"
-CRON_KEY="autocorp-cron-secret-2026"
+ADMIN_PASSWORD="generate-a-unique-secret-in-your-secret-manager"
+AUTH_SECRET_KEY="generate-at-least-32-random-bytes-in-your-secret-manager"
+HOOK_KEY="generate-a-unique-webhook-secret-in-your-secret-manager"
+CRON_KEY="generate-a-unique-cron-secret-in-your-secret-manager"
 
 SALARY_EGP_PER_1K_TOKENS=0.8
 PRICE_MARGIN_RATIO=2.5

@@ -1,0 +1,53 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: requirements.lock
+
+  sbom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Regenerate reproducible runtime SBOM
+        run: |
+          python -m pip install --upgrade pip cyclonedx-bom==7.5.0
+          python -m cyclonedx_py requirements --output-reproducible --spec-version 1.7 --output-format JSON --output-file docs/sbom.cdx.json requirements.lock
+          git diff --exit-code -- docs/sbom.cdx.json
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r requirements-dev.lock
+      - name: Compile application
+        run: python -m compileall -q app api tests
+      - name: Scan repository text for likely credentials
+        run: python scripts/scan_tracked_secrets.py
+      - name: Run security regression suite
+        run: pytest -q
+      - name: Check duplicated dashboard stays synchronized
+        run: cmp static/index.html api/static/index.html

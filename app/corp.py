@@ -12,7 +12,7 @@ import zipfile
 
 import httpx
 
-from . import builder, db, llm, roles, skills, tools, security
+from . import artifacts, builder, db, llm, roles, skills, tools, security
 
 RATE = float(os.getenv("SALARY_EGP_PER_1K_TOKENS", "0.8"))
 THRESHOLD = float(os.getenv("PLAN_APPROVAL_THRESHOLD_EGP", "2000"))
@@ -112,10 +112,12 @@ async def tg_owner(text, buttons=None):
 # ---------- Ledger + contracts ----------
 def pay(agent, tokens, job_id, memo):
     amt = round(tokens / 1000 * RATE, 4)
-    db.x("insert into ledger(ts,account,delta,memo,job_id) values(?,?,?,?,?)",
-         (time.time(), f"payroll:{agent}", -amt, memo, job_id))
-    db.x("update agents set balance=balance+?, uses=uses+1 where name=?", (amt, agent))
-    db.x("update jobs set cost=cost+? where id=?", (amt, job_id))
+    db.transaction([
+        ("insert into ledger(ts,account,delta,memo,job_id) values(?,?,?,?,?)",
+         (time.time(), f"payroll:{agent}", -amt, memo, job_id)),
+        ("update agents set balance=balance+?, uses=uses+1 where name=?", (amt, agent)),
+        ("update jobs set cost=cost+? where id=?", (amt, job_id)),
+    ])
     return amt
 
 
@@ -249,7 +251,10 @@ async def plan_job(job_id):
         db.x("update jobs set plan=?, price=? where id=?", (json.dumps(plan, ensure_ascii=False), plan["price_egp"], job_id))
         log(job_id, f"CEO plan: {plan['service']} | {len(plan['steps'])} steps | quote {plan['price_egp']:.0f} EGP "
                     f"| new roles: {[n['name'] for n in plan['new_roles']] or 'none'}")
-        auto_approve = os.getenv("AUTO_APPROVE", "1") == "1"
+        # Low-risk planning can continue under the configured cost threshold;
+        # hiring or larger commitments still require a human unless explicitly
+        # enabled for a controlled test environment.
+        auto_approve = os.getenv("AUTO_APPROVE", "0") == "1"
         if not auto_approve and (plan["new_roles"] or plan["price_egp"] >= THRESHOLD):
             db.x("update jobs set status='awaiting_plan' where id=?", (job_id,))
             why = "new hire(s)" if plan["new_roles"] else "quote above threshold"
@@ -340,6 +345,11 @@ async def call_agent(ag, ctx, task, job_id):
 
 
 async def deploy_netlify(html, job_id):
+    # Possession of a deployment credential is never implicit approval to
+    # publish customer content. Production publishing needs the reviewed flow
+    # in the remediation plan; this switch exists only for controlled tests.
+    if os.getenv("ENABLE_AUTOMATED_DEPLOYMENT", "0") != "1":
+        return None
     token = os.getenv("NETLIFY_TOKEN")
     if not token:
         return None
@@ -434,6 +444,20 @@ async def run_job(job_id):
                          (job_id, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), time.time()))
 
         if html:
+            artifact_issues = artifacts.validate_site_html(html)
+            if artifact_issues:
+                # Model output cannot bypass the deterministic template release gate.
+                job_row = db.one("select * from jobs where id=?", (job_id,)) or {}
+                settings_row = db.one("select * from site_settings where job_id=?", (job_id,)) or {}
+                items_rows = db.q("select * from site_items where job_id=?", (job_id,))
+                html = builder.build_site_html(
+                    job_id,
+                    job_row.get("client") or "",
+                    job_row.get("request") or "",
+                    settings=settings_row,
+                    items=items_rows,
+                )
+                log(job_id, "Rejected unsafe or incomplete model artifact; used validated template output.")
             # Store site in DB (works on Vercel) and optionally on filesystem
             db.x("INSERT OR REPLACE INTO site_pages(job_id, html, created_at) VALUES(?,?,?)",
                  (job_id, html, time.time()))
@@ -495,7 +519,9 @@ async def run_job(job_id):
                 print(f"[ENTERPRISE FILES GEN ERR] {ent_err}")
 
             site_url = await deploy_netlify(html, job_id) or f"/sites/{job_id}/"
-        auto_deliver = os.getenv("AUTO_DELIVER", "1") == "1"
+        # Delivery triggers external customer notifications and downstream
+        # webhooks, so it remains approval-driven unless explicitly opted in.
+        auto_deliver = os.getenv("AUTO_DELIVER", "0") == "1"
         if auto_deliver:
             db.x("update jobs set result=?, site_url=? where id=?",
                  (json.dumps({"outputs": outputs}, ensure_ascii=False), site_url, job_id))
@@ -516,13 +542,15 @@ async def run_job(job_id):
 async def deliver(job_id):
     job = db.one("select * from jobs where id=?", (job_id,))
     plan = json.loads(job["plan"])
-    db.x("insert into ledger(ts,account,delta,memo,job_id) values(?,?,?,?,?)",
-         (time.time(), "client_payment", job["price"], "SIMULATED payment (wire Paymob/Stripe for real)", job_id))
     res = json.loads(job["result"] or "{}")
+    # Project delivery is not payment confirmation. A real gateway webhook and
+    # immutable payment ledger are required before recording any revenue.
     res["invoice"] = (f"Invoice #{job_id}\nClient: {job['client']}\nService: {plan['summary']}\n"
-                      f"Total: {job['price']:.0f} EGP\nStatus: paid (simulated)")
+                      f"Quoted total: {job['price']:.0f} EGP\n"
+                      "Payment status: not processed by AutoCorp")
+    res["payment_status"] = "not_processed"
     db.x("update jobs set status='delivered', result=? where id=?", (json.dumps(res, ensure_ascii=False), job_id))
-    log(job_id, f"DELIVERED. Revenue +{job['price']:.0f} EGP, agent payroll {job['cost']:.2f} EGP")
+    log(job_id, "DELIVERED after owner approval. Payment remains unprocessed.")
     if str(job["client"]).startswith("tg:"):
         chat_id = job["client"][3:]
         site_url = job.get("site_url") or f"/sites/{job_id}/"
@@ -532,7 +560,7 @@ async def deliver(job_id):
             f"🌐 رابط موقعك المباشر:\n{full_url}\n\n"
             f"✨ المميزات المفعلة في موقعك:\n"
             f"• سلة مشتريات تفاعلية وطلب بضغطة زر.\n"
-            f"• بوابات الدفع المصرية: فودافون كاش، إنستاباي، فوري، والدفع عند الاستلام.\n"
+            f"• الطلبات تُسجل بانتظار تأكيد التاجر؛ لا تعالج المنصة أي دفعات.\n"
             f"• زر تواصل وتأكيد سريع عبر الواتساب.\n"
             f"• تصميم عصري متجاوب بالكامل مع الموبايل.\n\n"
             f"🧾 تفاصيل الفاتورة:\n{res.get('invoice', '')}"
@@ -589,8 +617,11 @@ async def emit(event, payload):
         if event in tools._hooks():
             await tools.webhook(event, payload)
         elif event == "post_approved" and os.getenv("MAKE_WEBHOOK_URL"):
-            async with httpx.AsyncClient(timeout=20) as cl:
-                await cl.post(os.getenv("MAKE_WEBHOOK_URL"), json=payload)
+            # Legacy direct Make dispatch has no destination validation or
+            # signature. Keep it disabled until it is migrated into the
+            # signed OUTBOUND_WEBHOOKS registry.
+            log(payload.get("job_id", 0) if isinstance(payload, dict) else 0,
+                "Legacy MAKE_WEBHOOK_URL ignored; migrate to signed OUTBOUND_WEBHOOKS.")
     except Exception as e:
         print("emit error", e)
 

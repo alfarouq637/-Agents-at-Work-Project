@@ -11,6 +11,7 @@ dist/
 build/
 venv/
 .venv/
+.pip-tools-cache/
 
 # SQLite
 *.db
@@ -38,3 +39,6 @@ static/uploads/*
 api/static/uploads/*
 !api/static/uploads/.gitkeep
 
+# Local pitch/demo media (kept outside the source repository)
+*.mp4
+*.pdf

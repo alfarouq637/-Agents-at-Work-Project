@@ -760,7 +760,7 @@ textarea{resize:vertical;min-height:75px}
         </div>
         <div class="form-group">
           <label>كلمة المرور</label>
-          <input type="password" id="login-password" required placeholder="أدخل كلمة المرور">
+          <input type="password" id="login-password" required autocomplete="current-password" placeholder="أدخل كلمة المرور">
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%;padding:11px;font-weight:800;margin-top:8px">
           دخول إلى حسابي
@@ -779,7 +779,7 @@ textarea{resize:vertical;min-height:75px}
         </div>
         <div class="form-group">
           <label>كلمة المرور</label>
-          <input type="password" id="reg-password" required placeholder="أدخل كلمة مرور قوية">
+          <input type="password" id="reg-password" required minlength="12" autocomplete="new-password" placeholder="أدخل كلمة مرور قوية (12 خانة على الأقل)">
         </div>
         <p style="font-size:.74rem;color:var(--fg3);margin-bottom:12px;font-family:'Readex Pro',sans-serif">
           💡 التسجيل يمنحك تجربة بناء حتى (موقعين) مجاناً بالكامل دون أي بطاقة بنكية!
@@ -936,7 +936,7 @@ textarea{resize:vertical;min-height:75px}
 
         <div class="form-group">
           <label>رمز الوصول الشخصي (GitHub Personal Access Token) *</label>
-          <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+          <input type="password" id="gh-token" placeholder="أدخل رمز GitHub الشخصي">
           <span style="font-size:.72rem;color:var(--fg3)">يتطلب صلاحية <code>repo</code> لإنشاء ورفع الملفات. <a href="https://github.com/settings/tokens/new" target="_blank" style="color:var(--accent2)">إنشاء توكن</a></span>
         </div>
 
@@ -1213,7 +1213,7 @@ textarea{resize:vertical;min-height:75px}
       </div>
       <div class="form-group">
         <label>رمز الوصول البرمجي (Bot API Token) *</label>
-        <input type="password" id="bim-token" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ...">
+        <input type="password" id="bim-token" placeholder="Paste the token issued by BotFather">
       </div>
       <div class="form-group">
         <label>اسم البوت</label>
@@ -1420,12 +1420,12 @@ textarea{resize:vertical;min-height:75px}
       <div style="background:linear-gradient(135deg,rgba(0,206,201,.1),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.3);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
         <div style="display:flex;align-items:center;gap:14px">
           <div id="sec-grade-badge" style="width:64px;height:64px;border-radius:50%;background:#00cec9;color:#0b0f19;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.8rem;box-shadow:0 0 20px rgba(0,206,201,.5)">
-            A+
+            —
           </div>
           <div>
             <div style="display:flex;align-items:center;gap:8px">
-              <h4 style="margin:0;font-size:1.1rem;font-weight:900" id="sec-score-txt">درجة الأمان: 100 / 100</h4>
-              <span id="sec-status-pill" class="tag tag-delivered" style="font-size:.72rem">معتمد للأمان (APPROVED)</span>
+              <h4 style="margin:0;font-size:1.1rem;font-weight:900" id="sec-score-txt">Static review pending</h4>
+              <span id="sec-status-pill" class="tag tag-running" style="font-size:.72rem">Not a certification</span>
             </div>
             <p style="margin:4px 0 0;font-size:.78rem;color:var(--fg3)" id="sec-reviewer-txt">
               فاحص الأمان: <b>Cybersecurity Reviewer (AutoCorp SecOps)</b>
@@ -1496,7 +1496,7 @@ textarea{resize:vertical;min-height:75px}
 <script>
 // State
 let currentMode = 'landing';
-let isAdmin = localStorage.getItem("autocorp_admin") === "1";
+let isAdmin = false;
 let currentUser = null;
 let allJobs = [];
 let catalogCounter = 0;
@@ -1505,6 +1505,22 @@ let currentTheme = localStorage.getItem("autocorp_theme") || 'dark';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// HTML escaping is not enough inside an inline event handler: the browser
+// decodes entities before compiling the JavaScript. Serialize arguments first.
+const jsArg = value => JSON.stringify(String(value ?? ''));
+const safeSiteUrl = (value, fallback) => {
+  try {
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+    const url = new URL(raw, window.location.origin);
+    if (url.protocol === 'https:' || (url.origin === window.location.origin && url.protocol === window.location.protocol)) return url.href;
+  } catch (_) {}
+  return fallback;
+};
+const safeImageUrl = value => {
+  const url = safeSiteUrl(value, '');
+  return url && (url.startsWith('https://') || new URL(url).pathname.startsWith('/static/uploads/')) ? url : '';
+};
 
 // =========================================================
 // Bilingual Dictionary (AR & EN)
@@ -1606,13 +1622,8 @@ function updateThemeButton(){
 }
 
 function getSafeToken(){
-  const t = localStorage.getItem("autocorp_user_token") || localStorage.getItem("autocorp_token") || '';
-  if(!t) return '';
-  try {
-    return encodeURIComponent(t.trim());
-  } catch(e) {
-    return '';
-  }
+  // Sessions live in an HttpOnly cookie, never in browser-readable storage.
+  return '';
 }
 
 function applyTranslations(){
@@ -1686,15 +1697,8 @@ function updateAdminView(){
 // Authentication Helpers
 // =========================================================
 async function checkAuthSession(){
-  const token = getSafeToken();
-  if(!token){
-    renderUserBadge();
-    return;
-  }
   try{
-    const res = await fetch('/api/auth/me', {
-      headers: {'x-user-token': token}
-    });
+    const res = await fetch('/api/auth/me');
     const d = await res.json();
     if(d.authenticated){
       currentUser = d.user;
@@ -1777,11 +1781,8 @@ async function handleAuthLogin(e){
     const d = await res.json();
     if(res.ok && d.ok){
       currentUser = d.user;
-      localStorage.setItem("autocorp_user_token", d.user.token);
       if(d.user.is_admin){
         isAdmin = true;
-        localStorage.setItem("autocorp_admin", "1");
-        localStorage.setItem("autocorp_token", d.user.token);
       }
       closeAuthModal();
       renderUserBadge();
@@ -1809,7 +1810,6 @@ async function handleAuthRegister(e){
     const d = await res.json();
     if(res.ok && d.ok){
       currentUser = d.user;
-      localStorage.setItem("autocorp_user_token", d.user.token);
       closeAuthModal();
       renderUserBadge();
       alert(`🎉 تم إنشاء حسابك بنجاح (${d.user.username})! رصيدك متاح لإنشاء موقعين مجاناً.`);
@@ -1822,9 +1822,10 @@ async function handleAuthRegister(e){
   }
 }
 
-function logoutUser(){
-  localStorage.removeItem("autocorp_user_token");
+async function logoutUser(){
+  await fetch('/api/auth/logout', {method: 'POST'});
   currentUser = null;
+  isAdmin = false;
   renderUserBadge();
   loadJobs();
 }
@@ -1958,7 +1959,8 @@ async function handleCreateStore(e){
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-token': userToken
+        'x-user-token': userToken,
+        'Idempotency-Key': crypto.randomUUID()
       },
       body: JSON.stringify(payload)
     });
@@ -2019,7 +2021,7 @@ function renderPublicShowcase(jobs){
   c.innerHTML = deliveredJobs.slice(0, 6).map(j => {
     let brandDisplay = j.brand_name || j.client || 'متجر إلكتروني';
     if(brandDisplay.startsWith('tg:')) brandDisplay = 'متجر الأكيل والتسوق';
-    const siteUrl = j.frontend_url || ('/sites/' + (j.slug || j.id) + '/');
+    const siteUrl = safeSiteUrl(j.frontend_url, '/sites/' + (j.slug || j.id) + '/');
     return `
     <div style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;flex-direction:column;justify-content:space-between">
       <div>
@@ -2031,7 +2033,7 @@ function renderPublicShowcase(jobs){
           ${esc(j.request.substring(0, 100))}...
         </p>
       </div>
-      <a href="${siteUrl}" target="_blank" class="btn btn-success btn-sm" style="font-weight:800;width:100%">
+      <a href="${esc(siteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="font-weight:800;width:100%">
         🌐 فتح وتشغيل الموقع الإلكتروني (Live Website)
       </a>
     </div>
@@ -2060,7 +2062,7 @@ function renderMyStores(jobs){
 
   container.innerHTML = myStores.map(j => {
     const isPaid = j.is_paid;
-    const siteUrl = j.frontend_url || ('/sites/' + (j.slug || j.id) + '/');
+    const siteUrl = safeSiteUrl(j.frontend_url, '/sites/' + (j.slug || j.id) + '/');
     return `
       <div class="card" style="border:1px solid ${isPaid ? 'rgba(0,206,201,.3)' : 'var(--border)'}">
         <div class="card-header">
@@ -2087,31 +2089,31 @@ function renderMyStores(jobs){
         <div style="background:rgba(0,206,201,.04);padding:14px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.18);display:flex;flex-direction:column;gap:10px">
           <!-- Row 1: Core site and edit tools -->
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <a href="${siteUrl}" target="_blank" class="btn btn-success" style="font-weight:900;padding:8px 18px">
+            <a href="${esc(siteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-success" style="font-weight:900;padding:8px 18px">
               🌐 فتح وتشغيل الموقع
             </a>
 
-            <button class="btn btn-primary btn-sm" onclick="openRefineModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-primary btn-sm" onclick="openRefineModal(${j.id}, ${esc(jsArg(j.client))})">
               🪄 تطوير ببرومبت
             </button>
 
-            <button class="btn btn-ghost btn-sm" onclick="openVisualEditModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-ghost btn-sm" onclick="openVisualEditModal(${j.id}, ${esc(jsArg(j.client))})">
               🎨 المحرر المرئي
             </button>
 
-            <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, ${esc(jsArg(j.client))})">
               ✏️ محرر الأكواد والملفات
             </button>
 
-            <button class="btn btn-ghost btn-sm" onclick="openDatabaseModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-ghost btn-sm" onclick="openDatabaseModal(${j.id}, ${esc(jsArg(j.client))})">
               🗄️ قاعدة بيانات المتجر
             </button>
 
-            <button class="btn btn-ghost btn-sm" onclick="openSecurityModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-ghost btn-sm" onclick="openSecurityModal(${j.id}, ${esc(jsArg(j.client))})">
               🛡️ فحص الأمان (OWASP)
             </button>
 
-            <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, ${esc(jsArg(j.client))})">
               📦 إدارة المنتجات
             </button>
 
@@ -2122,19 +2124,19 @@ function renderMyStores(jobs){
 
           <!-- Row 2: Marketing, Integrations, Deployment & Deletion -->
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.06);padding-top:10px">
-            <button class="btn btn-gold btn-sm" onclick="openMarketingModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-gold btn-sm" onclick="openMarketingModal(${j.id}, ${esc(jsArg(j.client))})">
               📢 التسويق الذكي بالإيميل
             </button>
 
-            <button class="btn btn-ghost btn-sm" onclick="openBotModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-ghost btn-sm" onclick="openBotModal(${j.id}, ${esc(jsArg(j.client))})">
               🤖 ربط بوت Telegram & WhatsApp
             </button>
 
-            <button class="btn btn-ghost btn-sm" onclick="openHostingModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-ghost btn-sm" onclick="openHostingModal(${j.id}, ${esc(jsArg(j.client))})">
               ⚙️ النشر والدومين و ZIP
             </button>
 
-            <button class="btn btn-primary btn-sm" onclick="openGitVercelModal(${j.id}, '${esc(j.client)}')">
+            <button class="btn btn-primary btn-sm" onclick="openGitVercelModal(${j.id}, ${esc(jsArg(j.client))})">
               🚀 نشر GitHub & Vercel
             </button>
 
@@ -2143,7 +2145,7 @@ function renderMyStores(jobs){
               💳 تفعيل الاشتراك
             </button>` : ''}
 
-            <button class="btn btn-danger btn-sm" onclick="openDeleteConfirmModal(${j.id}, '${esc(j.client)}')" style="margin-right:auto">
+            <button class="btn btn-danger btn-sm" onclick="openDeleteConfirmModal(${j.id}, ${esc(jsArg(j.client))})" style="margin-right:auto">
               🗑️ حذف المشروع نهائياً
             </button>
           </div>
@@ -2373,7 +2375,7 @@ async function submitGitHubDeploy(){
         <div style="background:rgba(0,206,201,.1);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;margin-top:10px">
           <div style="color:var(--accent);font-weight:900;margin-bottom:6px">🎉 تم الرفع إلى GitHub بنجاح!</div>
           <p style="font-size:.8rem;color:var(--fg);margin-bottom:8px">${esc(d.message)}</p>
-          <a href="${d.repo_url}" target="_blank" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
+          <a href="${esc(safeSiteUrl(d.repo_url, ''))}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
             🔗 فتح المستودع على GitHub (${esc(d.repo_url)})
           </a>
         </div>
@@ -2435,7 +2437,7 @@ async function submitVercelDeploy(){
           <div style="background:rgba(0,206,201,.1);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;margin-top:10px">
             <div style="color:var(--accent);font-weight:900;margin-bottom:6px">🎉 تم النشر على Vercel Cloud بنجاح!</div>
             <p style="font-size:.8rem;color:var(--fg);margin-bottom:8px">الحالة: <b>${esc(d.status || 'READY')}</b></p>
-            <a href="${d.url}" target="_blank" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
+          <a href="${esc(safeSiteUrl(d.url, ''))}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
               🌐 فتح موقعك على Vercel (${esc(d.url)})
             </a>
           </div>
@@ -2579,9 +2581,8 @@ async function submitInlineAdminLogin(){
     });
     const d = await res.json();
     if(d.ok){
-      localStorage.setItem("autocorp_admin", "1");
-      localStorage.setItem("autocorp_token", d.token);
       isAdmin = true;
+      currentUser = {username: d.username || 'Administrator', is_admin: true};
       renderUserBadge();
       updateAdminView();
       alert(`👑 ${d.username ? 'أهلاً بك (' + d.username + ')' : 'أهلاً بك'}! تم تسجيل الدخول كمدير مشرف.`);
@@ -2593,10 +2594,10 @@ async function submitInlineAdminLogin(){
   }
 }
 
-function logoutAdmin(){
-  localStorage.removeItem("autocorp_admin");
-  localStorage.removeItem("autocorp_token");
+async function logoutAdmin(){
+  await fetch('/api/auth/logout', {method: 'POST'});
   isAdmin = false;
+  currentUser = null;
   renderUserBadge();
   updateAdminView();
 }
@@ -2701,7 +2702,7 @@ async function reloadFileEditorList(){
   try{
     const res = await fetch(`/api/sites/${jid}/files`, {headers: {'x-user-token': token}});
     const files = await res.json();
-    sel.innerHTML = files.map(f => `<option value="${f.filename}">${f.filename} (${f.type})</option>`).join('');
+    sel.innerHTML = files.map(f => `<option value="${esc(f.filename)}">${esc(f.filename)} (${esc(f.type)})</option>`).join('');
     if(files.length){
       sel.value = files[0].filename;
       await onFileEditorSelectChange();
@@ -2849,7 +2850,7 @@ async function submitRefineSite(){
         <div style="background:rgba(0,206,201,.1);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;margin-top:10px">
           <div style="color:var(--accent);font-weight:900;margin-bottom:6px">🎉 تم تحديث الموقع بنجاح!</div>
           <p style="font-size:.8rem;color:var(--fg);margin-bottom:8px">${esc(d.message)}</p>
-          <a href="${d.frontend_url}" target="_blank" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
+          <a href="${esc(safeSiteUrl(d.frontend_url, '/sites/' + jid + '/') )}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="display:inline-block;font-weight:800">
             🌐 فتح الموقع المحدّث (${esc(d.frontend_url)})
           </a>
         </div>
@@ -2969,15 +2970,28 @@ async function loadProductsList(jid){
   tb.innerHTML = '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--fg3)">جاري جلب المنتجات...</td></tr>';
   try{
     const res = await fetch(`/api/sites/${jid}/items`);
+    if(!res.ok) throw new Error('Product list request failed');
     const items = await res.json();
-    if(!items.length){
+    if(!Array.isArray(items)) throw new Error('Invalid product list response');
+    const safeItems = items.filter(it => it && typeof it === 'object').map(it => {
+      const id = Number(it.id);
+      const price = Number(it.price);
+      if(!Number.isSafeInteger(id) || id < 1) return null;
+      return {
+        ...it,
+        id,
+        price: Number.isFinite(price) && price >= 0 ? price : 0,
+        image_url: safeImageUrl(it.image_url)
+      };
+    }).filter(Boolean) : [];
+    if(!safeItems.length){
       tb.innerHTML = '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--fg3)">لا توجد منتجات مسجلة حتى الآن</td></tr>';
       return;
     }
-    tb.innerHTML = items.map(it => `
+    tb.innerHTML = safeItems.map(it => `
       <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
         <td style="padding:6px">
-          ${it.image_url ? `<img src="${it.image_url}" style="width:34px;height:34px;object-fit:cover;border-radius:4px">` : '🛒'}
+          ${safeImageUrl(it.image_url) ? `<img src="${esc(safeImageUrl(it.image_url))}" alt="" style="width:34px;height:34px;object-fit:cover;border-radius:4px">` : '🛒'}
         </td>
         <td style="padding:6px;font-weight:700">${esc(it.title)}</td>
         <td style="padding:6px;color:var(--gold)">${it.price} ج.م</td>
@@ -2987,8 +3001,9 @@ async function loadProductsList(jid){
         </td>
       </tr>
     `).join('');
-  }catch(e){
-    tb.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">فشل التحميل: ${e.message}</td></tr>`;
+  }catch(_e){
+    // Keep transport and parser details out of HTML and user-visible output.
+    tb.innerHTML = '<tr><td colspan="5" style="color:var(--danger)">تعذر تحميل المنتجات. حاول مرة أخرى.</td></tr>';
   }
 }
 
@@ -3325,7 +3340,7 @@ function renderTablePills(tables){
   const c = $('#db-tables-pills');
   if(!c) return;
   c.innerHTML = tables.map(t => `
-    <button class="btn btn-sm ${t.table_name === activeDbTable ? 'btn-primary' : 'btn-ghost'}" onclick="loadTenantTableData('${t.table_name}')" style="font-size:.76rem;padding:4px 9px">
+    <button class="btn btn-sm ${t.table_name === activeDbTable ? 'btn-primary' : 'btn-ghost'}" onclick="loadTenantTableData(${esc(jsArg(t.table_name))})" style="font-size:.76rem;padding:4px 9px">
       📁 ${t.table_name} <span class="badge" style="background:rgba(255,255,255,.15);margin-right:4px">${t.row_count}</span>
     </button>
   `).join('');
@@ -3340,7 +3355,7 @@ async function loadTenantTableData(tableName){
 
   const token = getSafeToken();
   try{
-    const res = await fetch(`/api/sites/${jid}/database/tables/${tableName}`, {
+    const res = await fetch(`/api/sites/${jid}/database/tables/${encodeURIComponent(tableName)}`, {
       headers: {'x-user-token': token}
     });
     const d = await res.json();
@@ -3355,7 +3370,7 @@ async function loadTenantTableData(tableName){
       <table style="width:100%;border-collapse:collapse;font-size:.76rem">
         <thead>
           <tr style="border-bottom:1px solid var(--border);color:var(--accent2);text-align:right">
-            ${cols.map(col => `<th style="padding:6px">${col}</th>`).join('')}
+            ${cols.map(col => `<th style="padding:6px">${esc(col)}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
@@ -3421,7 +3436,7 @@ async function runTenantSqlQuery(){
       <table style="width:100%;border-collapse:collapse;font-size:.76rem">
         <thead>
           <tr style="border-bottom:1px solid var(--border);color:var(--accent2);text-align:right">
-            ${cols.map(col => `<th style="padding:6px">${col}</th>`).join('')}
+            ${cols.map(col => `<th style="padding:6px">${esc(col)}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
@@ -3530,7 +3545,7 @@ async function runLiveSastScan(){
     btn.textContent = '🔄 إعادة الفحص التلقائي (Run SAST)';
     if(res.ok && d.success){
       renderSecurityAudit(d.audit);
-      alert('✅ تم الانتهاء من فحص الأمان SAST بنجاح وتحديث شهادة OWASP Top 10!');
+      alert('✅ اكتمل الفحص الساكن. النتيجة ليست شهادة OWASP أو موافقة نشر.');
     }
   }catch(err){
     btn.disabled = false;
@@ -3541,30 +3556,30 @@ async function runLiveSastScan(){
 
 function renderSecurityAudit(audit){
   currentSecurityAudit = audit;
-  const score = audit.score || 100;
-  const grade = audit.grade || 'A+';
-  const status = audit.status || 'APPROVED';
+  const score = Number.isFinite(audit.heuristic_score) ? audit.heuristic_score : audit.score;
+  const grade = audit.grade || 'STATIC_REVIEW';
+  const status = audit.status || 'STATIC_REVIEW';
 
-  $('#sec-score-txt').textContent = `درجة الأمان: ${score} / 100`;
+  $('#sec-score-txt').textContent = `Static review heuristic: ${Number.isFinite(score) ? score + ' / 100' : 'N/A'} — not a certification`;
   $('#sec-grade-badge').textContent = grade;
   $('#sec-reviewer-txt').innerHTML = `فاحص الأمان: <b>${esc(audit.reviewer_agent || 'Cybersecurity Reviewer')}</b>`;
 
   const badge = $('#sec-grade-badge');
-  if(score >= 90){
+  if(status === 'STATIC_REVIEW_PASSED'){
     badge.style.background = '#00cec9';
     badge.style.boxShadow = '0 0 20px rgba(0,206,201,.5)';
-    $('#sec-status-pill').className = 'tag tag-delivered';
-    $('#sec-status-pill').textContent = 'معتمد للأمان (APPROVED)';
-  } else if(score >= 75){
+    $('#sec-status-pill').className = 'tag tag-running';
+    $('#sec-status-pill').textContent = 'Static checks passed — review required';
+  } else if(status === 'NEEDS_REVISION'){
     badge.style.background = '#fdcb6e';
     badge.style.boxShadow = '0 0 20px rgba(253,203,110,.5)';
     $('#sec-status-pill').className = 'tag tag-running';
-    $('#sec-status-pill').textContent = 'يحتاج لملاحظات (WARNING)';
+    $('#sec-status-pill').textContent = 'Static review needs revision';
   } else {
     badge.style.background = '#ff7675';
     badge.style.boxShadow = '0 0 20px rgba(255,118,117,.5)';
     $('#sec-status-pill').className = 'tag tag-danger';
-    $('#sec-status-pill').textContent = 'غير معتمد (NEEDS FIX)';
+    $('#sec-status-pill').textContent = 'Static review unavailable';
   }
 
   // Quick metrics
@@ -3587,8 +3602,12 @@ function renderSecurityAudit(audit){
   // OWASP Checklist tab
   const owasp = audit.owasp_compliance || {};
   const checklistContainer = $('#sec-checklist-items');
-  checklistContainer.innerHTML = Object.entries(owasp).map(([k, item]) => {
-    const isPass = item.status === 'PASS';
+  const safeOwasp = Object.entries(owasp).map(([key, item]) => [
+    esc(key),
+    {...item, title: esc(item.title), details: esc(item.details)}
+  ]);
+  checklistContainer.innerHTML = safeOwasp.map(([k, item]) => {
+    const isPass = item.status === 'STATIC_CHECK_PASSED';
     return `
       <div style="background:rgba(255,255,255,.03);border:1px solid ${isPass ? 'rgba(0,206,201,.2)' : 'rgba(255,118,117,.3)'};border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
         <div>
@@ -3598,7 +3617,7 @@ function renderSecurityAudit(audit){
           <div style="font-size:.76rem;color:var(--fg3);margin-top:2px">${item.details}</div>
         </div>
         <span class="tag ${isPass ? 'tag-delivered' : 'tag-danger'}" style="font-size:.72rem">
-          ${isPass ? '✅ اجتياز (PASS)' : '⚠️ تنبيه (ATTN)'}
+          ${isPass ? 'ℹ️ Static check passed' : '⚠️ Not verified'}
         </span>
       </div>
     `;
@@ -3606,7 +3625,12 @@ function renderSecurityAudit(audit){
 
   // Passed rules tab
   const passedContainer = $('#sec-passed-items');
-  passedContainer.innerHTML = passed.map(p => `
+  const safePassed = passed.map(p => ({
+    name: esc(p.name),
+    category: esc(p.category),
+    description: esc(p.description)
+  }));
+  passedContainer.innerHTML = safePassed.map(p => `
     <div style="background:rgba(0,206,201,.05);border:1px solid rgba(0,206,201,.2);border-radius:var(--radius-sm);padding:10px 14px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <b style="color:var(--success);font-size:.82rem">✓ ${p.name}</b>
@@ -3619,9 +3643,17 @@ function renderSecurityAudit(audit){
   // Findings tab
   const findingsContainer = $('#sec-findings-items');
   if(!findings.length){
-    findingsContainer.innerHTML = '<div style="background:rgba(0,206,201,.05);border:1px solid rgba(0,206,201,.2);border-radius:var(--radius-sm);padding:16px;text-align:center;color:var(--success);font-weight:700">🎉 رائع! كود الموقع نظيف تماماً ومطابق لمعايير OWASP Top 10 بدون أي ثغرات مكشوفة.</div>';
+    findingsContainer.innerHTML = '<div style="background:rgba(0,206,201,.05);border:1px solid rgba(0,206,201,.2);border-radius:var(--radius-sm);padding:16px;text-align:center;color:var(--fg2);font-weight:700">ℹ️ لم يرصد الفحص الساكن المحدود أنماطاً إضافية. لا يثبت ذلك خلو الموقع من الثغرات أو توافقه مع OWASP.</div>';
   } else {
-    findingsContainer.innerHTML = findings.map(f => `
+    const safeFindings = findings.map(f => ({
+      rule: esc(f.rule),
+      severity: esc(String(f.severity || 'unknown').toUpperCase()),
+      file: esc(f.file),
+      line: esc(f.line),
+      description: esc(f.description),
+      fix: esc(f.fix)
+    }));
+    findingsContainer.innerHTML = safeFindings.map(f => `
       <div style="background:rgba(255,118,117,.06);border:1px solid rgba(255,118,117,.3);border-radius:var(--radius-sm);padding:12px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <b style="color:var(--danger);font-size:.84rem">⚠️ ${f.rule} (${f.severity.toUpperCase()})</b>
@@ -3678,27 +3710,28 @@ async function loadAdminSitesManager(){
               </tr>
             </thead>
             <tbody>
-              ${jobs.map(j => {
-                const siteUrl = j.frontend_url || ('/sites/' + (j.slug || j.id) + '/');
+              ${jobs.map((j, index) => {
+                const clientDisplay = j.client || j.brand_name;
+                const siteUrl = safeSiteUrl(j.frontend_url, '/sites/' + (j.slug || j.id) + '/');
                 return `
                 <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
                   <td style="padding:8px;font-family:'JetBrains Mono',monospace;color:var(--accent2)">#${j.id}</td>
-                  <td style="padding:8px"><b>${esc(j.client || j.brand_name)}</b></td>
-                  <td style="padding:8px"><span class="tag ${j.status === 'delivered' ? 'tag-delivered' : 'tag-running'}">${j.status}</span></td>
+                  <td style="padding:8px"><b>${esc(clientDisplay)}</b></td>
+                  <td style="padding:8px"><span class="tag ${j.status === 'delivered' ? 'tag-delivered' : 'tag-running'}" data-job-status-index="${index}"></span></td>
                   <td style="padding:8px;color:${j.is_paid ? 'var(--success)' : 'var(--gold)'}">${j.is_paid ? '✅ مدفوع' : '⏳ تجريبي'}</td>
                   <td style="padding:8px"><b>${j.orders_count || 0}</b></td>
                   <td style="padding:8px">
                     <div style="display:flex;gap:4px;flex-wrap:wrap">
-                      <a href="${siteUrl}" target="_blank" class="btn btn-success btn-sm" style="padding:3px 7px;font-size:.7rem">🌐 فتح</a>
-                      <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">✏️ الأكواد</button>
-                      <button class="btn btn-ghost btn-sm" onclick="openDatabaseModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🗄️ الداتابيز</button>
-                      <button class="btn btn-ghost btn-sm" onclick="openSecurityModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🛡️ الأمان</button>
-                      <button class="btn btn-ghost btn-sm" onclick="openVisualEditModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🎨 المرئي</button>
-                      <button class="btn btn-primary btn-sm" onclick="openRefineModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🪄 برومبت</button>
-                      <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">📦 المنتجات</button>
-                      <button class="btn btn-gold btn-sm" onclick="openMarketingModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">📢 تسويق</button>
-                      <button class="btn btn-ghost btn-sm" onclick="openBotModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🤖 بوتات</button>
-                      <button class="btn btn-danger btn-sm" onclick="openDeleteConfirmModal(${j.id}, '${esc(j.client)}')" style="padding:3px 7px;font-size:.7rem">🗑️ حذف</button>
+                      <a href="${esc(siteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="padding:3px 7px;font-size:.7rem">🌐 فتح</a>
+                      <button class="btn btn-ghost btn-sm" onclick="openFileEditorModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">✏️ الأكواد</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openDatabaseModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">🗄️ الداتابيز</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openSecurityModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">🛡️ الأمان</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openVisualEditModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">🎨 المرئي</button>
+                      <button class="btn btn-primary btn-sm" onclick="openRefineModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">🪄 برومبت</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openProductsModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">📦 المنتجات</button>
+                      <button class="btn btn-gold btn-sm" onclick="openMarketingModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">📢 تسويق</button>
+                      <button class="btn btn-ghost btn-sm" onclick="openBotModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">🤖 بوتات</button>
+                      <button class="btn btn-danger btn-sm" onclick="openDeleteConfirmModal(${j.id}, ${esc(jsArg(j.client))})" style="padding:3px 7px;font-size:.7rem">🗑️ حذف</button>
                     </div>
                   </td>
                 </tr>
@@ -3709,6 +3742,10 @@ async function loadAdminSitesManager(){
         </div>
       </div>
     `;
+    c.querySelectorAll('[data-job-status-index]').forEach(node => {
+      const status = jobs[Number(node.dataset.jobStatusIndex)]?.status;
+      node.textContent = typeof status === 'string' ? status.slice(0, 80) : '';
+    });
   }catch(e){
     c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
   }

@@ -1,64 +1,93 @@
-# 🚀 دليل رفع وتشغيل منصة AutoCorp على Vercel بالكامل
+# نشر AutoCorp على Vercel — دليل آمن لبيئة المعاينة
 
-تم تصميم منصة **AutoCorp** لتعمل بشكل مثالي كـ **Serverless Application** على منصة **Vercel** دون أي مكتبات ثنائية معقدة، بالاعتماد على:
-1. **Vercel Serverless Functions (`@vercel/python`)** لتشغيل واجهات FastAPI.
-2. **Turso libSQL Cloud (`/v2/pipeline`)** عبر اتصالات HTTPS مشفرة تضمن استقرار وسرعة قواعد البيانات دون الحاجة لملفات SQLite محلية.
-3. **Telegram Webhook** لاستقبال رسائل تيليجرام ومعالجتها لحظياً.
+> هذا الدليل يجهز نسخة معاينة محمية من التطبيق الحالي، وليس إقراراً بأن
+> المنصة جاهزة للإنتاج أو متاحة دائماً. لا تنشر بيانات عملاء أو تدفق دفع حي
+> قبل استيفاء بوابات الإصدار في
+> [خطة المعالجة](docs/ENTERPRISE_REMEDIATION_PLAN.md).
 
----
+## قبل النشر
 
-## 📋 الخطوة 1: الرفع عبر Vercel Dashboard (طريقة الـ 1-Click)
+1. دوّر كل سر استُخدم تاريخياً، ثم خزّنه في مدير أسرار Vercel فقط.
+2. شغّل محلياً `python -m pip install -r requirements.txt` ثم `pytest -q`.
+3. استخدم قاعدة Turso منفصلة للمعاينة؛ لا تعتمد على SQLite المحلي، لأن قرص
+   Vercel مؤقت ولا يصلح كقاعدة بيانات مشتركة.
+4. لا تضع أسرار الإنتاج في Preview deployments أو في ملفات `.env` المتتبعة.
 
-1. ادخل إلى حسابك على [Vercel.com](https://vercel.com).
-2. اضغط على زر **"Add New..."** ثم اختر **"Project"**.
-3. قم بربط مستودع GitHub الخاص بك:
-   ```
-   https://github.com/alfarouq637/-Agents-at-Work-Project.git
-   ```
-4. في شاشة إعدادات المشروع (Configure Project):
-   - **Framework Preset**: اتركه **Other** (يتعرف Vercel تلقائياً على `vercel.json`).
-   - **Root Directory**: `./` (المجلد الرئيسي).
-   - **Build Command**: اتركه فارغاً.
-   - **Output Directory**: اتركه فارغاً.
+## إعداد المشروع
 
----
+- اربط المستودع من Vercel واختر **Other** وRoot Directory: `./`.
+- لا تضف المتغير `VERCEL` يدوياً؛ تضبطه منصة Vercel وقت التشغيل.
+- لا تضف Build Command مخصصاً. نقطة الدخول هي `api/index.py` وتعرّض تطبيق
+  FastAPI باسم `app`، وهو النمط المدعوم في
+  [Python Runtime](https://vercel.com/docs/functions/runtimes/python).
+- لا تفعّل أياً من متغيرات `ENABLE_*` عالية الخطورة.
 
-## 🔑 الخطوة 2: ضبط متغيرات البيئة (Environment Variables) في Vercel
+## متغيرات بيئة الإنتاج المطلوبة
 
-قبل الضغط على **Deploy**، افتح قسم **Environment Variables** في Vercel وأضف المتغيرات التالية:
+أضف القيم في **Project Settings → Environment Variables**، واختر Production
+فقط للأسرار. التغييرات لا تسري على نشر قائم حتى تعيد النشر.
 
-| اسم المتغير (Variable Name) | القيمة المقترحة (Value) | الوصف |
-| :--- | :--- | :--- |
-| `VERCEL` | `1` | تفعيل وضع السيرفرلس |
-| `TURSO_DATABASE_URL` | `libsql://your-db.aws-eu-west-1.turso.io` | رابط قاعدة بيانات Turso Cloud |
-| `TURSO_AUTH_TOKEN` | `eyJhbGciOi...` | توكن المصادقة المشفر لقاعدة Turso |
-| `ADMIN_PASSWORD` | `AlfarouqIbrahim` (أو كلمة سرك) | كلمة مرور المشرف العام لحماية لوحة الإدارة |
-| `ADMIN_KEY` | `autocorp-admin-secret-2026` | مفتاح التوكن السري للمشرف |
-| `AUTH_SECRET_KEY` | `autocorp-jwt-salt-secure-2026` | مفتاح تشفير توكنات تسجيل دخول العملاء |
-| `TELEGRAM_BOT_TOKEN` | `8620532191:AAGha00LT89LYPtZxelOyiKgrxw8p3KaGdA` | توكن بوت التيليجرام الرسمي |
-| `TELEGRAM_BOT_USERNAME` | `autocorp_Alfarouq_Ibrahim_bot` | يوزر نيم البوت |
-| `OPENROUTER_API_KEY` | مفتاح OpenRouter الخاص بك | اختياري لتوليد النصوص والنماذج الذكية |
-| `NVIDIA_API_KEY` | مفتاح NVIDIA NIM الخاص بك | اختياري لنموذج الرؤية وتحليل صور المنيو |
-| `GROQ_API_KEY` | مفتاح Groq الخاص بك | اختياري للمحادثة السريعة |
-| `MOCK` | `0` (أو `1` للمحاكاة بدون رصيد) | وضع التشغيل |
+| المتغير | الغرض |
+| --- | --- |
+| `TURSO_DATABASE_URL` | عنوان قاعدة Turso الإنتاجية المنفصلة. |
+| `TURSO_AUTH_TOKEN` | رمز Turso محدود الصلاحية. |
+| `AUTH_SECRET_KEY` | قيمة عشوائية عالية الإنتروبيا لتوقيع الجلسات. |
+| `ADMIN_PASSWORD` | كلمة مرور مشرف فريدة وطويلة؛ لا تستخدمها في Telegram. |
+| `PUBLIC_URL` | رابط HTTPS الأساسي فقط، مثل `https://app.example.com`. |
+| `TRUSTED_ORIGINS` | أصول الويب الأولى الإضافية مفصولة بفواصل؛ اتركه فارغاً إن لم توجد. |
+| `MAINTENANCE_MODE` | اتركه `0` عادةً؛ اضبطه مؤقتاً على `1` أثناء الاستجابة للحوادث أو تدوير الأسرار لمنع كل عمليات الكتابة. |
+| `TELEGRAM_BOT_TOKEN` | اختياري؛ رمز البوت بعد تدويره. |
+| `TELEGRAM_SECRET` | مطلوب عند تفعيل webhook؛ قيمة عشوائية مستقلة. |
+| `TELEGRAM_OWNER_CHAT_ID` | اختياري؛ Chat ID الوحيد الذي يستطيع اعتماد العمليات. |
 
----
+عند وجود `PUBLIC_URL` يبدأ بـ`https://` يفعّل التطبيق تلقائياً HSTS ووسم
+`Secure` لملف الجلسة. اترك كل مفاتيح `ENABLE_DIRECT_DEPLOYMENT` و
+`ENABLE_TENANT_FILE_EDITOR` و`ENABLE_TENANT_SQL_CONSOLE` و
+`ENABLE_TENANT_BOT_CREDENTIALS` و`ENABLE_DEMO_PAYMENT_ACTIVATION` على `0`.
 
-## 🌐 الخطوة 3: تفعيل Webhook لبوت تيليجرام على Vercel
+عند تمكين `MAINTENANCE_MODE=1` تظل الصفحات و`GET /api/healthz` متاحة للقراءة،
+لكن التطبيق يرفض كل `POST` و`PUT` و`PATCH` و`DELETE` (بما فيها Telegram
+والـwebhooks) بـ`503`. أعده إلى `0` فقط بعد اكتمال التدوير والتحقق من النشر.
 
-بعد إتمام الرفع والحصول على رابط موقعك على Vercel (مثال: `https://autocorp.vercel.app`):
-قم بتفعيل الـ Webhook حتى يستقبل بوت التيليجرام الرسائل عبر السيرفرلس:
+توضح وثائق Vercel أن الأسرار متاحة لكل نشر جديد في البيئة المحددة، لذا أعد
+النشر بعد الإضافة أو التدوير ولا تضعها في الشيفرة أو سجلات البناء. راجع
+[إدارة متغيرات Vercel](https://vercel.com/docs/environment-variables).
 
-افتح المتصفح أو موجه الأوامر واطلب الرابط التالي:
+## Telegram webhook (اختياري)
+
+فعّل البوت فقط بعد أن تصبح `https://YOUR_DOMAIN/api/healthz` جاهزة وتضبط
+`PUBLIC_URL` على نفس الأصل. يرفض التطبيق webhook بلا رأس
+`X-Telegram-Bot-Api-Secret-Token`.
+
+احفظ `TELEGRAM_BOT_TOKEN` و`TELEGRAM_SECRET` كمتغيرات بيئة في جلسة طرفية
+خاصة (لا تضع القيم حرفياً في history أو دردشة)، ثم نفّذ:
+
 ```bash
-curl "https://api.telegram.org/bot8620532191:AAGha00LT89LYPtZxelOyiKgrxw8p3KaGdA/setWebhook?url=https://YOUR_VERCEL_DOMAIN.vercel.app/telegram"
+curl --fail --silent --show-error \
+  -F "url=${PUBLIC_URL%/}/telegram" \
+  -F "secret_token=${TELEGRAM_SECRET}" \
+  "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
 ```
-*(استبدل `YOUR_VERCEL_DOMAIN` برابط مشروعك الذي يمنحه لك Vercel).*
 
----
+يعتمد ذلك على `secret_token` الرسمي لـ`setWebhook`؛ تؤكد وثائق Telegram أن
+webhook يجب أن يكون HTTPS وأنه يمكن تعيينه عبر هذه العملية. راجع
+[دليل Telegram Webhooks](https://core.telegram.org/bots/webhooks).
 
-## ✅ التحقق بعد الرفع:
-- **الرئيسية واللاندينج بيدج**: `https://YOUR_VERCEL_DOMAIN.vercel.app/`
-- **لوحة المشرف العام**: اضغط على "👑 لوحة المشرف" وأدخل كلمة المرور.
-- **تطبيق العميل**: `https://YOUR_VERCEL_DOMAIN.vercel.app/sites/5/`
-- **بوت التيليجرام**: أرسل رسالة للبوت على `@autocorp_Alfarouq_Ibrahim_bot` وسيرد عليك فوراً.
+## بوابة التحقق بعد النشر
+
+1. تحقق من `GET /api/healthz`. يجب أن يعود `200` مع `ready: true` و
+   `database_ready: true` ومن دون إعدادات أو تبعيات مطلوبة مفقودة.
+2. تحقق من تسجيل مستخدم تجريبي ثم تسجيل خروجه؛ يجب أن يكون ملف الجلسة
+   `HttpOnly` و`Secure`، وأن تصبح النسخة المنسوخة من الجلسة غير صالحة بعد
+   الخروج.
+3. اختبر Telegram برسالة غير حساسة فقط، ثم راجع أن `TELEGRAM_SECRET` غير
+   موجود في الاستجابات أو السجلات.
+4. لا تفعّل الدفع أو النشر المباشر أو بيانات بوت التاجر من هذه النسخة.
+
+## قيود الاستضافة الحالية
+
+Vercel مناسب لهذه الواجهة والمعاينات القصيرة وwebhook، لكنه ليس منصة للمهام
+الدائمة أو polling أو سير عمل الوكلاء طويل الأمد. يستمر polling محلياً فقط؛
+الإنتاج يحتاج webhook وعمّال/طابوراً دائماً قبل الادعاء بالتشغيل المستمر.
+يتطلب الهدف النهائي PostgreSQL مع RLS وتخزين كائنات وoutbox ومراقبة ونسخاً
+احتياطياً واختبارات استعادة كما هو محدد في الخطة.

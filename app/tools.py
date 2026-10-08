@@ -1,12 +1,15 @@
 """Tools agents may use. Which agent gets which tool is decided by skills/*.md.
 All network tools are guarded (public hosts only / pre-registered webhooks only)."""
 import ast
+import hashlib
+import hmac
 import ipaddress
 import json
 import operator
 import os
 import re
 import socket
+import time
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import httpx
@@ -104,11 +107,33 @@ def _hooks():
 
 
 async def webhook(name, payload=None):
+    # External automation is intentionally opt-in. A configured URL alone is
+    # not approval to send customer or delivery data outside the platform.
+    if os.getenv("ENABLE_OUTBOUND_WEBHOOKS", "0") != "1":
+        return "Outbound webhooks are disabled."
     url = _hooks().get(name)
     if not url:
         return f"Unknown webhook '{name}'. Registered: {list(_hooks())}"
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not _public(url):
+        return "BLOCKED: outbound webhooks must use a public HTTPS URL."
+    secret = os.getenv("OUTBOUND_WEBHOOK_SECRET", "")
+    if not secret:
+        return "Outbound webhook signing secret is not configured."
+
+    body = json.dumps(payload or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    timestamp = str(int(time.time()))
+    signature = hmac.new(
+        secret.encode("utf-8"), timestamp.encode("ascii") + b"." + body, hashlib.sha256
+    ).hexdigest()
+    headers = {
+        "Content-Type": "application/json",
+        "X-AutoCorp-Event": name,
+        "X-AutoCorp-Timestamp": timestamp,
+        "X-AutoCorp-Signature": f"sha256={signature}",
+    }
     async with httpx.AsyncClient(timeout=25) as cl:
-        r = await cl.post(url, json=payload or {})
+        r = await cl.post(url, content=body, headers=headers, follow_redirects=False)
     return f"webhook '{name}' -> HTTP {r.status_code}"
 
 

@@ -8,7 +8,7 @@ import json
 import os
 import sqlite3
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import httpx
 
@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     site_url TEXT,
     price REAL DEFAULT 0,
     cost REAL DEFAULT 0,
-    created_at REAL
+    created_at REAL,
+    idempotency_key TEXT,
+    request_hash TEXT
 );
 CREATE TABLE IF NOT EXISTS ledger (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,8 +114,10 @@ CREATE TABLE IF NOT EXISTS site_orders (
     total_egp REAL,
     payment_method TEXT,
     payment_ref TEXT,
-    status TEXT DEFAULT 'confirmed',
-    created_at REAL
+    status TEXT DEFAULT 'pending_confirmation',
+    created_at REAL,
+    idempotency_key TEXT,
+    request_hash TEXT
 );
 CREATE TABLE IF NOT EXISTS site_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -152,6 +156,15 @@ CREATE TABLE IF NOT EXISTS users (
     telegram_id TEXT,
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS user_sessions (
+    session_id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    revoked_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_active_user
+    ON user_sessions (user_id, expires_at);
 CREATE TABLE IF NOT EXISTS telegram_updates (
     update_id TEXT PRIMARY KEY,
     created_at REAL
@@ -246,7 +259,46 @@ CREATE TABLE IF NOT EXISTS site_security_audits (
     reviewer_agent TEXT DEFAULT 'Cybersecurity Reviewer',
     audited_at REAL
 );
+CREATE TABLE IF NOT EXISTS audit_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at REAL NOT NULL,
+    actor_type TEXT NOT NULL,
+    actor_id INTEGER,
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id TEXT,
+    outcome TEXT NOT NULL,
+    request_id TEXT,
+    metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_audit_events_occurred_at ON audit_events(occurred_at DESC);
+CREATE TABLE IF NOT EXISTS idempotency_records (
+    scope TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    job_id INTEGER NOT NULL DEFAULT 0,
+    order_id INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (scope, idempotency_key)
+);
 """
+
+# These indexes are applied after additive migrations because older databases
+# may not yet have the newer columns when the base schema is first evaluated.
+INDEX_STATEMENTS = (
+    "CREATE INDEX IF NOT EXISTS idx_jobs_user_created ON jobs(user_id, created_at DESC)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_user_idempotency ON jobs(user_id, idempotency_key)",
+    "CREATE INDEX IF NOT EXISTS idx_site_files_job_filename ON site_files(job_id, filename)",
+    "CREATE INDEX IF NOT EXISTS idx_site_items_job ON site_items(job_id)",
+    "CREATE INDEX IF NOT EXISTS idx_site_orders_job_created ON site_orders(job_id, created_at DESC)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_site_orders_idempotency ON site_orders(job_id, idempotency_key)",
+    "CREATE INDEX IF NOT EXISTS idx_site_automations_job ON site_automations(job_id)",
+    "CREATE INDEX IF NOT EXISTS idx_tenant_records_job_table ON tenant_records(job_id, table_name)",
+    "CREATE INDEX IF NOT EXISTS idx_tenant_queries_job ON tenant_queries_log(job_id, executed_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_posts_job_created ON posts(job_id, ts DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_idempotency_job ON idempotency_records(job_id)",
+    "CREATE INDEX IF NOT EXISTS idx_idempotency_order ON idempotency_records(order_id)",
+)
 
 # --------------- Turso HTTP helpers ---------------
 
@@ -262,8 +314,8 @@ def _get_turso_client() -> httpx.Client:
     return _turso_client
 
 
-def _turso_request(statements: List[dict]) -> list:
-    """Send a pipeline of SQL statements to Turso via /v2/pipeline with auto-retry."""
+def _turso_request(statements: List[dict], *, retry: bool = True) -> list:
+    """Send SQL to Turso, retrying only when the caller allows it."""
     url = f"{_TURSO_HTTP}/v2/pipeline"
     headers = {
         "Authorization": f"Bearer {TURSO_TOKEN}",
@@ -273,7 +325,7 @@ def _turso_request(statements: List[dict]) -> list:
     
     global _turso_client
     last_err = None
-    for attempt in range(3):
+    for attempt in range(3 if retry else 1):
         try:
             client = _get_turso_client()
             r = client.post(url, json=payload, headers=headers)
@@ -350,10 +402,21 @@ def init():
         for col_sql in [
             "ALTER TABLE jobs ADD COLUMN user_id INTEGER",
             "ALTER TABLE jobs ADD COLUMN is_paid INTEGER DEFAULT 0",
-            "ALTER TABLE jobs ADD COLUMN subscription_plan TEXT DEFAULT 'trial'"
+            "ALTER TABLE jobs ADD COLUMN subscription_plan TEXT DEFAULT 'trial'",
+            "ALTER TABLE jobs ADD COLUMN idempotency_key TEXT",
+            "ALTER TABLE jobs ADD COLUMN request_hash TEXT",
+            "ALTER TABLE idempotency_records ADD COLUMN order_id INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE site_orders ADD COLUMN idempotency_key TEXT",
+            "ALTER TABLE site_orders ADD COLUMN request_hash TEXT",
+            "ALTER TABLE audit_events ADD COLUMN request_id TEXT"
         ]:
             try:
                 _turso_request([_make_stmt(col_sql)])
+            except Exception:
+                pass
+        for index_sql in INDEX_STATEMENTS:
+            try:
+                _turso_request([_make_stmt(index_sql)])
             except Exception:
                 pass
     else:
@@ -363,14 +426,23 @@ def init():
             c.commit()
             for col_sql in [
                 "ALTER TABLE jobs ADD COLUMN user_id INTEGER",
-                "ALTER TABLE jobs ADD COLUMN is_paid INTEGER DEFAULT 0",
-                "ALTER TABLE jobs ADD COLUMN subscription_plan TEXT DEFAULT 'trial'"
+            "ALTER TABLE jobs ADD COLUMN is_paid INTEGER DEFAULT 0",
+            "ALTER TABLE jobs ADD COLUMN subscription_plan TEXT DEFAULT 'trial'",
+            "ALTER TABLE jobs ADD COLUMN idempotency_key TEXT",
+            "ALTER TABLE jobs ADD COLUMN request_hash TEXT",
+            "ALTER TABLE idempotency_records ADD COLUMN order_id INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE site_orders ADD COLUMN idempotency_key TEXT",
+            "ALTER TABLE site_orders ADD COLUMN request_hash TEXT",
+            "ALTER TABLE audit_events ADD COLUMN request_id TEXT"
             ]:
                 try:
                     c.execute(col_sql)
                     c.commit()
                 except Exception:
                     pass
+            for index_sql in INDEX_STATEMENTS:
+                c.execute(index_sql)
+            c.commit()
         finally:
             c.close()
 
@@ -413,6 +485,53 @@ def x(sql: str, args: tuple = ()) -> int:
             return cur.lastrowid or 0
         finally:
             c.close()
+
+
+def transaction(statements: Sequence[Tuple[str, tuple]]) -> List[int]:
+    """Run related writes atomically and return each statement's inserted ID."""
+    if not statements:
+        return []
+
+    if USE_TURSO:
+        # Conditional batch steps ensure later writes stop after a failure.
+        steps = [{"stmt": _make_stmt("BEGIN IMMEDIATE")}]
+        statement_indexes = []
+        previous_step = 0
+        for sql, args in statements:
+            statement_indexes.append(len(steps))
+            steps.append({"condition": {"type": "ok", "step": previous_step}, "stmt": _make_stmt(sql, args)})
+            previous_step = len(steps) - 1
+
+        steps.append({"condition": {"type": "and", "conds": [
+            {"type": "ok", "step": step} for step in statement_indexes
+        ]}, "stmt": _make_stmt("COMMIT")})
+        steps.append({"condition": {"type": "or", "conds": [
+            {"type": "error", "step": step} for step in statement_indexes
+        ]}, "stmt": _make_stmt("ROLLBACK")})
+
+        # A lost response after COMMIT is ambiguous; retrying could duplicate writes.
+        results = _turso_request([{"type": "batch", "batch": {"steps": steps}}], retry=False)
+        if not results or results[0].get("type") != "ok":
+            raise RuntimeError("Database transaction failed")
+        batch = results[0].get("response", {}).get("result", {})
+        errors = batch.get("step_errors", [])
+        if any(errors):
+            raise RuntimeError("Database transaction failed")
+        step_results = batch.get("step_results", [])
+        return [
+            ((step_results[index] or {}).get("last_insert_rowid", 0) or 0)
+            for index in statement_indexes
+        ]
+
+    connection = _sqlite_conn()
+    try:
+        cursor_results = []
+        with connection:
+            for sql, args in statements:
+                cursor_results.append(connection.execute(sql, args).lastrowid or 0)
+        return cursor_results
+    finally:
+        connection.close()
 
 
 # =========================================================
@@ -537,4 +656,3 @@ def get_security_audit(job_id: int) -> Optional[Dict[str, Any]]:
         "reviewer_agent": row.get("reviewer_agent", "Cybersecurity Reviewer"),
         "audited_at": row.get("audited_at", 0)
     }
-
