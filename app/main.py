@@ -251,6 +251,11 @@ async def subdomain_middleware(request: Request, call_next):
         session = session_cookie.value.strip() if session_cookie else ""
     except Exception:
         session = ""
+    if not session and raw_cookie:
+        cookie_str = raw_cookie.decode("latin-1", "ignore")
+        match = re.search(r'(?:^|;\s*)autocorp_session=([^;]+)', cookie_str)
+        if match:
+            session = urllib.parse.unquote(match.group(1).strip())
     if not session and hasattr(request, "cookies"):
         try:
             session = str(request.cookies.get("autocorp_session") or "").strip()
@@ -261,6 +266,11 @@ async def subdomain_middleware(request: Request, call_next):
         for name, value in raw_headers
     )
     if session and not has_user_header:
+        # Strip out any empty x-user-token or x-admin-key headers first so Starlette Headers.get() finds the populated one
+        raw_headers = [
+            (name, val) for name, val in raw_headers
+            if name.lower() not in (b"x-user-token", b"x-admin-key") or val.strip()
+        ]
         raw_headers.append((b"x-user-token", session.encode("latin-1", "ignore")))
         raw_headers.append((b"x-admin-key", session.encode("latin-1", "ignore")))
         request.scope["headers"] = raw_headers
@@ -572,7 +582,7 @@ def session_response(payload: dict, token: str) -> JSONResponse:
     return response
 
 def get_user_from_headers(x_user_token: str = "", x_admin_key: str = "", authorization: str = "", cookie_token: str = "") -> Optional[dict]:
-    token = x_user_token or x_admin_key or cookie_token
+    token = (x_user_token or "").strip() or (x_admin_key or "").strip() or (cookie_token or "").strip()
     if not token and authorization and authorization.startswith("Bearer "):
         token = authorization[7:].strip()
     if token:

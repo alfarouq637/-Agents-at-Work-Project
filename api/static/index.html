@@ -1494,6 +1494,18 @@ textarea{resize:vertical;min-height:75px}
   </div>
 
 <script>
+// Ensure all API and site requests carry same-origin credentials by default
+const _rawFetch = window.fetch;
+window.fetch = function(url, options = {}) {
+  const opts = { ...options };
+  if (typeof url === 'string' && (url.startsWith('/api/') || url.startsWith('/sites/'))) {
+    if (!opts.credentials) {
+      opts.credentials = 'same-origin';
+    }
+  }
+  return _rawFetch(url, opts);
+};
+
 // State
 let currentMode = 'landing';
 let isAdmin = false;
@@ -1992,13 +2004,17 @@ async function handleCreateStore(e){
   const userToken = getSafeToken();
 
   try{
+    const reqHeaders = {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': crypto.randomUUID()
+    };
+    if(userToken){
+      reqHeaders['x-user-token'] = userToken;
+    }
     const res = await fetch('/api/jobs', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-token': userToken,
-        'Idempotency-Key': crypto.randomUUID()
-      },
+      credentials: 'same-origin',
+      headers: reqHeaders,
       body: JSON.stringify(payload)
     });
     const d = await res.json();
@@ -2024,10 +2040,17 @@ async function handleCreateStore(e){
 // =========================================================
 async function loadJobs(){
   try{
+    const reqHeaders = {};
+    const userToken = getSafeToken();
+    if(userToken) reqHeaders['x-user-token'] = userToken;
     const res = await fetch('/api/jobs', {
-      headers: {'x-user-token': getSafeToken()}
+      credentials: 'same-origin',
+      headers: reqHeaders
     });
     const jobs = await res.json();
+    if(!Array.isArray(jobs)){
+      return;
+    }
     allJobs = jobs;
 
     // Filter user's stores vs public
@@ -3728,9 +3751,11 @@ async function loadAdminSitesManager(){
   c.innerHTML = '<div style="color:var(--fg3);padding:10px">جاري جلب كافة مشاريع الوكالة...</div>';
   try{
     const token = getSafeToken();
-    const res = await fetch('/api/jobs', {headers: {'x-admin-key': token}});
+    const adminHeaders = {};
+    if(token) adminHeaders['x-admin-key'] = token;
+    const res = await fetch('/api/jobs', {credentials: 'same-origin', headers: adminHeaders});
     const jobs = await res.json();
-    if(!jobs.length){
+    if(!Array.isArray(jobs) || !jobs.length){
       c.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--fg3)">لا توجد أي مشاريع مسجلة حالياً في النظام.</div>';
       return;
     }

@@ -345,8 +345,8 @@ def _turso_request(statements: List[dict], *, retry: bool = True) -> list:
     raise last_err
 
 
-def _make_stmt(sql: str, params: tuple = ()) -> dict:
-    """Build a Turso pipeline statement object."""
+def _make_stmt_body(sql: str, params: tuple = ()) -> dict:
+    """Build a Turso statement dict with typed args."""
     args = []
     for p in params:
         if p is None:
@@ -357,7 +357,12 @@ def _make_stmt(sql: str, params: tuple = ()) -> dict:
             args.append({"type": "float", "value": p})
         else:
             args.append({"type": "text", "value": str(p)})
-    return {"type": "execute", "stmt": {"sql": sql, "args": args}}
+    return {"sql": sql, "args": args}
+
+
+def _make_stmt(sql: str, params: tuple = ()) -> dict:
+    """Build a Turso pipeline statement object."""
+    return {"type": "execute", "stmt": _make_stmt_body(sql, params)}
 
 
 def _rows_to_dicts(result: dict) -> List[Dict[str, Any]]:
@@ -452,6 +457,9 @@ def q(sql: str, args: tuple = ()) -> List[Dict[str, Any]]:
     if USE_TURSO:
         results = _turso_request([_make_stmt(sql, args)])
         if results:
+            if results[0].get("type") == "error":
+                err = results[0].get("error", {})
+                raise RuntimeError(f"Database query error: {err.get('message', 'unknown error')}")
             return _rows_to_dicts(results[0])
         return []
     else:
@@ -473,6 +481,9 @@ def x(sql: str, args: tuple = ()) -> int:
     if USE_TURSO:
         results = _turso_request([_make_stmt(sql, args)])
         if results:
+            if results[0].get("type") == "error":
+                err = results[0].get("error", {})
+                raise RuntimeError(f"Database execution error: {err.get('message', 'unknown error')}")
             resp = results[0].get("response", {})
             res = resp.get("result", {})
             return res.get("last_insert_rowid", 0) or 0
@@ -494,20 +505,20 @@ def transaction(statements: Sequence[Tuple[str, tuple]]) -> List[int]:
 
     if USE_TURSO:
         # Conditional batch steps ensure later writes stop after a failure.
-        steps = [{"stmt": _make_stmt("BEGIN IMMEDIATE")}]
+        steps = [{"stmt": _make_stmt_body("BEGIN IMMEDIATE")}]
         statement_indexes = []
         previous_step = 0
         for sql, args in statements:
             statement_indexes.append(len(steps))
-            steps.append({"condition": {"type": "ok", "step": previous_step}, "stmt": _make_stmt(sql, args)})
+            steps.append({"condition": {"type": "ok", "step": previous_step}, "stmt": _make_stmt_body(sql, args)})
             previous_step = len(steps) - 1
 
         steps.append({"condition": {"type": "and", "conds": [
             {"type": "ok", "step": step} for step in statement_indexes
-        ]}, "stmt": _make_stmt("COMMIT")})
+        ]}, "stmt": _make_stmt_body("COMMIT")})
         steps.append({"condition": {"type": "or", "conds": [
             {"type": "error", "step": step} for step in statement_indexes
-        ]}, "stmt": _make_stmt("ROLLBACK")})
+        ]}, "stmt": _make_stmt_body("ROLLBACK")})
 
         # A lost response after COMMIT is ambiguous; retrying could duplicate writes.
         results = _turso_request([{"type": "batch", "batch": {"steps": steps}}], retry=False)

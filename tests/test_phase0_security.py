@@ -1862,3 +1862,49 @@ def test_builder_calm_neon_palettes():
         assert pal["primary"].startswith("#")
 
 
+def test_cookie_session_store_creation_without_bearer_header(monkeypatch, tmp_path):
+    configure_test_database(monkeypatch, tmp_path)
+    monkeypatch.setattr(corp, "spawn", lambda task: task.close())
+    with TestClient(app) as client:
+        # 1. Register a user
+        reg_resp = client.post(
+            "/api/auth/register",
+            json={"username": "store_owner", "password": "StrongPassword123!", "phone": "01000000000"},
+        )
+        assert reg_resp.status_code == 200
+        assert "autocorp_session" in client.cookies
+
+        # 2. Check /api/auth/me relying purely on cookie
+        me_resp = client.get("/api/auth/me")
+        assert me_resp.status_code == 200
+        assert me_resp.json()["authenticated"] is True
+        assert me_resp.json()["user"]["username"] == "store_owner"
+
+        # 3. Create a store using POST /api/jobs with cookie session, explicitly with empty x-user-token header
+        job_resp = client.post(
+            "/api/jobs",
+            headers={"x-user-token": "", "Idempotency-Key": "test-idem-key-12345678"},
+            json={
+                "brand_name": "متجر الخضار الطازج",
+                "category": "خضار وفواكه طازجة",
+                "slogan": "من الغيط للبيت",
+                "request": "متجر لبيع الخضار والفواكه الطازجة مع توصيل سريع",
+            },
+        )
+        assert job_resp.status_code == 200
+        jid = job_resp.json()["id"]
+        assert jid > 0
+
+        # 4. Verify in DB that job was created with correct user_id
+        job = db.one("SELECT * FROM jobs WHERE id = ?", (jid,))
+        assert job is not None
+        assert job["user_id"] == reg_resp.json()["user"]["id"]
+
+        # 5. Verify GET /api/jobs with cookie returns the user's store
+        jobs_resp = client.get("/api/jobs", headers={"x-user-token": ""})
+        assert jobs_resp.status_code == 200
+        user_jobs = jobs_resp.json()
+        assert len(user_jobs) == 1
+        assert user_jobs[0]["id"] == jid
+
+
