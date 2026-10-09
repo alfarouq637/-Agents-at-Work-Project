@@ -36,11 +36,11 @@ def for_agent(name, dept):
         if "*" in r or name.lower() in r or (dept or "").lower() in d:
             texts.append(f"## {s['file'][:-3]}\n{s['body']}")
             tools.update(s["meta"].get("tools", []))
-    return "\n\n".join(texts)[:6000], tools
+    return "\n\n".join(texts)[:35000], tools
 
 
 def save(name, content):
     safe = re.sub(r"[^a-z0-9-]", "-", name.lower())[:40].strip("-") or "skill"
     with open(os.path.join(DIR, safe + ".md"), "w", encoding="utf-8") as f:
-        f.write(content[:4000])
+        f.write(content[:35000])
     return safe + ".md"

@@ -217,7 +217,7 @@ def normalize(plan, request):
              for s in plan["steps"] if isinstance(s, dict) and s.get("role")][:6]
     if plan["service"] == "web":
         steps = [s for s in steps if s["role"] not in ("Frontend Developer", "Cybersecurity Reviewer", "Code Reviewer")]
-        steps += [{"role": "Frontend Developer", "task": "Build the final full-stack website following Atomic UI components and Drizzle ORM."},
+        steps += [{"role": "Frontend Developer", "task": "Build the complete interactive Single Page Application (SPA) website. Follow the Enterprise Website Builder Blueprint: include top announcement bar, glass sticky header with live cart count badge, hero showcase, trust features, category filter tabs, products catalog grid with real photography and Egyptian pricing (ج.م), interactive slide-over cart drawer, Egyptian checkout modal (Vodafone Cash, InstaPay, Fawry, COD), customer reviews, floating WhatsApp, and self-contained JavaScript state management."},
                   {"role": "Cybersecurity Reviewer", "task": "Conduct an exhaustive OWASP Top 10 security audit and SAST scan on generated code."},
                   {"role": "Code Reviewer", "task": "Review website user experience and design quality."}]
     plan["steps"] = steps
@@ -295,6 +295,26 @@ LAYER_2_GUARDRAILS = (
     "6. Auth: Tokens MUST be handled with HttpOnly secure cookies.\n"
     "7. Security Filters: Helmet HTTP security headers, input sanitization filters, and CORS credentials protection enabled.\n"
     "8. Zero hardcoded secrets: everything loads from process.env."
+)
+
+FRONTEND_SPA_BLUEPRINT = (
+    "\n\n### [Layer 3: Mandatory Single-Page Application (SPA) Architectural Blueprint & Sections]\n"
+    "You MUST build a complete, high-end, production-ready Arabic Single-Page Application (SPA) containing ALL 11 required sections:\n"
+    "1. Top Announcement Bar: Promotions, free delivery threshold, and instant contact info.\n"
+    "2. Sticky Glass Header: With brand name, navigation links, and Cart Button with interactive badge counter (#cart-counter).\n"
+    "3. Hero Showcase: High-impact Arabic headline, descriptive subtitle, primary button (#products-grid), and WhatsApp chat CTA.\n"
+    "4. Features Grid: 3-4 trust cards (توصيل فوري لكافة المحافظات، جودة أصلية ومضمونة، معاينة عند الاستلام، دفع آمن وسهل).\n"
+    "5. Category Filter Tabs: Horizontal filter buttons ('الكل', ...) with dynamic JavaScript filtering on click.\n"
+    "6. Products Catalog Grid (#products-grid): Responsive grid where every product card renders a real high-res Unsplash photo in an aspect-square container, category & badge pills, title, description, price in EGP (ج.م), and '+ أضف للسلة' button.\n"
+    "7. Slide-over Cart Drawer (#cart-drawer): Sliding drawer with overlay, item thumbnails, quantity +/- buttons, subtotal, discount, and checkout button.\n"
+    "8. Egyptian Checkout Modal (#checkout-modal): Customer Name, Egyptian mobile (01xxxxxxxxx), delivery address, and Egyptian payment selection (Vodafone Cash, InstaPay, Fawry, Cash on Delivery) with instant order confirmation receipt.\n"
+    "9. Customer Testimonials: 3 authentic customer reviews with 5-star rating badges.\n"
+    "10. Floating WhatsApp Support Button: Linked to wa.me with pre-filled message.\n"
+    "11. Footer: About brand, working links, payment badges, and copyright.\n\n"
+    "### [Layer 4: Mandatory JavaScript State Engine & Strict Anti-Placeholder Guardrails]\n"
+    "- In <script>, implement: PRODUCTS array (with 4-8 realistic items matching client niche, realistic EGP prices, and high-res Unsplash URLs), cart = {}, activeFilter = 'الكل', renderProducts(), filterCategory(cat), addToCart(id), updateQty(id, delta), updateCartUI(), toggleCart(open), openCheckout(), closeCheckout(), submitOrder(e).\n"
+    "- Escape all dynamic strings with an escapeHtml() helper. Zero unescaped innerHTML.\n"
+    "- STRICTLY FORBIDDEN: Do NOT output placeholder text like '[ضع ...]', '[رابط ...]', '[اسم المتجر]', '[أدخل ...]', 'product-placeholder', 'موقع تجريبي', or 'نصوص مسودة'. Provide 100% finished Arabic copy and real Unsplash URLs."
 )
 
 CYBERSECURITY_REVIEWER_SYS = (
@@ -392,7 +412,7 @@ async def run_job(job_id):
             ag = await ensure_agent(role, job_id)
             log(job_id, f"{ag['name']} starts: {step['task'][:90]}")
             if ag["name"] == "Frontend Developer":
-                text = await call_agent(ag, ctx, step["task"] + "\n\n" + WEB_RULES + LAYER_1_THINKING + LAYER_2_GUARDRAILS, job_id)
+                text = await call_agent(ag, ctx, step["task"] + "\n\n" + WEB_RULES + FRONTEND_SPA_BLUEPRINT + LAYER_1_THINKING + LAYER_2_GUARDRAILS, job_id)
                 html = extract_html(text)
                 if html:
                     log(job_id, f"Frontend Developer generated complete HTML ({len(html)} chars)")
@@ -416,7 +436,7 @@ async def run_job(job_id):
                     t2 = await call_agent(
                         fe,
                         ctx,
-                        f"Remediate security flaws reported by Deep Learning Security Model:\n{fb}\n\nPrevious HTML:\n{html[:8000]}\n\n{WEB_RULES}{LAYER_2_GUARDRAILS}",
+                        f"Remediate security flaws reported by Deep Learning Security Model:\n{fb}\n\nPrevious HTML:\n{html[:8000]}\n\n{WEB_RULES}{FRONTEND_SPA_BLUEPRINT}{LAYER_2_GUARDRAILS}",
                         job_id,
                     )
                     remediated_html = extract_html(t2)
@@ -434,7 +454,7 @@ async def run_job(job_id):
                     log(job_id, f"QA REJECTED contract. Fine 2 EGP to Frontend Developer. Reason: {fb[:120]}")
                     fe = await ensure_agent("Frontend Developer", job_id)
                     t2 = await call_agent(fe, ctx, "Fix the website using this reviewer feedback:\n" + fb +
-                                          "\n\nPrevious HTML:\n" + html[:9000] + "\n\n" + WEB_RULES, job_id)
+                                          "\n\nPrevious HTML:\n" + html[:9000] + "\n\n" + WEB_RULES + FRONTEND_SPA_BLUEPRINT, job_id)
                     html = extract_html(t2) or html
                     outputs.append({"role": "Frontend Developer (revision)", "text": "Revised after QA feedback."})
             else:

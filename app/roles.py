@@ -22,7 +22,7 @@ DEPARTMENTS = {
         "Solutions Architect": "Turns a request into a page-by-page technical brief.",
         "UX Planner": "Defines page structure, user flow and calls to action.",
         "UI Designer": "Defines visual style, palette, typography and layout.",
-        "Frontend Developer": "Writes production-ready single-file HTML/Tailwind sites.",
+        "Frontend Developer": "Builds high-end, production-ready single-file HTML/Tailwind SPA websites with real imagery, interactive cart drawer, Egyptian payment checkout modal, and mobile-first responsive design.",
         "Backend Developer": "Designs and writes API/back-end code.",
         "Database Designer": "Designs schemas and data models.",
         "Arabic Content Writer": "Writes natural website copy in Arabic.",
