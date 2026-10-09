@@ -11,7 +11,10 @@ Updated: 2026-10-08
   every state-changing HTTP, Telegram, webhook, and generated-site request.
 - Replaced browser-readable authentication tokens with signed, HttpOnly session
   cookies. Password hashes use Argon2id; successful legacy `scrypt` or HMAC
-  password logins are upgraded automatically.
+  password logins are upgraded automatically. Added direct cookie dependency
+  resolution across all protected endpoints and operations routes, fixed Starlette
+  cached header invalidation on middleware injection, and added credentials
+  same-origin transport to dashboard authentication calls.
 - Required authentication and owner checks for jobs, job details, and uploads.
 - Added upload size, extension, and file-signature validation. PDF briefs are
   extracted as transient input and are not retained at public static URLs.
