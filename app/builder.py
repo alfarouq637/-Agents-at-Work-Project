@@ -187,12 +187,12 @@ PALETTES = {
 
 DEFAULT_CATALOGS = {
     "honey": [
-        {"title": "عسل سدر جبلي يمني دوعني نخب أول (كيلو)", "price": 420, "category": "عسل طبيعي فاخر", "badge": "الأكثر طلباً", "desc": "أجود أنواع السدر الجبلي الطبيعي المفحوص معملياً، غني بالمعادن ومضادات الأكسدة."},
-        {"title": "عسل حبة البركة الصافي المنقى (نصف كيلو)", "price": 190, "category": "أعسال علاجية", "badge": "مقوي للمناعة", "desc": "عسل نقي مغذى على أزهار حبة البركة، مثالي لتقوية الجهاز المناعي والجهاز التنفسي."},
-        {"title": "عسل زهور الموالح الطبيعي (كيلو)", "price": 150, "category": "عسل الزهور", "badge": "خفيف ولذيذ", "desc": "عسل حمضيات خفيف ولذيذ وغني بفيتامين C، محبب جداً للأطفال وطاقة يومية طبيعية."},
-        {"title": "غذاء ملكات النحل الصافي الطازج (50 جم)", "price": 240, "category": "مشتقات النحل", "badge": "طاقة ونشاط", "desc": "غذاء ملكي نقي 100% مستخرج طازجاً، محفز طبيعي للنشاط الذهني والبدني."},
-        {"title": "بوكس التوفير الملكي (3 برطمانات متنوعة + شمع)", "price": 520, "category": "بكجات التوفير", "badge": "وفر 25%", "desc": "سدر جبلي + حبة بركة + زهور موالح + قطعة شمع طبيعي في علبة إهداء فاخرة."},
-        {"title": "شمع عسل نحل طبيعي قطفة أولى (نصف كيلو)", "price": 170, "category": "شمع العسل", "badge": "طبيعي 100%", "desc": "إطارات شمع طبيعية مختومة خام بدون أي معالجة، تجربة تذوق ريفية أصيلة."},
+        {"title": "عسل سدر جبلي يمني دوعني نخب أول (كيلو)", "price": 420, "category": "عسل طبيعي فاخر", "badge": "الأكثر طلباً", "desc": "أجود أنواع السدر الجبلي الطبيعي المفحوص معملياً، غني بالمعادن ومضادات الأكسدة.", "image_url": "https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80"},
+        {"title": "عسل حبة البركة الصافي المنقى (نصف كيلو)", "price": 190, "category": "أعسال علاجية", "badge": "مقوي للمناعة", "desc": "عسل نقي مغذى على أزهار حبة البركة، مثالي لتقوية الجهاز المناعي والجهاز التنفسي.", "image_url": "https://images.unsplash.com/photo-1587049352851-8d4e89133924?auto=format&fit=crop&w=600&q=80"},
+        {"title": "عسل زهور الموالح الطبيعي (كيلو)", "price": 150, "category": "عسل الزهور", "badge": "خفيف ولذيذ", "desc": "عسل حمضيات خفيف ولذيذ وغني بفيتامين C، محبب جداً للأطفال وطاقة يومية طبيعية.", "image_url": "https://images.unsplash.com/photo-1582793988951-9aed5509eb97?auto=format&fit=crop&w=600&q=80"},
+        {"title": "غذاء ملكات النحل الصافي الطازج (50 جم)", "price": 240, "category": "مشتقات النحل", "badge": "طاقة ونشاط", "desc": "غذاء ملكي نقي 100% مستخرج طازجاً، محفز طبيعي للنشاط الذهني والبدني.", "image_url": "https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&w=600&q=80"},
+        {"title": "بوكس التوفير الملكي (3 برطمانات متنوعة + شمع)", "price": 520, "category": "بكجات التوفير", "badge": "وفر 25%", "desc": "سدر جبلي + حبة بركة + زهور موالح + قطعة شمع طبيعي في علبة إهداء فاخرة.", "image_url": "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&w=600&q=80"},
+        {"title": "شمع عسل نحل طبيعي قطفة أولى (نصف كيلو)", "price": 170, "category": "شمع العسل", "badge": "طبيعي 100%", "desc": "إطارات شمع طبيعية مختومة خام بدون أي معالجة، تجربة تذوق ريفية أصيلة.", "image_url": "https://images.unsplash.com/photo-1587049352847-81a56d773cae?auto=format&fit=crop&w=600&q=80"},
     ],
     "portfolio": [
         {"title": "اختبار اختراق تطبيقات الويب والـ APIs (Web Pentest)", "price": 2500, "category": "خدمات الفحص الأمني", "badge": "شامل التقرير", "desc": "فحص أمني عميق وكشف ثغرات OWASP Top 10 و Business Logic مع تقديم تقرير تفصيلي بالحلول."},
@@ -201,25 +201,25 @@ DEFAULT_CATALOGS = {
         {"title": "تأمين الحسابات ومكافحة الهندسة الاجتماعية (Hardening)", "price": 1200, "category": "حلول الحماية", "badge": "دعم فني", "desc": "تفعيل آليات 2FA/MFA، تدريب الفريق ضد رسائل التصيد Phishing، وتأمين البريد المؤسسي."},
     ],
     "restaurant": [
-        {"title": "طاجن ملوخية بالطشة واللحم البلدي", "price": 95, "category": "طواجن بلدي", "badge": "على أصوله", "desc": "ملوخية خضراء فريش بالسمن البلدي وقطع لحم كندوز فاخرة."},
-        {"title": "وجبة مشويات مشكلة مكس جريل (شخصين)", "price": 240, "category": "مشويات الفحم", "badge": "الأكثر طلباً", "desc": "كباب، كفتة بلدي، شيش طاووق، مع أرز بسمتي وسلطات وخبز."},
-        {"title": "حواوشي بلدي سوبر بالجبنة الموتزاريلا", "price": 65, "category": "حواوشي ومخبوزات", "badge": "مقرمش وشهي", "desc": "لحم مفروم متبل بالخلطة السرية مع موتزاريلا سايحة."},
-        {"title": "نصف دجاجة مشوية على الفحم + أرز مبهر", "price": 130, "category": "مشويات الفحم", "badge": "وجبة التوفير", "desc": "دجاج متبل بخلطة الأعشاب يقدم مع الأرز والبطاطس والتومية."},
-        {"title": "سلطة طحينة وسلطة خضراء ومخلل مشكل", "price": 25, "category": "مقبلات وسلطات", "badge": "طازج", "desc": "تشكيلة سلطات شرقية طازجة تكمل وجبتك المفضلة."},
+        {"title": "وجبة مشويات مشكلة مكس جريل (شخصين)", "price": 240, "category": "مشويات الفحم", "badge": "الأكثر طلباً", "desc": "كباب، كفتة بلدي، شيش طاووق، مع أرز بسمتي وسلطات وخبز.", "image_url": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=600&q=80"},
+        {"title": "طاجن ملوخية بالطشة واللحم البلدي", "price": 95, "category": "طواجن بلدي", "badge": "على أصوله", "desc": "ملوخية خضراء فريش بالسمن البلدي وقطع لحم كندوز فاخرة.", "image_url": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"},
+        {"title": "حواوشي بلدي سوبر بالجبنة الموتزاريلا", "price": 65, "category": "حواوشي ومخبوزات", "badge": "مقرمش وشهي", "desc": "لحم مفروم متبل بالخلطة السرية مع موتزاريلا سايحة.", "image_url": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80"},
+        {"title": "نصف دجاجة مشوية على الفحم + أرز مبهر", "price": 130, "category": "مشويات الفحم", "badge": "وجبة التوفير", "desc": "دجاج متبل بخلطة الأعشاب يقدم مع الأرز والبطاطس والتومية.", "image_url": "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=600&q=80"},
+        {"title": "سلطة طحينة وسلطة خضراء ومخلل مشكل", "price": 25, "category": "مقبلات وسلطات", "badge": "طازج", "desc": "تشكيلة سلطات شرقية طازجة تكمل وجبتك المفضلة.", "image_url": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80"},
     ],
     "vegetables": [
-        {"title": "طماطم بلدي نخب أول (كيلو)", "price": 18, "category": "خضار طازج", "badge": "طازج اليوم", "desc": "طماطم سكرية مقطوفة صباحاً من مزارعنا بعناية فائقة."},
-        {"title": "بطاطس تحمير سبونتا (كيلو)", "price": 20, "category": "خضار طازج", "badge": "ممتاز للتحمير", "desc": "حبات بطاطس منتقاة بجودة عالية وخالية من الشوائب."},
-        {"title": "خيار صوب بلدي فريش (كيلو)", "price": 16, "category": "خضار طازج", "badge": "الأكثر طلباً", "desc": "خيار مقرمش طازج يومياً مناسب للسلطات والاستهلاك اليومي."},
-        {"title": "بصل أحمر بلدي فاخر (كيلو)", "price": 22, "category": "خضار طازج", "badge": "جودة عالية", "desc": "بصل أحمر غني بالنكهة تخزين ممتاز."},
-        {"title": "بوكس التوفير العائلي المشكل (10 كجم)", "price": 195, "category": "بوكسات التوفير", "badge": "وفر 25%", "desc": "تشكيلة أسبوعية متكاملة (بطاطس، طماطم، بصل، خيار، كوسة، جزر)."},
-        {"title": "موز بلدي سكري فاخر (كيلو)", "price": 28, "category": "فواكه موسمية", "badge": "حلاوة طبيعية", "desc": "موز بلدي كامل النضج غني بالطاقة والبوتاسيوم."},
+        {"title": "طماطم بلدي نخب أول (كيلو)", "price": 18, "category": "خضار طازج", "badge": "طازج اليوم", "desc": "طماطم سكرية مقطوفة صباحاً من مزارعنا بعناية فائقة.", "image_url": "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80"},
+        {"title": "بطاطس تحمير سبونتا (كيلو)", "price": 20, "category": "خضار طازج", "badge": "ممتاز للتحمير", "desc": "حبات بطاطس منتقاة بجودة عالية وخالية من الشوائب.", "image_url": "https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=600&q=80"},
+        {"title": "خيار صوب بلدي فريش (كيلو)", "price": 16, "category": "خضار طازج", "badge": "الأكثر طلباً", "desc": "خيار مقرمش طازج يومياً مناسب للسلطات والاستهلاك اليومي.", "image_url": "https://images.unsplash.com/photo-1604977042946-1eecc30f269e?auto=format&fit=crop&w=600&q=80"},
+        {"title": "بصل أحمر بلدي فاخر (كيلو)", "price": 22, "category": "خضار طازج", "badge": "جودة عالية", "desc": "بصل أحمر غني بالنكهة تخزين ممتاز.", "image_url": "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=600&q=80"},
+        {"title": "بوكس التوفير العائلي المشكل (10 كجم)", "price": 195, "category": "بوكسات التوفير", "badge": "وفر 25%", "desc": "تشكيلة أسبوعية متكاملة (بطاطس، طماطم، بصل، خيار، كوسة، جزر).", "image_url": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80"},
+        {"title": "موز بلدي سكري فاخر (كيلو)", "price": 28, "category": "فواكه موسمية", "badge": "حلاوة طبيعية", "desc": "موز بلدي كامل النضج غني بالطاقة والبوتاسيوم.", "image_url": "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&w=600&q=80"},
     ],
     "electronics": [
-        {"title": "سماعة بلوتوث لاسلكية عازلة للضوضاء Pro", "price": 450, "category": "صوتيات وسماعات", "badge": "الأكثر مبيعاً", "desc": "صوت نقي بتقنية Hi-Fi مع مايك مدمج وبطارية تدوم 24 ساعة متواصلة."},
-        {"title": "ساعة ذكية مقاومة للماء مع تتبع نبضات القلب", "price": 680, "category": "إلكترونيات ذكية", "badge": "ضمان سنة", "desc": "شاشة أموليد لمسية، استقبال الإشعارات والمكالمات ومتابعة النشاط الرياضي."},
-        {"title": "باور بانك شحن فائق السرعة 20,000 مللي أمبير", "price": 390, "category": "شواحن وبطاريات", "badge": "شحن سريع 22.5W", "desc": "منافذ Type-C و USB متعددة لشحن 3 أجهزة في وقت واحد بأمان تام."},
-        {"title": "شاحن جداري GaN ثلاثي المنافذ 65W للابتوب والموبايل", "price": 320, "category": "شواحن وبطاريات", "badge": "تقنية GaN", "desc": "شحن فائق السرعة متوافق مع الآيفون والسامسونج واللابتوب بحجم مدمج."},
+        {"title": "سماعة بلوتوث لاسلكية عازلة للضوضاء Pro", "price": 450, "category": "صوتيات وسماعات", "badge": "الأكثر مبيعاً", "desc": "صوت نقي بتقنية Hi-Fi مع مايك مدمج وبطارية تدوم 24 ساعة متواصلة.", "image_url": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80"},
+        {"title": "ساعة ذكية مقاومة للماء مع تتبع نبضات القلب", "price": 680, "category": "إلكترونيات ذكية", "badge": "ضمان سنة", "desc": "شاشة أموليد لمسية، استقبال الإشعارات والمكالمات ومتابعة النشاط الرياضي.", "image_url": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80"},
+        {"title": "باور بانك شحن فائق السرعة 20,000 مللي أمبير", "price": 390, "category": "شواحن وبطاريات", "badge": "شحن سريع 22.5W", "desc": "منافذ Type-C و USB متعددة لشحن 3 أجهزة في وقت واحد بأمان تام.", "image_url": "https://images.unsplash.com/photo-1609592424109-dd9892f1b177?auto=format&fit=crop&w=600&q=80"},
+        {"title": "شاحن جداري GaN ثلاثي المنافذ 65W للابتوب والموبايل", "price": 320, "category": "شواحن وبطاريات", "badge": "تقنية GaN", "desc": "شحن فائق السرعة متوافق مع الآيفون والسامسونج واللابتوب بحجم مدمج.", "image_url": "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=600&q=80"},
     ],
     "clinic": [
         {"title": "كشف واستشارة طبية تخصصية شاملة", "price": 250, "category": "الكشوفات الطبية", "badge": "حجز مسبق", "desc": "فحص سريري دقيق، تشخيص الحالة، ووضع الخطة العلاجية المناسبة."},
@@ -232,14 +232,17 @@ DEFAULT_CATALOGS = {
         {"title": "باقة التسويق والمحتوى الشاملة للمؤسسات", "price": 5500, "category": "خدمات الشركات", "badge": "نمو مستدام", "desc": "خطة تسويق شهري كاملة: إدارة السوشيال ميديا، كتابة الإعلانات، وتحسين محركات البحث SEO."},
     ],
     "fashion": [
-        {"title": "قميص كلاسيك أوكسفورد قطن مصري 100%", "price": 320, "category": "ملابس رجالي", "badge": "قطن مصري", "desc": "خامة قطنية مريحة وناعمة، قصة سليم فيت عصرية مناسبة للعمل والمناسبات."},
-        {"title": "بنطلون جبردين إيطالي سليم فيت", "price": 380, "category": "ملابس رجالي", "badge": "الأكثر طلباً", "desc": "أقمشة مستوردة عالية الجودة ومقاومة للانكماش بألوان متعددة."},
-        {"title": "سويت شيرت هودي أوفر سايز شتوي فاخر", "price": 420, "category": "كاجوال شتوي", "badge": "تريند", "desc": "تقفيل فائق الجودة مع بطانة داخلية دافئة وخياطة مزدوجة متينة."},
+        {"title": "قميص كلاسيك أوكسفورد قطن مصري 100%", "price": 320, "category": "ملابس رجالي", "badge": "قطن مصري 100%", "desc": "خامة قطنية مريحة وناعمة، قصة سليم فيت عصرية مناسبة للعمل والمناسبات.", "image_url": "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=600&q=80"},
+        {"title": "بنطلون جبردين إيطالي كلاسيك", "price": 380, "category": "ملابس رجالي", "badge": "الأكثر طلباً", "desc": "أقمشة إيطالية مستوردة عالية الجودة ومقاومة للانكماش بتفصيل متقن.", "image_url": "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=600&q=80"},
+        {"title": "سويت شيرت هودي أوفر سايز شتوي فاخر", "price": 420, "category": "كاجوال شتوي", "badge": "تريند 2026", "desc": "تقفيل فائق الجودة مع بطانة داخلية دافئة وخياطة مزدوجة فائقة المتانة.", "image_url": "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=600&q=80"},
+        {"title": "تيشيرت بولو كاجوال قطن بيما ناعم", "price": 250, "category": "صيفي كاجوال", "badge": "قطن ناعم", "desc": "تيشيرت بولو أنيق بياقة متينة وملمس حريري يناسب الإطلالات اليومية.", "image_url": "https://images.unsplash.com/photo-1581655353564-df123a1eb820?auto=format&fit=crop&w=600&q=80"},
+        {"title": "جاكيت جينز عصري أزرق غامق", "price": 550, "category": "ملابس خارجية", "badge": "خامة ممتازة", "desc": "تصميم كلاسيكي متين مع جيوب أمامية وأزرار معدنية غير قابلة للصدأ.", "image_url": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=600&q=80"},
+        {"title": "حذاء سنيكرز كاجوال جلد مريح", "price": 490, "category": "أحذية وإكسسوارات", "badge": "راحة فائقة", "desc": "نعل طبي مرن ومريح للمشي الطويل مع تصميم عصري يتماشى مع كافة الإطلالات.", "image_url": "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=600&q=80"},
     ],
     "general": [
-        {"title": "الباقة الأساسية المتميزة", "price": 350, "category": "الخدمات الأساسية", "badge": "الأكثر طلباً", "desc": "خدمة متكاملة تشمل الفحص والمتابعة والدعم الفني الكامل."},
-        {"title": "الباقة المتقدمة الاحترافية", "price": 750, "category": "باقات احترافية", "badge": "قيمة مضاعفة", "desc": "تشمل كافة المميزات مع أولوية التنفيذ وتوصيل مجاني."},
-        {"title": "الخدمة السريعة الفورية", "price": 150, "category": "خدمات سريعة", "badge": "فوري", "desc": "تنفيذ عاجل خلال ساعات معدودة بأعلى معايير الدقة."},
+        {"title": "الباقة الأساسية المتميزة", "price": 350, "category": "الخدمات الأساسية", "badge": "الأكثر طلباً", "desc": "خدمة متكاملة تشمل الفحص والمتابعة والدعم الفني الكامل.", "image_url": "https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=600&q=80"},
+        {"title": "الباقة المتقدمة الاحترافية", "price": 750, "category": "باقات احترافية", "badge": "قيمة مضاعفة", "desc": "تشمل كافة المميزات مع أولوية التنفيذ وتوصيل مجاني.", "image_url": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80"},
+        {"title": "الخدمة السريعة الفورية", "price": 150, "category": "خدمات سريعة", "badge": "فوري", "desc": "تنفيذ عاجل خلال ساعات معدودة بأعلى معايير الدقة.", "image_url": "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=600&q=80"},
     ]
 }
 
@@ -1208,9 +1211,17 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         const badge = escapeProductHtml(p.badge);
         const title = escapeProductHtml(p.title);
         const description = escapeProductHtml(p.description || 'صنف عالي الجودة ومضمون تم اختياره بعناية.');
+        const imageUrl = p.image_url ? escapeProductHtml(p.image_url) : '';
         return `
         <div class="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1">
           <div>
+            ${{imageUrl ? `
+            <div class="overflow-hidden rounded-2xl mb-4 bg-slate-100 aspect-square flex items-center justify-center">
+              <img src="${{imageUrl}}" alt="${{title}}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-4xl bg-slate-100\\'>🛍️</div>';">
+            </div>` : `
+            <div class="overflow-hidden rounded-2xl mb-4 bg-gradient-to-br from-slate-100 to-slate-200 aspect-square flex items-center justify-center text-4xl">
+              🛍️
+            </div>`}}
             <div class="flex items-center justify-between mb-3">
               <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-readex">
                 ${{category}}

@@ -311,7 +311,7 @@ WEB_RULES = ("Output ONE complete self-contained HTML document starting with <!d
              "<script src=\"https://cdn.tailwindcss.com\"></script>. Use dir=\"rtl\" lang=\"ar\" if the client is "
              "Arabic. Mobile-first with calm, eye-friendly base surfaces (#0b0f17 / #0f172a) and elegant neon accents/glows. "
              "Ensure easy, intuitive usability across all devices (min-height 44px on touch targets, thumb-friendly actions). "
-             "Apply security protection filters: escape all dynamic variables, no unescaped innerHTML, and no external images (use CSS gradients/emoji). "
+             "Apply security protection filters: escape all dynamic variables, and no unescaped innerHTML. For product images use high-quality Unsplash image URLs (https://images.unsplash.com/...) or clear emoji icons. "
              "Include every section in the brief. No fake testimonials or invented numbers.")
 REVIEW_TASK = ("Review this website HTML for: broken structure, missing sections from the brief, RTL/mobile issues, "
                "invented claims. First line must be exactly 'APPROVED' or 'REJECT: <reasons>'.\n\n")
@@ -445,19 +445,29 @@ async def run_job(job_id):
             ctx += f"\n\n### {ag['name']}\n{text[:2500]}"
         site_url = None
         # Guarantee rich full-stack Arabic SPA website
-        if not html or len(html) < 2500 or "موقع تجريبي" in html:
-            job_row = db.one("select * from jobs where id=?", (job_id,))
+        is_bad_artifact = (
+            not html or len(html) < 4000
+            or "موقع تجريبي" in html
+            or "product-placeholder" in html
+            or "[ضع " in html or "[أدخل " in html or "[رابط" in html
+            or "نصوص مسودة" in html
+            or ("cart" not in html.lower() and "order" not in html.lower())
+        )
+        if is_bad_artifact:
+            job_row = db.one("select * from jobs where id=?", (job_id,)) or {}
             settings_row = db.one("select * from site_settings where job_id=?", (job_id,)) or {}
             items_rows = db.q("select * from site_items where job_id=?", (job_id,))
-            html = builder.build_site_html(job_id, job_row.get("client") or "", job_row.get("request") or "", settings=settings_row, items=items_rows)
-            log(job_id, f"AutoCorp Synthesizer built complete full-stack website ({len(html)} chars)")
             
             # Populate default site_items in DB if empty
             if not items_rows:
                 niche = builder.detect_niche((job_row.get("request") or "") + " " + (job_row.get("client") or ""))
                 for it in builder.DEFAULT_CATALOGS.get(niche, builder.DEFAULT_CATALOGS["general"]):
-                    db.x("insert into site_items(job_id, title, price, category, description, badge, created_at) values(?,?,?,?,?,?,?)",
-                         (job_id, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), time.time()))
+                    db.x("insert into site_items(job_id, title, price, category, description, badge, image_url, created_at) values(?,?,?,?,?,?,?,?)",
+                         (job_id, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), it.get("image_url", ""), time.time()))
+                items_rows = db.q("select * from site_items where job_id=?", (job_id,))
+
+            html = builder.build_site_html(job_id, job_row.get("client") or "", job_row.get("request") or "", settings=settings_row, items=items_rows)
+            log(job_id, f"AutoCorp Synthesizer built complete full-stack website ({len(html)} chars)")
 
         if html:
             artifact_issues = artifacts.validate_site_html(html)
