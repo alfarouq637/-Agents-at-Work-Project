@@ -1735,3 +1735,32 @@ def test_public_site_info_never_exposes_payment_configuration(monkeypatch, tmp_p
     assert "sensitive-wallet" not in response.text
     assert "sensitive-merchant-code" not in response.text
     assert "sensitive-instapay" not in response.text
+
+
+def test_auth_me_resolves_session_from_cookie_header_or_request_cookies(monkeypatch, tmp_path):
+    configure_test_database(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        response = register(client, "cookieuser", "long-password-1234")
+        assert response.status_code == 200
+        # Call /api/auth/me without any x-user-token or authorization header, relying solely on cookie
+        me_resp = client.get("/api/auth/me")
+        assert me_resp.status_code == 200
+        me_data = me_resp.json()
+        assert me_data["authenticated"] is True
+        assert me_data["user"]["username"] == "cookieuser"
+
+        # Also verify jobs listing endpoint resolves user via cookie
+        jobs_resp = client.get("/api/jobs")
+        assert jobs_resp.status_code == 200
+        assert isinstance(jobs_resp.json(), list)
+
+        # Logout with cookie clears session
+        logout_resp = client.post("/api/auth/logout")
+        assert logout_resp.status_code == 200
+        assert logout_resp.json()["ok"] is True
+
+        # After logout, /api/auth/me returns unauthenticated
+        me_after = client.get("/api/auth/me")
+        assert me_after.status_code == 200
+        assert me_after.json()["authenticated"] is False
+

@@ -1717,7 +1717,7 @@ function updateAdminView(){
 // =========================================================
 async function checkAuthSession(){
   try{
-    const res = await fetch('/api/auth/me');
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
     const d = await res.json();
     if(d.authenticated){
       currentUser = d.user;
@@ -1801,16 +1801,20 @@ async function handleAuthLogin(e){
     const d = await res.json();
     if(res.ok && d.ok){
       await checkAuthSession();
+      if(!currentUser && d.user){
+        currentUser = d.user;
+        if(currentUser.is_admin) isAdmin = true;
+      }
       if(!currentUser){
         alert('❌ تعذر حفظ جلسة الدخول في المتصفح. اسمح بملفات تعريف الارتباط لهذا الموقع ثم أعد تسجيل الدخول.');
         return;
       }
-      if(d.user.is_admin){
+      if(d.user && d.user.is_admin){
         isAdmin = true;
       }
       closeAuthModal();
       renderUserBadge();
-      alert(`✅ أهلاً بك يا (${d.user.username})! تم تسجيل دخولك بنجاح.`);
+      alert(`✅ أهلاً بك يا (${(currentUser || d.user).username})! تم تسجيل دخولك بنجاح.`);
       loadJobs();
     }else{
       alert('❌ ' + apiErrorMessage(d, 'بيانات الدخول غير صحيحة'));
@@ -1835,13 +1839,17 @@ async function handleAuthRegister(e){
     const d = await res.json();
     if(res.ok && d.ok){
       await checkAuthSession();
+      if(!currentUser && d.user){
+        currentUser = d.user;
+        if(currentUser.is_admin) isAdmin = true;
+      }
       if(!currentUser){
         alert('❌ تم إنشاء الحساب، لكن تعذر حفظ جلسة الدخول في المتصفح. اسمح بملفات تعريف الارتباط ثم سجّل الدخول.');
         return;
       }
       closeAuthModal();
       renderUserBadge();
-      alert(`🎉 تم إنشاء حسابك بنجاح (${d.user.username})! رصيدك متاح لإنشاء موقعين مجاناً.`);
+      alert(`🎉 تم إنشاء حسابك بنجاح (${(currentUser || d.user).username})! رصيدك متاح لإنشاء موقعين مجاناً.`);
       loadJobs();
     }else{
       alert('❌ ' + apiErrorMessage(d, 'تعذر إنشاء الحساب'));
@@ -1852,7 +1860,7 @@ async function handleAuthRegister(e){
 }
 
 async function logoutUser(){
-  await fetch('/api/auth/logout', {method: 'POST'});
+  await fetch('/api/auth/logout', {method: 'POST', credentials: 'same-origin'});
   currentUser = null;
   isAdmin = false;
   renderUserBadge();
@@ -2624,7 +2632,7 @@ async function submitInlineAdminLogin(){
 }
 
 async function logoutAdmin(){
-  await fetch('/api/auth/logout', {method: 'POST'});
+  await fetch('/api/auth/logout', {method: 'POST', credentials: 'same-origin'});
   isAdmin = false;
   currentUser = null;
   renderUserBadge();

@@ -28,7 +28,7 @@ from typing import Optional, Dict, Any, List
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Query, Request, UploadFile, File, Form
+from fastapi import FastAPI, Cookie, Header, HTTPException, Query, Request, UploadFile, File, Form
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -239,13 +239,21 @@ async def subdomain_middleware(request: Request, call_next):
     # Browser sessions are HttpOnly cookies. Mirror the signed value into the
     # existing internal header interface so legacy route handlers never need a
     # browser-readable bearer token. This must happen before any access to
-    # request.headers: Starlette caches that header view on first use.
     raw_headers = list(request.scope.get("headers", []))
     raw_cookie = next((value for name, value in raw_headers if name.lower() == b"cookie"), b"")
     cookies = SimpleCookie()
-    cookies.load(raw_cookie.decode("latin-1", "ignore"))
-    session_cookie = cookies.get("autocorp_session")
-    session = session_cookie.value.strip() if session_cookie else ""
+    session = ""
+    try:
+        cookies.load(raw_cookie.decode("latin-1", "ignore"))
+        session_cookie = cookies.get("autocorp_session")
+        session = session_cookie.value.strip() if session_cookie else ""
+    except Exception:
+        session = ""
+    if not session and hasattr(request, "cookies"):
+        try:
+            session = str(request.cookies.get("autocorp_session") or "").strip()
+        except Exception:
+            session = ""
     has_user_header = any(
         name.lower() == b"x-user-token" and value.strip()
         for name, value in raw_headers
@@ -254,6 +262,16 @@ async def subdomain_middleware(request: Request, call_next):
         raw_headers.append((b"x-user-token", session.encode("latin-1", "ignore")))
         raw_headers.append((b"x-admin-key", session.encode("latin-1", "ignore")))
         request.scope["headers"] = raw_headers
+        if hasattr(request, "_headers"):
+            try:
+                delattr(request, "_headers")
+            except Exception:
+                pass
+        if hasattr(request, "_cookies"):
+            try:
+                delattr(request, "_cookies")
+            except Exception:
+                pass
 
     request_id = request.headers.get("x-request-id", "").strip()
     if not re.fullmatch(r"[A-Za-z0-9_-]{8,80}", request_id):
@@ -376,14 +394,15 @@ async def upload_file(
     job_id: Optional[int] = Form(None),
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
-    authorization: str = Header(default="")
+    authorization: str = Header(default=""),
+    autocorp_session: str = Cookie(default=""),
 ):
     """Accept a small allow-list of authenticated image/PDF uploads safely."""
-    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization, cookie_token=autocorp_session)
     if not user:
         raise HTTPException(401, "Authentication is required to upload a file")
     if job_id is not None:
-        require_site_access(job_id, x_user_token, x_admin_key, authorization)
+        require_site_access(job_id, x_user_token, x_admin_key, authorization, cookie_token=autocorp_session)
     if not rate_limit.upload_limiter.allow(f"user:{user['id']}"):
         raise HTTPException(
             429,
@@ -550,8 +569,8 @@ def session_response(payload: dict, token: str) -> JSONResponse:
     )
     return response
 
-def get_user_from_headers(x_user_token: str = "", x_admin_key: str = "", authorization: str = "") -> Optional[dict]:
-    token = x_user_token or x_admin_key
+def get_user_from_headers(x_user_token: str = "", x_admin_key: str = "", authorization: str = "", cookie_token: str = "") -> Optional[dict]:
+    token = x_user_token or x_admin_key or cookie_token
     if not token and authorization and authorization.startswith("Bearer "):
         token = authorization[7:].strip()
     if token:
@@ -559,8 +578,8 @@ def get_user_from_headers(x_user_token: str = "", x_admin_key: str = "", authori
         token = urllib.parse.unquote(str(token).strip())
     return auth.get_active_user(token)
 
-def require_site_access(jid: int, x_user_token: str = "", x_admin_key: str = "", authorization: str = "") -> dict:
-    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+def require_site_access(jid: int, x_user_token: str = "", x_admin_key: str = "", authorization: str = "", cookie_token: str = "") -> dict:
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization, cookie_token=cookie_token)
     if not auth.verify_site_ownership(jid, user):
         raise HTTPException(403, "غير مصرح لك بالوصول لإعدادات أو تحميل هذا المتجر. يرجى تسجيل الدخول بحساب مالك المتجر أو المشرف العام.")
     return user or {}
@@ -769,12 +788,14 @@ def api_login(body: LoginRequest, request: Request):
 
 @app.post("/api/auth/logout")
 def api_logout(
+    request: Request,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
     authorization: str = Header(default=""),
+    autocorp_session: str = Cookie(default=""),
 ):
     """Revoke the current session and clear its browser cookie."""
-    token = x_user_token or x_admin_key
+    token = x_user_token or x_admin_key or autocorp_session or str(request.cookies.get("autocorp_session") or "").strip()
     if not token and authorization.lower().startswith("bearer "):
         token = authorization[7:].strip()
     if token:
@@ -793,11 +814,14 @@ def api_logout(
 
 @app.get("/api/auth/me")
 def api_me(
+    request: Request,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
-    authorization: str = Header(default="")
+    authorization: str = Header(default=""),
+    autocorp_session: str = Cookie(default=""),
 ):
-    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    cookie_token = autocorp_session or str(request.cookies.get("autocorp_session") or "").strip()
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization, cookie_token=cookie_token)
     if not user:
         return {"authenticated": False}
     c_row = db.one("SELECT count(*) as c FROM jobs WHERE user_id = ? OR client = ?", (user["id"], user["username"]))
@@ -915,10 +939,12 @@ async def new_job(
     idempotency_key: str = Header(default="", alias="Idempotency-Key"),
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
-    authorization: str = Header(default="")
+    authorization: str = Header(default=""),
+    autocorp_session: str = Cookie(default=""),
 ):
     body_data = body.model_dump(exclude_unset=True)
-    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    cookie_token = autocorp_session or str(request.cookies.get("autocorp_session") or "").strip()
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization, cookie_token=cookie_token)
     if not user:
         raise HTTPException(401, "يرجى تسجيل الدخول أو إنشاء حساب أولاً قبل إطلاق وبناء المتجر.")
         
@@ -1078,13 +1104,16 @@ async def hook_job(body: dict, x_hook_key: str = Header(default="")):
 
 @app.get("/api/jobs")
 def get_jobs(
+    request: Request,
     limit: int = Query(default=40, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
-    authorization: str = Header(default="")
+    authorization: str = Header(default=""),
+    autocorp_session: str = Cookie(default=""),
 ):
-    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    cookie_token = autocorp_session or str(request.cookies.get("autocorp_session") or "").strip()
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization, cookie_token=cookie_token)
     if not user:
         raise HTTPException(401, "Authentication is required")
     where = ""
@@ -1158,11 +1187,14 @@ def get_jobs(
 @app.get("/api/jobs/{jid}")
 def get_job_detail(
     jid: int,
+    request: Request,
     x_user_token: str = Header(default=""),
     x_admin_key: str = Header(default=""),
-    authorization: str = Header(default="")
+    authorization: str = Header(default=""),
+    autocorp_session: str = Cookie(default=""),
 ):
-    user = get_user_from_headers(x_user_token, x_admin_key, authorization)
+    cookie_token = autocorp_session or str(request.cookies.get("autocorp_session") or "").strip()
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization, cookie_token=cookie_token)
     j = db.one("select * from jobs where id=?", (jid,))
     if not j:
         raise HTTPException(404, "المشروع غير موجود")
