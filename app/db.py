@@ -414,7 +414,8 @@ def init():
             "ALTER TABLE site_orders ADD COLUMN idempotency_key TEXT",
             "ALTER TABLE site_orders ADD COLUMN request_hash TEXT",
             "ALTER TABLE audit_events ADD COLUMN request_id TEXT",
-            "ALTER TABLE site_pages ADD COLUMN slug TEXT"
+            "ALTER TABLE site_pages ADD COLUMN slug TEXT",
+            "ALTER TABLE site_items ADD COLUMN image_url TEXT"
         ]:
             try:
                 _turso_request([_make_stmt(col_sql)])
@@ -440,7 +441,8 @@ def init():
                 "ALTER TABLE site_orders ADD COLUMN idempotency_key TEXT",
                 "ALTER TABLE site_orders ADD COLUMN request_hash TEXT",
                 "ALTER TABLE audit_events ADD COLUMN request_id TEXT",
-                "ALTER TABLE site_pages ADD COLUMN slug TEXT"
+                "ALTER TABLE site_pages ADD COLUMN slug TEXT",
+                "ALTER TABLE site_items ADD COLUMN image_url TEXT"
             ]:
                 try:
                     c.execute(col_sql)

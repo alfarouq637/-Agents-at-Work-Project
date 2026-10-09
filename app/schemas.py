@@ -289,7 +289,9 @@ class ProjectCatalogItemRequest(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     price: Decimal = Field(default=Decimal("0"), ge=0, le=Decimal("1000000000"))
     category: str = Field(default="", max_length=80)
+    description: str = Field(default="", max_length=2000)
     badge: str = Field(default="", max_length=40)
+    image_url: str = Field(default="", max_length=512)
 
 
 class ProjectAnswerRequest(BaseModel):
