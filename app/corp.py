@@ -301,7 +301,7 @@ FRONTEND_SPA_BLUEPRINT = (
     "\n\n### [Layer 3: Mandatory Single-Page Application (SPA) Architectural Blueprint & Sections]\n"
     "You MUST build a complete, high-end, production-ready Arabic Single-Page Application (SPA) containing ALL 11 required sections:\n"
     "1. Top Announcement Bar: Promotions, free delivery threshold, and instant contact info.\n"
-    "2. Sticky Glass Header: With brand name, navigation links, and Cart Button with interactive badge counter (#cart-counter).\n"
+    "2. Sticky Glass Header: With brand name, navigation links, bilingual language toggle button (English / العربية), dark/light theme toggle button (🌙 ليلي / ☀️ نهاري), and Cart Button with interactive badge counter (#cart-counter).\n"
     "3. Hero Showcase: High-impact Arabic headline, descriptive subtitle, primary button (#products-grid), and WhatsApp chat CTA.\n"
     "4. Features Grid: 3-4 trust cards (توصيل فوري لكافة المحافظات، جودة أصلية ومضمونة، معاينة عند الاستلام، دفع آمن وسهل).\n"
     "5. Category Filter Tabs: Horizontal filter buttons ('الكل', ...) with dynamic JavaScript filtering on click.\n"
@@ -311,10 +311,12 @@ FRONTEND_SPA_BLUEPRINT = (
     "9. Customer Testimonials: 3 authentic customer reviews with 5-star rating badges.\n"
     "10. Floating WhatsApp Support Button: Linked to wa.me with pre-filled message.\n"
     "11. Footer: About brand, working links, payment badges, and copyright.\n\n"
-    "### [Layer 4: Mandatory JavaScript State Engine & Strict Anti-Placeholder Guardrails]\n"
+    "### [Layer 4: Mandatory JavaScript State Engine, Bilingual I18N & Dark/Light Theme System]\n"
     "- In <script>, implement: PRODUCTS array (with 4-8 realistic items matching client niche, realistic EGP prices, and high-res Unsplash URLs), cart = {}, activeFilter = 'الكل', renderProducts(), filterCategory(cat), addToCart(id), updateQty(id, delta), updateCartUI(), toggleCart(open), openCheckout(), closeCheckout(), submitOrder(e).\n"
+    "- Full Dark/Light Theme Engine: Implement applyStoreTheme(dark) and toggleStoreTheme() toggling 'dark' class on <html>, with comprehensive CSS overrides in <style> for background (#0b0f19), cards (#0f172a), borders (#1e293b), inputs, cart drawer, modals, and text, persisting choice in localStorage.getItem('store_theme').\n"
+    "- Full Bilingual (AR/EN) Engine: Tag all user-facing text with data-i18n attributes. Implement an I18N dictionary object with complete 'ar' and 'en' translations for navigation, hero, catalog, cart, checkout, reviews, and footer. Implement applyStoreLang(lang) and toggleStoreLang() switching dir='rtl'|'ltr', lang='ar'|'en', updating element textContent/placeholders, and saving to localStorage.getItem('store_lang').\n"
     "- Escape all dynamic strings with an escapeHtml() helper. Zero unescaped innerHTML.\n"
-    "- STRICTLY FORBIDDEN: Do NOT output placeholder text like '[ضع ...]', '[رابط ...]', '[اسم المتجر]', '[أدخل ...]', 'product-placeholder', 'موقع تجريبي', or 'نصوص مسودة'. Provide 100% finished Arabic copy and real Unsplash URLs."
+    "- STRICTLY FORBIDDEN: Do NOT output placeholder text like '[ضع ...]', '[رابط ...]', '[اسم المتجر]', '[أدخل ...]', 'product-placeholder', 'موقع تجريبي', or 'نصوص مسودة'. Provide 100% finished copy and real Unsplash URLs."
 )
 
 CYBERSECURITY_REVIEWER_SYS = (

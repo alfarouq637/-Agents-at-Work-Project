@@ -819,8 +819,73 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     .hero-grad {{ background: {hero_grad}; }}
     .cart-drawer {{ transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }}
     .cart-drawer.closed {{ transform: translateX(100%); }}
+    html[dir="ltr"] .cart-drawer.closed {{ transform: translateX(100%); }}
     .backdrop {{ transition: opacity 0.3s ease; }}
     .backdrop.hidden {{ opacity: 0; pointer-events: none; }}
+
+    /* Universal Seamless Dark Mode System */
+    html.dark {{
+      color-scheme: dark;
+    }}
+    html.dark body {{
+      background-color: #0b0f17 !important;
+      color: #f1f5f9 !important;
+    }}
+    html.dark header {{
+      background-color: rgba(15, 23, 42, 0.95) !important;
+      border-color: #1e293b !important;
+    }}
+    html.dark .bg-white {{
+      background-color: #131b2a !important;
+      border-color: #1e293b !important;
+    }}
+    html.dark .bg-slate-50 {{
+      background-color: #0f172a !important;
+      border-color: #1e293b !important;
+    }}
+    html.dark .bg-slate-100 {{
+      background-color: #1e293b !important;
+    }}
+    html.dark .text-slate-900,
+    html.dark .text-slate-800 {{
+      color: #f8fafc !important;
+    }}
+    html.dark .text-slate-700,
+    html.dark .text-slate-600 {{
+      color: #cbd5e1 !important;
+    }}
+    html.dark .text-slate-500 {{
+      color: #94a3b8 !important;
+    }}
+    html.dark .border-slate-200,
+    html.dark .border-slate-100,
+    html.dark [class*="border-slate-200"] {{
+      border-color: #1e293b !important;
+    }}
+    html.dark #cart-drawer,
+    html.dark #checkout-modal > div,
+    html.dark #success-modal > div,
+    html.dark #order-receipt {{
+      background-color: #0f172a !important;
+      color: #f8fafc !important;
+      border-color: #334155 !important;
+    }}
+    html.dark input,
+    html.dark textarea,
+    html.dark select {{
+      background-color: #1e293b !important;
+      color: #f8fafc !important;
+      border-color: #334155 !important;
+    }}
+    html.dark .cat-btn.bg-white {{
+      background-color: #1e293b !important;
+      color: #cbd5e1 !important;
+      border-color: #334155 !important;
+    }}
+    html.dark .cat-btn.bg-slate-900 {{
+      background-color: {primary} !important;
+      color: #0f172a !important;
+    }}
   </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
@@ -830,14 +895,14 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
   <div class="bg-slate-900 text-slate-200 text-xs py-2 px-4 text-center flex items-center justify-between border-b border-slate-800">
     <div class="flex items-center gap-2 mx-auto">
       <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-      <span id="promo-bar-text">🎉 <b>تسوق عبر المتجر:</b> أضف المنتجات إلى طلبك وأرسله للمراجعة</span>
+      <span id="promo-bar-text" data-i18n="promo_bar">🎉 <b>تسوق عبر المتجر:</b> أضف المنتجات إلى طلبك وأرسله للمراجعة</span>
       {promo_contact_cta}
     </div>
     <div class="flex items-center gap-2">
-      <button onclick="toggleStoreTheme()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition flex items-center gap-1" id="store-theme-btn">
-        <span>☀️</span> <span id="store-theme-lbl">نهاري</span>
+      <button onclick="toggleStoreTheme()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition flex items-center gap-1.5 border border-slate-700 shadow-sm" id="store-theme-btn" title="تبديل الوضع / Toggle Theme">
+        <span id="store-theme-icon">🌙</span> <span id="store-theme-lbl" data-i18n="theme_dark">ليلي</span>
       </button>
-      <button onclick="toggleStoreLang()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-bold transition" id="store-lang-btn">
+      <button onclick="toggleStoreLang()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-bold transition border border-slate-700 shadow-sm" id="store-lang-btn" title="Language / تغيير اللغة" data-i18n="lang_btn">
         English
       </button>
     </div>
@@ -853,23 +918,24 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
           </div>
           <div>
             <h1 class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">{html.escape(brand_name)}</h1>
-            <p class="text-xs text-slate-500 font-readex">الجودة والأمانة في كل طلب</p>
+            <p class="text-xs text-slate-500 font-readex" data-i18n="brand_sub">الجودة والأمانة في كل طلب</p>
           </div>
         </a>
       </div>
 
       <nav class="hidden md:flex items-center gap-8 text-sm font-bold text-slate-600">
-        <a href="#hero" class="hover:text-brand-500 transition">الرئيسية</a>
-        <a href="#catalog" class="hover:text-brand-500 transition">قائمة المنتجات</a>
-        <a href="#features" class="hover:text-brand-500 transition">لماذا نحن؟</a>
-        <a href="#contact" class="hover:text-brand-500 transition">تواصل معنا</a>
+        <a href="#hero" class="hover:text-brand-500 transition" data-i18n="nav_home">الرئيسية</a>
+        <a href="#catalog" class="hover:text-brand-500 transition" data-i18n="nav_catalog">قائمة المنتجات</a>
+        <a href="#features" class="hover:text-brand-500 transition" data-i18n="nav_features">لماذا نحن؟</a>
+        <a href="#reviews" class="hover:text-brand-500 transition" data-i18n="nav_reviews">آراء العملاء</a>
+        <a href="#contact" class="hover:text-brand-500 transition" data-i18n="nav_contact">تواصل معنا</a>
       </nav>
 
       <div class="flex items-center gap-3">
         <!-- Floating Cart Trigger -->
         <button onclick="toggleCart(true)" class="relative flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-white shadow-md hover:shadow-lg transition active:scale-95" style="background:{primary}">
           <span class="text-lg">🛒</span>
-          <span class="hidden sm:inline text-sm">السلة</span>
+          <span class="hidden sm:inline text-sm" data-i18n="cart_btn">السلة</span>
           <span id="cart-counter" class="bg-amber-400 text-slate-950 text-xs px-2 py-0.5 rounded-full font-black">0</span>
         </button>
       </div>
@@ -882,18 +948,16 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
       <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur border border-white/20 mb-6">
-        <span>✨ المتجر الرقمي المتكامل</span>
-        <span class="w-1 h-1 rounded-full bg-white"></span>
-        <span>دفع مصري مباشر</span>
+        <span data-i18n="hero_badge">✨ المتجر الرقمي المتكامل • دفع مصري مباشر</span>
       </div>
       <h2 class="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight max-w-4xl mx-auto mb-6">
         {html.escape(slogan)}
       </h2>
-      <p class="text-base sm:text-lg text-white/90 max-w-2xl mx-auto font-readex leading-relaxed mb-10">
+      <p class="text-base sm:text-lg text-white/90 max-w-2xl mx-auto font-readex leading-relaxed mb-10" data-i18n="hero_sub">
         أرسل طلبك من المتجر، وسيتم التواصل معك من التاجر لتأكيد التوافر وطريقة الدفع والتسليم.
       </p>
       <div class="flex flex-wrap items-center justify-center gap-4">
-        <a href="#catalog" class="px-8 py-3.5 rounded-xl bg-white text-slate-950 font-black text-sm shadow-xl hover:bg-slate-100 transition hover:scale-105 active:scale-95">
+        <a href="#catalog" class="px-8 py-3.5 rounded-xl bg-white text-slate-950 font-black text-sm shadow-xl hover:bg-slate-100 transition hover:scale-105 active:scale-95" data-i18n="hero_cta">
           🛒 تصفح القائمة والأسعار
         </a>
         {hero_contact_cta}
@@ -907,29 +971,29 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
       <div class="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-4">
         <div class="text-3xl">🌿</div>
         <div>
-          <h4 class="font-bold text-slate-900 mb-1">طبيعي ومضمون 100%</h4>
-          <p class="text-xs text-slate-500 font-readex">نحرص على أعلى معايير الجودة والفحص قبل التسليم.</p>
+          <h4 class="font-bold text-slate-900 mb-1" data-i18n="feat1_title">طبيعي ومضمون 100%</h4>
+          <p class="text-xs text-slate-500 font-readex" data-i18n="feat1_desc">نحرص على أعلى معايير الجودة والفحص قبل التسليم.</p>
         </div>
       </div>
       <div class="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-4">
         <div class="text-3xl">⚡</div>
         <div>
-          <h4 class="font-bold text-slate-900 mb-1">توصيل سريع للباب</h4>
-          <p class="text-xs text-slate-500 font-readex">شحن مباشر حتى باب منزلك في وقت قياسي.</p>
+          <h4 class="font-bold text-slate-900 mb-1" data-i18n="feat2_title">توصيل سريع للباب</h4>
+          <p class="text-xs text-slate-500 font-readex" data-i18n="feat2_desc">شحن مباشر حتى باب منزلك في وقت قياسي.</p>
         </div>
       </div>
       <div class="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-4">
         <div class="text-3xl">💳</div>
         <div>
-          <h4 class="font-bold text-slate-900 mb-1">طرق دفع مرنة</h4>
-          <p class="text-xs text-slate-500 font-readex">فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام.</p>
+          <h4 class="font-bold text-slate-900 mb-1" data-i18n="feat3_title">طرق دفع مرنة</h4>
+          <p class="text-xs text-slate-500 font-readex" data-i18n="feat3_desc">فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام.</p>
         </div>
       </div>
       <div class="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-4">
         <div class="text-3xl">🛡️</div>
         <div>
-          <h4 class="font-bold text-slate-900 mb-1">ضمان الرضا والمعاينة</h4>
-          <p class="text-xs text-slate-500 font-readex">إمكانية المعاينة قبل الاستلام واستبدال فوري.</p>
+          <h4 class="font-bold text-slate-900 mb-1" data-i18n="feat4_title">خدمة عملاء مباشرة</h4>
+          <p class="text-xs text-slate-500 font-readex" data-i18n="feat4_desc">متابعة فورية عبر الواتساب لتلبية كافة الاستفسارات.</p>
         </div>
       </div>
     </div>
@@ -939,13 +1003,13 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
   <section id="catalog" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-1 w-full">
     <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
       <div>
-        <span class="text-xs font-bold text-brand-600 tracking-wider uppercase font-readex">قائمة الأصناف المتاحة</span>
-        <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">اختر ما يناسبك واطلبه الآن</h3>
+        <span class="text-xs font-bold text-brand-600 tracking-wider uppercase font-readex" data-i18n="cat_title_badge">قائمة الأصناف المتاحة</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1" data-i18n="cat_title">اختر ما يناسبك واطلبه الآن</h3>
       </div>
       
       <!-- Category Filter Tabs -->
       <div class="flex flex-wrap gap-2" id="category-filters">
-        <button onclick="filterCategory('الكل')" class="cat-btn px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-900 text-white" data-cat="الكل">الكل</button>
+        <button onclick="filterCategory('الكل')" class="cat-btn px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-900 text-white" data-cat="الكل" data-i18n="cat_all">الكل</button>
         {cat_buttons_html}
       </div>
     </div>
@@ -960,8 +1024,8 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
   <section id="reviews" class="py-14 bg-slate-50 border-t border-slate-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-10">
-        <span class="text-xs font-bold text-amber-600 tracking-wider uppercase font-readex">تقييمات موثقة</span>
-        <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">آراء وتجارب العملاء ⭐⭐⭐⭐⭐</h3>
+        <span class="text-xs font-bold text-amber-600 tracking-wider uppercase font-readex" data-i18n="reviews_badge">تقييمات موثقة</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1" data-i18n="reviews_title">آراء وتجارب العملاء ⭐⭐⭐⭐⭐</h3>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
@@ -969,7 +1033,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
             <b class="text-xs text-slate-900">محمد السعيد</b>
             <span class="text-amber-400 text-xs">★★★★★</span>
           </div>
-          <p class="text-xs text-slate-600 font-readex leading-relaxed">
+          <p class="text-xs text-slate-600 font-readex leading-relaxed" data-i18n="rev1_text">
             المنتجات وصلت مطابقة للصور تماماً، وسرعة الاستجابة على الواتساب والتوصيل محترمة جداً.
           </p>
         </div>
@@ -978,7 +1042,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
             <b class="text-xs text-slate-900">سارة إبراهيم</b>
             <span class="text-amber-400 text-xs">★★★★★</span>
           </div>
-          <p class="text-xs text-slate-600 font-readex leading-relaxed">
+          <p class="text-xs text-slate-600 font-readex leading-relaxed" data-i18n="rev2_text">
             التغليف فاخر وأصلي والدفع بإنستاباي كان في ثواني، شكراً على الأمانة والاحترافية.
           </p>
         </div>
@@ -987,7 +1051,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
             <b class="text-xs text-slate-900">أحمد حسام</b>
             <span class="text-amber-400 text-xs">★★★★★</span>
           </div>
-          <p class="text-xs text-slate-600 font-readex leading-relaxed">
+          <p class="text-xs text-slate-600 font-readex leading-relaxed" data-i18n="rev3_text">
             أفضل تجربة شراء أونلاين في مصر، بالتأكيد هكرر الطلب تاني.
           </p>
         </div>
@@ -1000,20 +1064,20 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 sm:p-12 text-white shadow-xl flex flex-col lg:flex-row items-center justify-between gap-8">
         <div>
-          <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">خدمة العملاء متصلة</span>
-          <h3 class="text-2xl sm:text-3xl font-black mt-3 mb-2">هل لديك استفسار أو طلب خاص؟</h3>
+          <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30" data-i18n="contact_badge">خدمة العملاء متصلة</span>
+          <h3 class="text-2xl sm:text-3xl font-black mt-3 mb-2" data-i18n="contact_title">هل لديك استفسار أو طلب خاص؟</h3>
           <p class="text-slate-300 text-sm font-readex max-w-xl">
             فريق خدمة عملاء {html.escape(brand_name)} جاهز للرد على استفساراتكم ومتابعة طلباتكم على مدار الساعة.
           </p>
           <div class="flex flex-wrap gap-6 mt-6 text-sm">
             <div class="flex items-center gap-2">
-              <span class="text-amber-400">📞</span> <b>هاتف:</b> <span>{html.escape(contact_phone)}</span>
+              <span class="text-amber-400">📞</span> <b data-i18n="contact_phone_lbl">هاتف:</b> <span>{html.escape(contact_phone)}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-emerald-400">💬</span> <b>واتساب:</b> <span>{html.escape(contact_whatsapp)}</span>
+              <span class="text-emerald-400">💬</span> <b data-i18n="contact_wa_lbl">واتساب:</b> <span>{html.escape(contact_whatsapp)}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-sky-400">📍</span> <b>العنوان:</b> <span>{html.escape(contact_address)}</span>
+              <span class="text-sky-400">📍</span> <b data-i18n="contact_addr_lbl">العنوان:</b> <span>{html.escape(contact_address)}</span>
             </div>
           </div>
         </div>
@@ -1030,10 +1094,10 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
   <footer class="bg-slate-950 text-slate-400 py-8 border-t border-slate-800 text-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div>
-        <p>© 2026 <b>{html.escape(brand_name)}</b> — جميع الحقوق محفوظة.</p>
+        <p>© 2026 <b>{html.escape(brand_name)}</b> — <span data-i18n="footer_rights">جميع الحقوق محفوظة.</span></p>
       </div>
       <div class="flex items-center gap-3 text-slate-500">
-        <span>مدعوم بواسطة وكالة</span>
+        <span data-i18n="footer_powered">مدعوم بواسطة وكالة</span>
         <span class="px-2.5 py-1 rounded bg-slate-900 text-slate-300 font-bold border border-slate-800">AutoCorp AI 🇪🇬</span>
       </div>
     </div>
@@ -1045,7 +1109,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
       <div class="flex items-center gap-2">
         <span class="text-xl">🛒</span>
-        <h3 class="font-black text-lg text-slate-900">سلة مشترياتك</h3>
+        <h3 class="font-black text-lg text-slate-900" data-i18n="cart_title">سلة مشترياتك</h3>
         <span id="cart-items-total-badge" class="text-xs bg-brand-50 text-brand-700 font-bold px-2 py-0.5 rounded-full">0 عناصر</span>
       </div>
       <button onclick="toggleCart(false)" class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center font-bold text-sm">✕</button>
@@ -1060,29 +1124,29 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     <div class="p-5 border-t border-slate-200 bg-slate-50">
       <!-- Promo Code Input -->
       <div class="flex gap-2 mb-3">
-        <input type="text" id="cart-promo-input" placeholder="كود الخصم (WELCOME10)" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs uppercase focus:outline-none focus:ring-1 focus:ring-brand-500">
-        <button onclick="applyCartPromo()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">تطبيق</button>
+        <input type="text" id="cart-promo-input" data-i18n="cart_promo_ph" placeholder="كود الخصم (WELCOME10)" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs uppercase focus:outline-none focus:ring-1 focus:ring-brand-500">
+        <button onclick="applyCartPromo()" data-i18n="cart_promo_apply" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">تطبيق</button>
       </div>
 
       <div class="space-y-2 mb-4 text-sm font-readex">
         <div class="flex justify-between text-slate-500">
-          <span>المجموع الفرعي:</span>
+          <span data-i18n="cart_subtotal_lbl">المجموع الفرعي:</span>
           <span id="cart-subtotal" class="font-bold text-slate-800">0 ج.م</span>
         </div>
         <div class="flex justify-between text-emerald-600" id="cart-discount-row" style="display:none">
-          <span>الخصم المطبق:</span>
+          <span data-i18n="cart_discount_lbl">الخصم المطبق:</span>
           <span id="cart-discount" class="font-bold">0 ج.م</span>
         </div>
         <div class="flex justify-between text-slate-500">
-          <span>رسوم التوصيل:</span>
+          <span data-i18n="cart_shipping_lbl">رسوم التوصيل:</span>
           <span id="cart-shipping" class="font-bold text-emerald-600">20 ج.م</span>
         </div>
         <div class="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-200">
-          <span>الإجمالي النهائي:</span>
+          <span data-i18n="cart_total_lbl">الإجمالي النهائي:</span>
           <span id="cart-total" class="text-brand-600">0 ج.م</span>
         </div>
       </div>
-      <button id="checkout-btn" onclick="openCheckoutModal()" disabled class="w-full py-3.5 rounded-xl font-black text-white text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed" style="background:{primary}">
+      <button id="checkout-btn" onclick="openCheckoutModal()" disabled class="w-full py-3.5 rounded-xl font-black text-white text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed" style="background:{primary}" data-i18n="cart_checkout_btn">
         📦 متابعة طلب التاجر
       </button>
     </div>
@@ -1093,42 +1157,42 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl relative">
       <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
         <div>
-          <h3 class="text-xl font-black text-slate-900">إرسال طلب إلى التاجر 🇪🇬</h3>
-          <p class="text-xs text-slate-500 font-readex">سيتواصل التاجر لتأكيد الطلب وطريقة الدفع؛ لا تُعالج أي دفعة هنا.</p>
+          <h3 class="text-xl font-black text-slate-900" data-i18n="checkout_modal_title">إرسال طلب إلى التاجر 🇪🇬</h3>
+          <p class="text-xs text-slate-500 font-readex" data-i18n="checkout_modal_sub">سيتواصل التاجر لتأكيد الطلب وطريقة الدفع؛ لا تُعالج أي دفعة هنا.</p>
         </div>
         <button onclick="closeCheckoutModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center font-bold">✕</button>
       </div>
 
       <form id="order-form" onsubmit="submitOrder(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">الاسم بالكامل *</label>
-          <input type="text" id="cust-name" required placeholder="مثال: أحمد محمود" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="block text-xs font-bold text-slate-700 mb-1" data-i18n="checkout_name_lbl">الاسم بالكامل *</label>
+          <input type="text" id="cust-name" required data-i18n="checkout_name_ph" placeholder="مثال: أحمد محمود" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">رقم الهاتف / الواتساب *</label>
-          <input type="tel" id="cust-phone" required placeholder="مثال: 01012345678" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="block text-xs font-bold text-slate-700 mb-1" data-i18n="checkout_phone_lbl">رقم الهاتف / الواتساب *</label>
+          <input type="tel" id="cust-phone" required data-i18n="checkout_phone_ph" placeholder="مثال: 01012345678" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">عنوان التوصيل بالتفصيل *</label>
-          <textarea id="cust-address" required placeholder="المدينة، الحي، اسم الشارع، رقم العمارة والشقة" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" rows="2"></textarea>
+          <label class="block text-xs font-bold text-slate-700 mb-1" data-i18n="checkout_address_lbl">عنوان التوصيل بالتفصيل *</label>
+          <textarea id="cust-address" required data-i18n="checkout_address_ph" placeholder="المدينة، الحي، اسم الشارع، رقم العمارة والشقة" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" rows="2"></textarea>
         </div>
 
         <!-- The prototype records an order request only; it must not direct a
              customer to an unverified wallet or payment provider. -->
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-2">حالة الدفع</label>
+          <label class="block text-xs font-bold text-slate-700 mb-2" data-i18n="checkout_payment_lbl">حالة الدفع</label>
           <div class="text-xs font-bold">
             <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
               <input type="radio" name="pay_method" value="cash_on_delivery" checked class="text-brand-500">
               <div>
-                <div>بانتظار تأكيد التاجر</div>
-                <div class="text-[10px] text-slate-400 font-normal">سيحدد التاجر طريقة الدفع والتسليم بعد مراجعة الطلب.</div>
+                <div data-i18n="checkout_payment_opt">بانتظار تأكيد التاجر</div>
+                <div class="text-[10px] text-slate-400 font-normal" data-i18n="checkout_payment_desc">سيحدد التاجر طريقة الدفع والتسليم بعد مراجعة الطلب.</div>
               </div>
             </label>
           </div>
         </div>
 
-        <button type="submit" id="submit-order-btn" class="w-full py-3.5 rounded-xl font-black text-white text-sm shadow-lg transition mt-4" style="background:{primary}">
+        <button type="submit" id="submit-order-btn" data-i18n="checkout_submit_btn" class="w-full py-3.5 rounded-xl font-black text-white text-sm shadow-lg transition mt-4" style="background:{primary}">
           ✅ تأكيد وإرسال الطلب الآن
         </button>
       </form>
@@ -1141,33 +1205,33 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
       <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl mx-auto mb-4">
         ✓
       </div>
-      <h3 class="text-xl font-black text-slate-900 mb-1">تم تأكيد طلبك بنجاح! 🎉</h3>
-      <p class="text-xs text-slate-500 font-readex mb-6">شكراً لاختيارك {html.escape(brand_name)}. جاري تجهيز طلبك للشحن والتسليم فوراً.</p>
+      <h3 class="text-xl font-black text-slate-900 mb-1" data-i18n="success_modal_title">تم تأكيد طلبك بنجاح! 🎉</h3>
+      <p class="text-xs text-slate-500 font-readex mb-6" data-i18n="success_modal_sub">شكراً لاختيارك {html.escape(brand_name)}. جاري تجهيز طلبك للشحن والتسليم فوراً.</p>
 
       <div class="bg-slate-50 rounded-2xl p-4 text-xs font-readex space-y-2 mb-6 border border-slate-100 text-right">
         <div class="flex justify-between">
-          <span class="text-slate-500">رقم الأوردر:</span>
+          <span class="text-slate-500" data-i18n="success_order_id_lbl">رقم الأوردر:</span>
           <b id="res-order-id" class="text-slate-900 font-mono">#0000</b>
         </div>
         <div class="flex justify-between">
-          <span class="text-slate-500">إجمالي المبلغ:</span>
+          <span class="text-slate-500" data-i18n="success_total_lbl">إجمالي المبلغ:</span>
           <b id="res-total" class="text-emerald-600 font-black">0 ج.م</b>
         </div>
         <div class="flex justify-between">
-          <span class="text-slate-500">طريقة الدفع:</span>
+          <span class="text-slate-500" data-i18n="success_method_lbl">طريقة الدفع:</span>
           <b id="res-payment-method" class="text-slate-800">كاش</b>
         </div>
         <div class="flex justify-between">
-          <span class="text-slate-500">المرجع / الكود:</span>
+          <span class="text-slate-500" data-i18n="success_ref_lbl">المرجع / الكود:</span>
           <b id="res-payment-ref" class="text-slate-800 font-mono">COD-0000</b>
         </div>
       </div>
 
       <div class="space-y-3">
-        <a id="res-whatsapp-link" href="#" target="_blank" class="block w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md transition">
+        <a id="res-whatsapp-link" href="#" target="_blank" data-i18n="success_wa_btn" class="block w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md transition">
           💬 إرسال تفاصيل الأوردر للواتساب للتأكيد
         </a>
-        <button onclick="closeSuccessModal()" class="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+        <button onclick="closeSuccessModal()" data-i18n="success_close_btn" class="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
           إغلاق ومتابعة التسوق
         </button>
       </div>
@@ -1193,12 +1257,13 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
 
     function renderProducts() {{
       const grid = document.getElementById('products-grid');
+      const dict = (typeof I18N !== 'undefined' && I18N[storeLang]) ? I18N[storeLang] : {{"empty_cat": "لا توجد منتجات في هذا القسم حالياً", "add_to_cart": "+ أضف للسلة", "price_lbl": "السعر:", "currency": "ج.م"}};
       const filtered = (activeFilter === 'الكل') 
         ? PRODUCTS 
         : PRODUCTS.filter(p => p.category === activeFilter);
         
       if (!filtered.length) {{
-        grid.innerHTML = '<div class="col-span-full py-12 text-center text-slate-400 font-bold">لا توجد منتجات في هذا القسم حالياً</div>';
+        grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400 font-bold">${{dict.empty_cat}}</div>`;
         return;
       }}
 
@@ -1210,8 +1275,11 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         const category = escapeProductHtml(p.category);
         const badge = escapeProductHtml(p.badge);
         const title = escapeProductHtml(p.title);
-        const description = escapeProductHtml(p.description || 'صنف عالي الجودة ومضمون تم اختياره بعناية.');
+        const description = escapeProductHtml(p.description || (storeLang === 'en' ? 'Certified high-quality item.' : 'صنف عالي الجودة ومضمون تم اختياره بعناية.'));
         const imageUrl = p.image_url ? escapeProductHtml(p.image_url) : '';
+        const addBtnText = dict.add_to_cart;
+        const priceLabel = dict.price_lbl;
+        const curr = dict.currency;
         return `
         <div class="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1">
           <div>
@@ -1240,12 +1308,12 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
 
           <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
             <div>
-              <span class="text-xs text-slate-400 font-bold">السعر:</span>
-              <div class="text-lg font-black text-slate-900">${{safePrice}} <span class="text-xs font-bold text-slate-500">ج.م</span></div>
+              <span class="text-xs text-slate-400 font-bold">${{priceLabel}}</span>
+              <div class="text-lg font-black text-slate-900">${{safePrice}} <span class="text-xs font-bold text-slate-500">${{curr}}</span></div>
             </div>
 
             <button onclick="addToCart(${{id}})" class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-white text-xs shadow-md hover:shadow-lg transition active:scale-95" style="background:{primary}">
-              <span>+ أضف للسلة</span>
+              <span>${{addBtnText}}</span>
             </button>
           </div>
         </div>
@@ -1291,6 +1359,12 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     }}
 
     function updateCartUI() {{
+      const dict = (typeof I18N !== 'undefined' && I18N[storeLang]) ? I18N[storeLang] : {{
+        "cart_items_count": "عناصر",
+        "cart_empty_title": "سلتك فارغة حالياً",
+        "cart_empty_sub": "تصفح القائمة وأضف منتجاتك المفضلة",
+        "currency": "ج.م"
+      }};
       const countEl = document.getElementById('cart-counter');
       const badgeEl = document.getElementById('cart-items-total-badge');
       const itemsContainer = document.getElementById('cart-items');
@@ -1301,24 +1375,24 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
       const ids = Object.keys(cart);
       const totalCount = ids.reduce((sum, id) => sum + cart[id], 0);
 
-      countEl.textContent = totalCount;
-      badgeEl.textContent = totalCount + ' عناصر';
+      if (countEl) countEl.textContent = totalCount;
+      if (badgeEl) badgeEl.textContent = totalCount + ' ' + (dict.cart_items_count || 'عناصر');
 
       if (!ids.length) {{
         itemsContainer.innerHTML = `
           <div class="h-64 flex flex-col items-center justify-center text-center text-slate-400">
             <span class="text-4xl mb-2">🛒</span>
-            <p class="text-sm font-bold">سلتك فارغة حالياً</p>
-            <p class="text-xs text-slate-400 mt-1">تصفح القائمة وأضف منتجاتك المفضلة</p>
+            <p class="text-sm font-bold">${{dict.cart_empty_title || 'سلتك فارغة حالياً'}}</p>
+            <p class="text-xs text-slate-400 mt-1">${{dict.cart_empty_sub || 'تصفح القائمة وأضف منتجاتك المفضلة'}}</p>
           </div>
         `;
-        subtotalEl.textContent = '0 ج.م';
-        totalEl.textContent = '0 ج.م';
-        checkoutBtn.disabled = true;
+        if (subtotalEl) subtotalEl.textContent = '0 ' + dict.currency;
+        if (totalEl) totalEl.textContent = '0 ' + dict.currency;
+        if (checkoutBtn) checkoutBtn.disabled = true;
         return;
       }}
 
-      checkoutBtn.disabled = false;
+      if (checkoutBtn) checkoutBtn.disabled = false;
       let subtotal = 0;
 
       itemsContainer.innerHTML = ids.map(id => {{
@@ -1333,7 +1407,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
           <div class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
             <div class="flex-1 min-w-0 pr-2">
               <h5 class="text-xs font-black text-slate-900 truncate">${{itemTitle}}</h5>
-              <div class="text-[11px] text-slate-500">${{itemPrice}} ج.م × ${{cart[id]}}</div>
+              <div class="text-[11px] text-slate-500">${{itemPrice}} ${{dict.currency}} × ${{cart[id]}}</div>
             </div>
             <div class="flex items-center gap-2">
               <button onclick="updateQty(${{id}}, -1)" class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-100">-</button>
@@ -1346,18 +1420,20 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
 
       let discountVal = (subtotal * appliedPromoDiscount) / 100;
       const shipping = 20;
-      subtotalEl.textContent = subtotal + ' ج.م';
+      if (subtotalEl) subtotalEl.textContent = subtotal + ' ' + dict.currency;
+      const shippingEl = document.getElementById('cart-shipping');
+      if (shippingEl) shippingEl.textContent = shipping + ' ' + dict.currency;
       const discRow = document.getElementById('cart-discount-row');
       const discEl = document.getElementById('cart-discount');
       if (discRow && discEl) {{
         if (appliedPromoDiscount > 0) {{
           discRow.style.display = 'flex';
-          discEl.textContent = `${{discountVal.toFixed(0)}} ج.م (-${{appliedPromoDiscount}}%)`;
+          discEl.textContent = `${{discountVal.toFixed(0)}} ${{dict.currency}} (-${{appliedPromoDiscount}}%)`;
         }} else {{
           discRow.style.display = 'none';
         }}
       }}
-      totalEl.textContent = Math.max(0, (subtotal - discountVal + shipping)).toFixed(0) + ' ج.م';
+      if (totalEl) totalEl.textContent = Math.max(0, (subtotal - discountVal + shipping)).toFixed(0) + ' ' + dict.currency;
     }}
 
     function applyCartPromo() {{
@@ -1366,44 +1442,212 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
       else if (code === 'EGYPT2026') appliedPromoDiscount = 15;
       else if (code === 'AUTOCORP') appliedPromoDiscount = 20;
       else {{
-        alert('كود الخصم غير صحيح أو منتهي الصلاحية');
+        alert(storeLang === 'en' ? 'Invalid or expired promo code' : 'كود الخصم غير صحيح أو منتهي الصلاحية');
         return;
       }}
-      alert(`🎉 تم تفعيل كود الخصم بنجاح (-${{appliedPromoDiscount}}%)!`);
+      alert(storeLang === 'en' ? `🎉 Promo code applied successfully (-${{appliedPromoDiscount}}%)!` : `🎉 تم تفعيل كود الخصم بنجاح (-${{appliedPromoDiscount}}%)!`);
       updateCartUI();
     }}
 
+    const I18N = {{
+      ar: {{
+        promo_bar_text: '🎉 <b>عروض حصرية:</b> كود خصم 10%: <b>WELCOME10</b> | 🚚 توصيل سريع لجميع المحافظات',
+        brand_sub: 'المتجر الإلكتروني المعتمد 🇪🇬',
+        nav_home: 'الرئيسية',
+        nav_catalog: 'المنتجات',
+        nav_features: 'المميزات',
+        nav_reviews: 'آراء العملاء',
+        nav_contact: 'تواصل معنا',
+        theme_dark: 'ليلي',
+        theme_light: 'نهاري',
+        lang_btn: 'English',
+        cart_btn: 'السلة',
+        hero_badge: 'منتجات مصرية أصلية 100%',
+        hero_cta: '🛍️ تصفح التشكيلة واطلب فوراً',
+        feat1_title: 'خامات قطنية ممتازة',
+        feat1_desc: 'أعلى معايير الجودة والتصنيع المصري الفاخر.',
+        feat2_title: 'توصيل سريع للباب',
+        feat2_desc: 'شحن مباشر حتى باب منزلك في وقت قياسي.',
+        feat3_title: 'طرق دفع مرنة',
+        feat3_desc: 'فودافون كاش، إنستاباي، فوري، وكاش عند الاستلام.',
+        feat4_title: 'خدمة عملاء مباشرة',
+        feat4_desc: 'متابعة فورية عبر الواتساب لتلبية كافة الاستفسارات.',
+        cat_title_badge: 'قائمة الأصناف المتاحة',
+        cat_title: 'اختر ما يناسبك واطلبه الآن',
+        cat_all: 'الكل',
+        empty_cat: 'لا توجد منتجات في هذا القسم حالياً',
+        add_to_cart: '+ أضف للسلة',
+        price_lbl: 'السعر:',
+        currency: 'ج.م',
+        reviews_badge: 'تقييمات موثقة',
+        reviews_title: 'آراء وتجارب العملاء ⭐⭐⭐⭐⭐',
+        rev1_text: 'المنتجات وصلت مطابقة للصور تماماً، وسرعة الاستجابة على الواتساب والتوصيل محترمة جداً.',
+        rev2_text: 'التغليف فاخر وأصلي والدفع بإنستاباي كان في ثواني، شكراً على الأمانة والاحترافية.',
+        rev3_text: 'أفضل تجربة شراء أونلاين في مصر، بالتأكيد هكرر الطلب تاني.',
+        contact_badge: 'خدمة العملاء متصلة',
+        contact_title: 'هل لديك استفسار أو طلب خاص؟',
+        contact_phone_lbl: 'هاتف:',
+        contact_wa_lbl: 'واتساب:',
+        contact_addr_lbl: 'العنوان:',
+        footer_rights: 'جميع الحقوق محفوظة.',
+        footer_powered: 'مدعوم بواسطة وكالة',
+        cart_title: 'سلة مشترياتك',
+        cart_items_count: 'عناصر',
+        cart_empty_title: 'سلتك فارغة حالياً',
+        cart_empty_sub: 'تصفح القائمة وأضف منتجاتك المفضلة',
+        cart_promo_ph: 'كود الخصم (WELCOME10)',
+        cart_promo_apply: 'تطبيق',
+        cart_subtotal_lbl: 'المجموع الفرعي:',
+        cart_discount_lbl: 'الخصم المطبق:',
+        cart_shipping_lbl: 'رسوم التوصيل:',
+        cart_total_lbl: 'الإجمالي النهائي:',
+        cart_checkout_btn: '📦 متابعة طلب التاجر',
+        checkout_modal_title: 'إرسال طلب إلى التاجر 🇪🇬',
+        checkout_modal_sub: 'سيتواصل التاجر لتأكيد الطلب وطريقة الدفع؛ لا تُعالج أي دفعة هنا.',
+        checkout_name_lbl: 'الاسم بالكامل *',
+        checkout_name_ph: 'مثال: أحمد محمود',
+        checkout_phone_lbl: 'رقم الهاتف / الواتساب *',
+        checkout_phone_ph: 'مثال: 01012345678',
+        checkout_address_lbl: 'عنوان التوصيل بالتفصيل *',
+        checkout_address_ph: 'المدينة، الحي، اسم الشارع، رقم العمارة والشقة',
+        checkout_payment_lbl: 'حالة الدفع',
+        checkout_payment_opt: 'بانتظار تأكيد التاجر',
+        checkout_payment_desc: 'سيحدد التاجر طريقة الدفع والتسليم بعد مراجعة الطلب.',
+        checkout_submit_btn: '✅ تأكيد وإرسال الطلب الآن',
+        success_modal_title: 'تم تأكيد طلبك بنجاح! 🎉',
+        success_order_id_lbl: 'رقم الأوردر:',
+        success_total_lbl: 'إجمالي المبلغ:',
+        success_method_lbl: 'طريقة الدفع:',
+        success_ref_lbl: 'المرجع / الكود:',
+        success_wa_btn: '💬 إرسال تفاصيل الأوردر للواتساب للتأكيد',
+        success_close_btn: 'إغلاق ومتابعة التسوق'
+      }},
+      en: {{
+        promo_bar_text: '🎉 <b>Exclusive Deals:</b> 10% Off Code: <b>WELCOME10</b> | 🚚 Fast Delivery Nationwide',
+        brand_sub: 'Certified Online Store 🇪🇬',
+        nav_home: 'Home',
+        nav_catalog: 'Catalog',
+        nav_features: 'Features',
+        nav_reviews: 'Reviews',
+        nav_contact: 'Contact',
+        theme_dark: 'Dark',
+        theme_light: 'Light',
+        lang_btn: 'العربية',
+        cart_btn: 'Cart',
+        hero_badge: '100% Egyptian Authentic Quality',
+        hero_cta: '🛍️ Browse Catalog & Order',
+        feat1_title: 'Premium Egyptian Fabric',
+        feat1_desc: 'Finest authentic quality crafted to perfection.',
+        feat2_title: 'Direct Fast Delivery',
+        feat2_desc: 'Express door-to-door delivery across all governorates.',
+        feat3_title: 'Flexible Payment',
+        feat3_desc: 'Vodafone Cash, InstaPay, Fawry, and Cash on Delivery.',
+        feat4_title: 'Instant Support',
+        feat4_desc: 'Direct WhatsApp and phone assistance around the clock.',
+        cat_title_badge: 'Available Collections',
+        cat_title: 'Select Your Favorites and Order Now',
+        cat_all: 'All',
+        empty_cat: 'No items found in this section right now',
+        add_to_cart: '+ Add to Cart',
+        price_lbl: 'Price:',
+        currency: 'EGP',
+        reviews_badge: 'Verified Reviews',
+        reviews_title: 'Customer Feedback ⭐⭐⭐⭐⭐',
+        rev1_text: 'Products arrived exactly as pictured, fast WhatsApp response and great delivery.',
+        rev2_text: 'Luxury packaging, InstaPay payment took seconds, thank you for the professionalism.',
+        rev3_text: 'Best online shopping experience in Egypt, will definitely order again.',
+        contact_badge: 'Customer Support Online',
+        contact_title: 'Have a Question or Special Request?',
+        contact_phone_lbl: 'Phone:',
+        contact_wa_lbl: 'WhatsApp:',
+        contact_addr_lbl: 'Address:',
+        footer_rights: 'All rights reserved.',
+        footer_powered: 'Powered by Agency',
+        cart_title: 'Your Shopping Cart',
+        cart_items_count: 'items',
+        cart_empty_title: 'Your cart is currently empty',
+        cart_empty_sub: 'Explore catalog items and add to cart',
+        cart_promo_ph: 'Promo code (WELCOME10)',
+        cart_promo_apply: 'Apply',
+        cart_subtotal_lbl: 'Subtotal:',
+        cart_discount_lbl: 'Discount Applied:',
+        cart_shipping_lbl: 'Delivery Fee:',
+        cart_total_lbl: 'Total Amount:',
+        cart_checkout_btn: '📦 Proceed with Merchant Order',
+        checkout_modal_title: 'Submit Order Request 🇪🇬',
+        checkout_modal_sub: 'The merchant will contact you to confirm; no payment charged here.',
+        checkout_name_lbl: 'Full Name *',
+        checkout_name_ph: 'e.g. Ahmed Mahmoud',
+        checkout_phone_lbl: 'Phone / WhatsApp *',
+        checkout_phone_ph: 'e.g. 01012345678',
+        checkout_address_lbl: 'Delivery Address *',
+        checkout_address_ph: 'City, district, street, building and apartment',
+        checkout_payment_lbl: 'Payment Status',
+        checkout_payment_opt: 'Awaiting Merchant Confirmation',
+        checkout_payment_desc: 'Merchant confirms payment method and delivery after reviewing.',
+        checkout_submit_btn: '✅ Confirm & Send Order Now',
+        success_modal_title: 'Order Confirmed Successfully! 🎉',
+        success_order_id_lbl: 'Order ID:',
+        success_total_lbl: 'Total Amount:',
+        success_method_lbl: 'Payment Method:',
+        success_ref_lbl: 'Reference / Code:',
+        success_wa_btn: '💬 Send Order Details via WhatsApp',
+        success_close_btn: 'Close & Continue Shopping'
+      }}
+    }};
+
     let isStoreDark = false;
-    function toggleStoreTheme() {{
-      isStoreDark = !isStoreDark;
+    function applyStoreTheme(dark) {{
+      isStoreDark = !!dark;
       if (isStoreDark) {{
-        document.body.style.backgroundColor = '#0b0f19';
-        document.body.style.color = '#f1f5f9';
-        const lbl = document.getElementById('store-theme-lbl');
-        if (lbl) lbl.textContent = 'ليلي';
+        document.documentElement.classList.add('dark');
       }} else {{
-        document.body.style.backgroundColor = '#f8fafc';
-        document.body.style.color = '#1e293b';
-        const lbl = document.getElementById('store-theme-lbl');
-        if (lbl) lbl.textContent = 'نهاري';
+        document.documentElement.classList.remove('dark');
+      }}
+      try {{ localStorage.setItem('store_theme', isStoreDark ? 'dark' : 'light'); }} catch (e) {{}}
+      const lbl = document.getElementById('store-theme-lbl');
+      if (lbl) {{
+        const dict = (typeof I18N !== 'undefined' && I18N[storeLang]) ? I18N[storeLang] : I18N.ar;
+        lbl.textContent = isStoreDark ? dict.theme_dark : dict.theme_light;
       }}
     }}
 
+    function toggleStoreTheme() {{
+      applyStoreTheme(!isStoreDark);
+    }}
+
     let storeLang = 'ar';
-    function toggleStoreLang() {{
-      storeLang = storeLang === 'ar' ? 'en' : 'ar';
+    function applyStoreLang(lang) {{
+      storeLang = (lang === 'en') ? 'en' : 'ar';
       document.documentElement.lang = storeLang;
-      document.documentElement.dir = storeLang === 'ar' ? 'rtl' : 'ltr';
+      document.documentElement.dir = (storeLang === 'ar') ? 'rtl' : 'ltr';
+      try {{ localStorage.setItem('store_lang', storeLang); }} catch (e) {{}}
+
+      const dict = (typeof I18N !== 'undefined' && I18N[storeLang]) ? I18N[storeLang] : I18N.ar;
+
       const btn = document.getElementById('store-lang-btn');
-      if (btn) btn.textContent = storeLang === 'ar' ? 'English' : 'العربية';
-      const bar = document.getElementById('promo-bar-text');
-      if (bar) {{
-        if (storeLang === 'en') {{
-          bar.innerHTML = '🎉 <b>Special Deals:</b> 10% Off Code: <b>WELCOME10</b> | 🚚 Fast Delivery Nationwide';
-        }} else {{
-          bar.innerHTML = '🎉 <b>عروض حصرية:</b> كود خصم 10%: <b>WELCOME10</b> | 🚚 توصيل سريع لجميع المحافظات';
+      if (btn) btn.textContent = dict.lang_btn;
+
+      const themeLbl = document.getElementById('store-theme-lbl');
+      if (themeLbl) themeLbl.textContent = isStoreDark ? dict.theme_dark : dict.theme_light;
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {{
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {{
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {{
+            el.placeholder = dict[key];
+          }} else {{
+            el.innerHTML = dict[key];
+          }}
         }}
-      }}
+      }});
+
+      renderProducts();
+      updateCartUI();
+    }}
+
+    function toggleStoreLang() {{
+      applyStoreLang(storeLang === 'ar' ? 'en' : 'ar');
     }}
 
     let appliedPromoDiscount = 0;
@@ -1505,8 +1749,21 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
     }}
 
     // Init
-    renderProducts();
-    updateCartUI();
+    try {{
+      const savedTheme = localStorage.getItem('store_theme');
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      applyStoreTheme(savedTheme ? savedTheme === 'dark' : prefersDark);
+    }} catch (e) {{
+      applyStoreTheme(false);
+    }}
+
+    try {{
+      const savedLang = localStorage.getItem('store_lang') || 'ar';
+      applyStoreLang(savedLang);
+    }} catch (e) {{
+      renderProducts();
+      updateCartUI();
+    }}
   </script>
 </body>
 </html>"""
