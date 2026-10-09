@@ -1764,3 +1764,26 @@ def test_auth_me_resolves_session_from_cookie_header_or_request_cookies(monkeypa
         assert me_after.status_code == 200
         assert me_after.json()["authenticated"] is False
 
+
+def test_enterprise_website_builder_skill_and_dashboard_parity():
+    import filecmp
+    from app import skills
+
+    # Verify static/index.html and api/static/index.html are byte-for-byte identical
+    assert filecmp.cmp("static/index.html", "api/static/index.html", shallow=False)
+
+    # Verify enterprise-website-builder skill is loaded
+    all_skills = skills.load()
+    builder_skill = next((s for s in all_skills if s["file"] == "enterprise-website-builder.md"), None)
+    assert builder_skill is not None, "enterprise-website-builder.md must be present in skills directory"
+    assert "*" in builder_skill["meta"].get("roles", [])
+
+    # Verify text is injected for engineering and security agents
+    sec_txt, sec_tools = skills.for_agent("Cybersecurity Reviewer", "security")
+    assert "enterprise-website-builder" in sec_txt
+    assert "calc" in sec_tools
+
+    dev_txt, dev_tools = skills.for_agent("Full-Stack Developer", "engineering")
+    assert "enterprise-website-builder" in dev_txt
+
+

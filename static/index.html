@@ -2546,7 +2546,7 @@ async function loadAdminLedger(){
       </div>
     `;
   }catch(e){
-    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
+    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${esc(e.message)}</div>`;
   }
 }
 
@@ -2573,7 +2573,7 @@ async function loadAdminRoster(){
       </div>
     `;
   }catch(e){
-    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
+    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${esc(e.message)}</div>`;
   }
 }
 
@@ -2603,7 +2603,7 @@ async function loadAdminProviders(){
       </div>
     `;
   }catch(e){
-    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
+    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${esc(e.message)}</div>`;
   }
 }
 
@@ -2751,7 +2751,7 @@ async function reloadFileEditorList(){
       await onFileEditorSelectChange();
     }
   }catch(e){
-    sel.innerHTML = `<option value="">فشل التحميل: ${e.message}</option>`;
+    sel.innerHTML = `<option value="">فشل التحميل: ${esc(e.message)}</option>`;
   }
 }
 
@@ -3404,12 +3404,12 @@ async function loadTenantTableData(tableName){
     const d = await res.json();
     const rows = d.rows || [];
     if(!rows.length){
-      c.innerHTML = `<div style="color:var(--fg3);padding:16px;text-align:center">الجدول <b>${tableName}</b> فارغ حالياً (لا توجد سجلات).</div>`;
+      c.innerHTML = `<div style="color:var(--fg3);padding:16px;text-align:center">الجدول <b>${esc(tableName)}</b> فارغ حالياً (لا توجد سجلات).</div>`;
       return;
     }
     const cols = Object.keys(rows[0]);
     c.innerHTML = `
-      <div style="font-size:.76rem;color:var(--fg2);margin-bottom:6px">عرض <b>${rows.length}</b> سجل من جدول <b>${tableName}</b>:</div>
+      <div style="font-size:.76rem;color:var(--fg2);margin-bottom:6px">عرض <b>${rows.length}</b> سجل من جدول <b>${esc(tableName)}</b>:</div>
       <table style="width:100%;border-collapse:collapse;font-size:.76rem">
         <thead>
           <tr style="border-bottom:1px solid var(--border);color:var(--accent2);text-align:right">
@@ -3430,7 +3430,7 @@ async function loadTenantTableData(tableName){
       </table>
     `;
   }catch(e){
-    c.innerHTML = `<div style="color:var(--danger);padding:10px">فشل قراءة بيانات الجدول: ${e.message}</div>`;
+    c.innerHTML = `<div style="color:var(--danger);padding:10px">فشل قراءة بيانات الجدول: ${esc(e.message)}</div>`;
   }
 }
 
@@ -3498,7 +3498,7 @@ async function runTenantSqlQuery(){
   }catch(e){
     btn.disabled = false;
     btn.textContent = '⚡ تشغيل الاستعلام (Run Query)';
-    c.innerHTML = `<div style="color:var(--danger);padding:10px">فشل الاستعلام: ${e.message}</div>`;
+    c.innerHTML = `<div style="color:var(--danger);padding:10px">فشل الاستعلام: ${esc(e.message)}</div>`;
   }
 }
 
@@ -3790,7 +3790,7 @@ async function loadAdminSitesManager(){
       node.textContent = typeof status === 'string' ? status.slice(0, 80) : '';
     });
   }catch(e){
-    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${e.message}</div>`;
+    c.innerHTML = `<div style="color:var(--danger)">فشل التحميل: ${esc(e.message)}</div>`;
   }
 }
 
