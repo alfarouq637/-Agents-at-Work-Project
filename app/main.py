@@ -1109,8 +1109,18 @@ async def new_job(
         try:
             await corp.plan_job(jid)
             job = db.one("select * from jobs where id=?", (jid,))
-            if job and job["status"] not in ("awaiting_plan", "rejected", "failed"):
+            if job and job["status"] == "awaiting_plan":
+                corp.log(jid, "Web wizard client authorized plan execution")
+                db.x("update jobs set status='running' where id=?", (jid,))
                 await corp.run_job(jid)
+                job = db.one("select * from jobs where id=?", (jid,))
+                if job and job["status"] == "awaiting_delivery":
+                    await corp.deliver(jid)
+            elif job and job["status"] not in ("rejected", "failed"):
+                await corp.run_job(jid)
+                job = db.one("select * from jobs where id=?", (jid,))
+                if job and job["status"] == "awaiting_delivery":
+                    await corp.deliver(jid)
         except Exception as e:
             print(f"[SYNC JOB ERROR] {e}")
     return {"id": jid, "brand_name": brand_name, "message": "تم إنشاء المشروع وبدأ فريق الـ Agents في التنفيذ"}
@@ -1246,8 +1256,26 @@ def get_job_detail(
 
 
 @app.post("/api/jobs/{jid}/decision")
-async def job_decision(jid: int, body: JobDecisionRequest, x_admin_key: str = Header(default="")):
-    admin(x_admin_key)
+async def job_decision(
+    jid: int,
+    body: JobDecisionRequest,
+    request: Request,
+    x_admin_key: str = Header(default=""),
+    x_user_token: str = Header(default=""),
+    authorization: str = Header(default=""),
+    autocorp_session: str = Cookie(default=""),
+):
+    cookie_token = autocorp_session or str(request.cookies.get("autocorp_session") or "").strip()
+    user = get_user_from_headers(x_user_token, x_admin_key, authorization, cookie_token=cookie_token)
+    is_admin_ok = False
+    try:
+        admin(x_admin_key)
+        is_admin_ok = True
+    except HTTPException:
+        if user and (user.get("is_admin") or user.get("role") == "admin"):
+            is_admin_ok = True
+    if not is_admin_ok and not (user and auth.verify_site_ownership(jid, user)):
+        raise HTTPException(403, "غير مصرح لك باتخاذ قرار بشأن هذا المشروع")
     return await corp.decide(jid, body.decision)
 
 

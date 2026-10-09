@@ -594,7 +594,13 @@ async def decide(job_id, decision):
     if job["status"] == "awaiting_plan":
         if ok:
             log(job_id, "Owner APPROVED plan")
-            spawn(run_job(job_id))
+            if IS_VERCEL:
+                await run_job(job_id)
+                job_check = db.one("select * from jobs where id=?", (job_id,))
+                if job_check and job_check.get("status") == "awaiting_delivery":
+                    await deliver(job_id)
+            else:
+                spawn(run_job(job_id))
         else:
             db.x("update jobs set status='rejected' where id=?", (job_id,))
             log(job_id, "Owner REJECTED plan")

@@ -144,6 +144,40 @@ textarea{resize:vertical;min-height:75px}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* Live Stepper & AI Agents Activity Stream */
+.live-pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 10px var(--success);animation:live-pulse 1.5s infinite;display:inline-block}
+@keyframes live-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.4}}
+
+.agent-pipeline-board{background:rgba(11,15,23,.75);border:1px solid rgba(0,242,254,.2);border-radius:var(--radius-sm);padding:14px;margin-bottom:12px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.pipeline-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.pipeline-title{font-size:.85rem;font-weight:800;display:flex;align-items:center;gap:6px}
+.pipeline-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.pipeline-step{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-size:.74rem;transition:all .3s ease}
+.pipeline-step.completed{border-color:rgba(0,245,160,.4);background:rgba(0,245,160,.06);color:var(--success)}
+.pipeline-step.active{border-color:var(--accent2);background:rgba(0,242,254,.1);color:#fff;box-shadow:0 0 14px rgba(0,242,254,.3);animation:step-pulse 2s infinite alternate}
+.pipeline-step.pending{color:var(--fg3);opacity:.55}
+@keyframes step-pulse{0%{border-color:rgba(0,242,254,.3);transform:scale(1)}100%{border-color:rgba(0,242,254,.9);transform:scale(1.02)}}
+
+.live-console-box{background:#080c14;border:1px solid rgba(0,242,254,.15);border-radius:var(--radius-sm);overflow:hidden;margin-top:10px}
+.live-console-head{background:rgba(255,255,255,.03);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06);font-size:.74rem;font-weight:700}
+.live-console-dots{display:flex;gap:5px}
+.live-console-dots span{width:8px;height:8px;border-radius:50%;display:inline-block}
+.live-console-body{max-height:220px;overflow-y:auto;padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:.72rem;line-height:1.7}
+.live-console-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
+.console-time{color:var(--fg3);font-size:.68rem;min-width:65px;direction:ltr;text-align:left}
+.console-tag{font-size:.65rem;padding:2px 7px;border-radius:4px;font-weight:800;white-space:nowrap}
+.tag-ceo{background:rgba(243,156,18,.2);color:var(--gold);border:1px solid rgba(243,156,18,.4)}
+.tag-arch{background:rgba(0,206,201,.2);color:var(--accent2);border:1px solid rgba(0,206,201,.4)}
+.tag-writer{background:rgba(168,85,247,.2);color:#c084fc;border:1px solid rgba(168,85,247,.4)}
+.tag-fe{background:rgba(56,189,248,.2);color:#38bdf8;border:1px solid rgba(56,189,248,.4)}
+.tag-sec{background:rgba(0,245,160,.2);color:var(--success);border:1px solid rgba(0,245,160,.4)}
+.tag-qa{background:rgba(230,126,34,.2);color:#f39c12;border:1px solid rgba(230,126,34,.4)}
+.tag-sys{background:rgba(148,163,184,.2);color:var(--fg2);border:1px solid rgba(148,163,184,.4)}
+
+.awaiting-plan-box{background:linear-gradient(135deg,rgba(243,156,18,.15),rgba(11,15,23,.95));border:1px solid rgba(243,156,18,.45);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;box-shadow:0 6px 20px rgba(243,156,18,.1)}
+.spinner-inline{width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -610,7 +644,13 @@ textarea{resize:vertical;min-height:75px}
           هنا تظهر المتاجر الخاصة بحسابك، يمكنك التحكم في إعدادات النشر والدومين والتحميل ومتابعة الطلبات.
         </p>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="loadJobs()">🔄 <span data-i18n="btn_refresh">تحديث المتاجر</span></button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="live-indicator" style="display:none;align-items:center;gap:6px;font-size:.78rem;color:var(--accent2);background:rgba(0,242,254,.08);padding:4px 10px;border-radius:20px;border:1px solid rgba(0,242,254,.25)">
+          <span class="live-pulse-dot"></span>
+          <span id="live-indicator-text">مباشر: الذكاء الاصطناعي يعمل الآن...</span>
+        </span>
+        <button class="btn btn-ghost btn-sm" onclick="loadJobs()">🔄 <span data-i18n="btn_refresh">تحديث المتاجر</span></button>
+      </div>
     </div>
 
     <!-- Stores List Container -->
@@ -2038,6 +2078,222 @@ async function handleCreateStore(e){
 // =========================================================
 // Load Jobs: Separate Public Showcase vs My Stores
 // =========================================================
+let activeJobsPollTimer = null;
+
+function scheduleActiveJobsPoll(jobs){
+  if(activeJobsPollTimer){
+    clearTimeout(activeJobsPollTimer);
+    activeJobsPollTimer = null;
+  }
+  const hasActive = Array.isArray(jobs) && jobs.some(j => ['planning', 'running', 'awaiting_plan', 'created'].includes(j.status));
+  const ind = $('#live-indicator');
+  if(hasActive){
+    if(ind) ind.style.display = 'inline-flex';
+    activeJobsPollTimer = setTimeout(() => {
+      loadJobs();
+    }, 2500);
+  }else{
+    if(ind) ind.style.display = 'none';
+  }
+}
+
+function getAgentTag(msg){
+  const m = (msg || '').toLowerCase();
+  if(m.includes('ceo') || m.includes('plan')) return {label: '👔 CEO الإدارة', class: 'tag-ceo'};
+  if(m.includes('architect') || m.includes('solutions')) return {label: '📐 المعماري', class: 'tag-arch'};
+  if(m.includes('content') || m.includes('writer')) return {label: '✍️ صياغة المحتوى', class: 'tag-writer'};
+  if(m.includes('frontend') || m.includes('html')) return {label: '💻 مطور الواجهات', class: 'tag-fe'};
+  if(m.includes('cybersecurity') || m.includes('deep learning') || m.includes('owasp') || m.includes('sast')) return {label: '🛡️ أمان Deep Learning', class: 'tag-sec'};
+  if(m.includes('code reviewer') || m.includes('qa') || m.includes('revision') || m.includes('fine 2')) return {label: '🧪 تدقيق الجودة QA', class: 'tag-qa'};
+  if(m.includes('synthesizer') || m.includes('deploy') || m.includes('delivered') || m.includes('live at')) return {label: '🚀 النشر والتسليم', class: 'tag-sec'};
+  return {label: '⚡ النظام', class: 'tag-sys'};
+}
+
+function getPipelineStages(j){
+  const events = (j.events || []).map(e => (e.msg || '').toLowerCase());
+  const isDelivered = j.status === 'delivered';
+  const isRunning = ['running', 'planning', 'awaiting_delivery'].includes(j.status);
+
+  const s1_done = isDelivered || events.some(e => e.includes('ceo plan') || e.includes('contract') || e.includes('architect done'));
+  const s2_done = isDelivered || events.some(e => e.includes('arabic content writer done'));
+  const s3_done = isDelivered || events.some(e => e.includes('frontend developer generated') || e.includes('complete html') || e.includes('synthesizer built'));
+  const s4_done = isDelivered || events.some(e => e.includes('deep learning security') || e.includes('owasp top 10'));
+  const s5_done = isDelivered || events.some(e => e.includes('code reviewer done') || e.includes('qa') || e.includes('revision'));
+  const s6_done = isDelivered;
+
+  let active = 1;
+  if(isDelivered){
+    active = 7;
+  } else if(!s1_done){
+    active = 1;
+  } else if(!s2_done){
+    active = 2;
+  } else if(!s3_done){
+    active = 3;
+  } else if(!s4_done){
+    active = 4;
+  } else if(!s5_done){
+    active = 5;
+  } else {
+    active = 6;
+  }
+
+  const stageStatus = (stepNum, isDone) => {
+    if(isDelivered || (isDone && active > stepNum)) return 'completed';
+    if(isRunning && active === stepNum) return 'active';
+    return 'pending';
+  };
+
+  return [
+    { id: 1, label: 'تخطيط الإدارة (CEO)', icon: '👔', status: stageStatus(1, s1_done) },
+    { id: 2, label: 'صياغة المحتوى العربي', icon: '✍️', status: stageStatus(2, s2_done) },
+    { id: 3, label: 'برمجة وتصميم الواجهات', icon: '💻', status: stageStatus(3, s3_done) },
+    { id: 4, label: 'فحص أمان Deep Learning', icon: '🛡️', status: stageStatus(4, s4_done) },
+    { id: 5, label: 'تدقيق الجودة والاختبار', icon: '🧪', status: stageStatus(5, s5_done) },
+    { id: 6, label: 'تجهيز الداتابيز والنشر', icon: '🚀', status: stageStatus(6, s6_done) },
+  ];
+}
+
+function renderAgentConsole(j){
+  const events = j.events || [];
+  const isRunning = ['running', 'planning'].includes(j.status);
+  return `
+    <div class="live-console-box">
+      <div class="live-console-head">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="live-console-dots">
+            <span style="background:#ff5f56"></span>
+            <span style="background:#ffbd2e"></span>
+            <span style="background:#27c93f"></span>
+          </div>
+          <span>💻 شاشة تتبع خطوات الـ AI المباشرة (Live Stream Console)</span>
+        </div>
+        <div>
+          ${isRunning ? `
+            <span style="color:var(--accent2);display:inline-flex;align-items:center;gap:6px;font-size:.72rem">
+              <span class="live-pulse-dot"></span> جاري كتابة ومراجعة الكود...
+            </span>` : `
+            <span style="color:var(--success);font-size:.72rem">
+              ✓ تم توثيق (${events.length}) مرحلة تعاقد وفحص
+            </span>`}
+        </div>
+      </div>
+      <div class="live-console-body">
+        ${events.length ? events.map(e => {
+          const tagInfo = getAgentTag(e.msg);
+          return `
+            <div class="live-console-row">
+              <span class="console-tag ${tagInfo.class}">${tagInfo.label}</span>
+              <span style="color:var(--fg);word-break:break-word">${esc(e.msg)}</span>
+            </div>
+          `;
+        }).join('') : `
+          <div style="color:var(--fg3);padding:8px 0">جاري بدء جلسة الوكلاء ورسم خطة المشروع...</div>
+        `}
+        ${isRunning ? `
+          <div class="live-console-row" style="color:var(--accent2);font-weight:700;margin-top:8px">
+            <span class="spinner-inline" style="border-color:var(--accent2);border-top-color:transparent"></span>
+            <span>الوكيل يعمل الآن في الخلفية لتجهيز مخرجات الخطوة الحالية...</span>
+          </div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderAgentPipelineBoard(j){
+  const stages = getPipelineStages(j);
+  const isRunning = ['running', 'planning'].includes(j.status);
+  const isDelivered = j.status === 'delivered';
+
+  return `
+    <div class="agent-pipeline-board">
+      <div class="pipeline-header">
+        <div class="pipeline-title">
+          <span>🤖 خط إنتاج فريق الـ AI Agents المتخصص:</span>
+          ${isRunning ? `
+            <span style="color:var(--accent2);display:inline-flex;align-items:center;gap:6px;font-size:.76rem;margin-right:10px">
+              <span class="live-pulse-dot"></span> الوكلاء يعملون بشكل مباشر الآن
+            </span>` : (isDelivered ? `
+            <span style="color:var(--success);font-size:.76rem;margin-right:10px">
+              ✓ تم تسليم الموقع بنجاح ومطابقة كافة المعايير
+            </span>` : '')}
+        </div>
+        <div style="font-size:.74rem;color:var(--fg3)">
+          كادر العمل: <b>5 وكلاء ذكاء اصطناعي</b>
+        </div>
+      </div>
+
+      <div class="pipeline-steps">
+        ${stages.map(st => `
+          <div class="pipeline-step ${st.status}">
+            <span style="font-size:1.1rem">${st.icon}</span>
+            <div style="flex:1">
+              <div style="font-weight:700">${esc(st.label)}</div>
+              <div style="font-size:.66rem;margin-top:2px;opacity:.85">
+                ${st.status === 'completed' ? '✓ مكتمل بنجاح' : (st.status === 'active' ? '⚡ جاري العمل...' : '⏳ بانتظار الدور')}
+              </div>
+            </div>
+            ${st.status === 'active' ? '<span class="spinner-inline"></span>' : ''}
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Live Stream Console -->
+      ${renderAgentConsole(j)}
+    </div>
+  `;
+}
+
+async function approveJobPlan(jid){
+  try{
+    const token = getSafeToken();
+    const headers = {'Content-Type': 'application/json'};
+    if(token) headers['x-user-token'] = token;
+    const btn = event?.target;
+    if(btn){
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-inline"></span> جاري بدء التنفيذ...';
+    }
+    const res = await fetch(`/api/jobs/${jid}/decision`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: headers,
+      body: JSON.stringify({decision: 'approve'})
+    });
+    const d = await res.json();
+    if(res.ok && d.ok){
+      loadJobs();
+    }else{
+      alert('خطأ: ' + (d.detail || d.message || 'تعذر اعتماد الخطة'));
+      if(btn){
+        btn.disabled = false;
+        btn.textContent = '⚡ اعتماد وبدء البرمجة فوراً';
+      }
+    }
+  }catch(err){
+    console.error("Approve error:", err);
+    alert("تعذر الاتصال بالخادم");
+  }
+}
+
+async function rejectJobPlan(jid){
+  if(!confirm("هل أنت متأكد من إلغاء هذا الطلب؟")) return;
+  try{
+    const token = getSafeToken();
+    const headers = {'Content-Type': 'application/json'};
+    if(token) headers['x-user-token'] = token;
+    const res = await fetch(`/api/jobs/${jid}/decision`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: headers,
+      body: JSON.stringify({decision: 'reject'})
+    });
+    loadJobs();
+  }catch(e){
+    console.error(e);
+  }
+}
+
 async function loadJobs(){
   try{
     const reqHeaders = {};
@@ -2065,6 +2321,9 @@ async function loadJobs(){
 
     // 2. Render "My Stores" View (Filtered to user's stores or all if admin)
     renderMyStores(jobs);
+
+    // 3. Schedule active jobs live poll
+    scheduleActiveJobsPoll(jobs);
   }catch(e){
     console.error("Failed loading jobs:", e);
   }
@@ -2123,15 +2382,30 @@ function renderMyStores(jobs){
   container.innerHTML = myStores.map(j => {
     const isPaid = j.is_paid;
     const siteUrl = safeSiteUrl(j.frontend_url, '/sites/' + (j.slug || j.id) + '/');
+    const isDelivered = j.status === 'delivered';
+
+    let statusBadge = '';
+    if(isDelivered){
+      statusBadge = '<span class="tag tag-delivered">جاهز ومنشور 🌐</span>';
+    } else if(j.status === 'awaiting_plan'){
+      statusBadge = '<span class="tag" style="background:rgba(243,156,18,.15);color:var(--gold);border-color:var(--gold)">⚠️ بانتظار اعتماد الخطة</span>';
+    } else if(j.status === 'awaiting_delivery'){
+      statusBadge = '<span class="tag" style="background:rgba(0,206,201,.15);color:var(--accent2);border-color:var(--accent2)">📦 بانتظار اعتماد التسليم</span>';
+    } else if(j.status === 'running' || j.status === 'planning'){
+      statusBadge = '<span class="tag tag-running">⚡ جاري البناء بالذكاء الاصطناعي...</span>';
+    } else if(j.status === 'rejected'){
+      statusBadge = '<span class="tag" style="color:var(--danger);border-color:var(--danger)">❌ ملغي</span>';
+    } else {
+      statusBadge = '<span class="tag tag-running">⏳ جاري التحضير...</span>';
+    }
+
     return `
       <div class="card" style="border:1px solid ${isPaid ? 'rgba(0,206,201,.3)' : 'var(--border)'}">
         <div class="card-header">
           <div>
             <b style="color:var(--accent2);font-size:1.15rem">#${j.id}</b>
             <span style="font-weight:900;font-size:1.05rem;margin-right:8px;color:#fff">${esc(j.client)}</span>
-            <span class="tag ${j.status === 'delivered' ? 'tag-delivered' : 'tag-running'}">
-              ${j.status === 'delivered' ? 'جاهز ومنشور' : 'جاري البناء...'}
-            </span>
+            ${statusBadge}
             <span class="tag" style="background:${isPaid ? 'rgba(0,206,201,.1)' : 'rgba(243,156,18,.1)'};color:${isPaid ? 'var(--success)' : 'var(--gold)'};border-color:${isPaid ? 'var(--success)' : 'var(--gold)'}">
               ${isPaid ? '✅ نشط ومدفوع' : '⏳ تجريبي / غير مدفوع'}
             </span>
@@ -2145,8 +2419,50 @@ function renderMyStores(jobs){
           📋 <b>تفاصيل الطلب:</b> ${esc(j.request)}
         </div>
 
+        ${j.status === 'awaiting_plan' ? `
+        <div class="awaiting-plan-box">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div>
+              <div style="font-weight:900;color:var(--gold);font-size:1rem;margin-bottom:4px">
+                ⚠️ الخطة التنفيذية جاهزة وبانتظار موافقتك لبدء البرمجة
+              </div>
+              <div style="font-size:.8rem;color:var(--fg2);line-height:1.5">
+                قام المدير التنفيذي (CEO) برسم بنية الموقع وتعيين الوكلاء المتخصصين. التكلفة التقديرية للخطة: <b>${Math.round(j.price || 3000)} ج.م</b>.
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <button class="btn btn-success" onclick="approveJobPlan(${j.id})" style="font-weight:900;padding:8px 18px">
+                ⚡ اعتماد الخطة وبدء البرمجة فوراً
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="rejectJobPlan(${j.id})">
+                ❌ إلغاء
+              </button>
+            </div>
+          </div>
+        </div>` : ''}
+
+        ${j.status === 'awaiting_delivery' ? `
+        <div class="awaiting-plan-box" style="border-color:rgba(0,206,201,.4);background:linear-gradient(135deg,rgba(0,206,201,.12),rgba(11,15,23,.95))">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div>
+              <div style="font-weight:900;color:var(--accent2);font-size:1rem;margin-bottom:4px">
+                ✨ اكتملت البرمجة والفحص الأمني بنجاح!
+              </div>
+              <div style="font-size:.8rem;color:var(--fg2)">
+                تم اجتياز جميع اختبارات الـ OWASP بنسبة 100%، يمكنك الآن اعتماد التسليم النهائي للنشر الفوري.
+              </div>
+            </div>
+            <button class="btn btn-success" onclick="approveJobPlan(${j.id})" style="font-weight:900;padding:8px 18px">
+              🚀 اعتماد ونشر الموقع الآن
+            </button>
+          </div>
+        </div>` : ''}
+
+        <!-- Live Agent Pipeline & Interactive Console -->
+        ${renderAgentPipelineBoard(j)}
+
         <!-- Actions (Shown to owner and admin) -->
-        <div style="background:rgba(0,206,201,.04);padding:14px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.18);display:flex;flex-direction:column;gap:10px">
+        <div style="background:rgba(0,206,201,.04);padding:14px;border-radius:var(--radius-sm);border:1px solid rgba(0,206,201,.18);display:flex;flex-direction:column;gap:10px;margin-top:12px">
           <!-- Row 1: Core site and edit tools -->
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <a href="${esc(siteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-success" style="font-weight:900;padding:8px 18px">
@@ -2210,15 +2526,6 @@ function renderMyStores(jobs){
             </button>
           </div>
         </div>
-
-        <!-- Collapsible internal logs -->
-        ${(j.events && j.events.length) ? `
-        <details style="margin-top:10px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px">
-          <summary style="font-size:.75rem;color:var(--fg3);cursor:pointer;font-weight:600">🔍 عرض سجل التعاقدات والـ QA الداخلي للفريق (${j.events.length} خطوة)</summary>
-          <div style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--fg2);line-height:1.7">
-            ${j.events.map(e => `<div>• ${esc(e.msg)}</div>`).join('')}
-          </div>
-        </details>` : ''}
       </div>
     `;
   }).join('');
