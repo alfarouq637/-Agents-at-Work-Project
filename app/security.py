@@ -22,6 +22,9 @@ import re
 import time
 from typing import Dict, Any, List
 
+from .security_deep_learning import deep_learning_security_audit, run_security_remediation_loop
+from .security_filters import SecurityFilterMiddleware, sanitize_input_text, scan_value_for_threats
+
 # Regex patterns for secrets detection (OWASP A02)
 SECRET_PATTERNS = [
     (r"AIzaSy[0-9A-Za-z\-_]{33}", "Google API Key leaked"),

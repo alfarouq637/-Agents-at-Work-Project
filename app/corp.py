@@ -285,11 +285,16 @@ LAYER_1_THINKING = (
 LAYER_2_GUARDRAILS = (
     "\n\n### [Layer 2: Architectural Constraints & Guardrails]\n"
     "1. UI: Atomic component library inspired by Shadcn UI / Radix UI with Tailwind CSS.\n"
-    "2. RTL: Native dir='rtl' lang='ar' with Cairo/Tajawal typography.\n"
-    "3. Backend: Modular Express 5 with Drizzle ORM and strictly parameterized queries.\n"
-    "4. Auth: Tokens MUST be handled with HttpOnly secure cookies.\n"
-    "5. Security: Helmet HTTP security headers and CORS credentials protection enabled.\n"
-    "6. Zero hardcoded secrets: everything loads from process.env."
+    "2. Colors & Aesthetics: Calm, non-glare, eye-friendly base palette (deep slates, dark charcoal #0B0F17 / #0F172A) "
+    "accented with elegant, vibrant neon highlights (Neon Cyan #00F2FE, Neon Emerald #00F5A0, Neon Amber #FFB800, "
+    "Neon Violet #A855F7) and subtle glowing borders/shadows.\n"
+    "3. Ergonomics & Universal Device Usability: Intuitive and effortless on all devices (mobile, tablet, desktop). "
+    "Touch targets at least 44px (min-h-[44px]), sticky mobile quick actions, and crystal-clear Cairo/Readex typography.\n"
+    "4. RTL: Native dir='rtl' lang='ar' with Cairo/Tajawal typography.\n"
+    "5. Backend: Modular Express 5 with Drizzle ORM and strictly parameterized queries.\n"
+    "6. Auth: Tokens MUST be handled with HttpOnly secure cookies.\n"
+    "7. Security Filters: Helmet HTTP security headers, input sanitization filters, and CORS credentials protection enabled.\n"
+    "8. Zero hardcoded secrets: everything loads from process.env."
 )
 
 CYBERSECURITY_REVIEWER_SYS = (
@@ -304,8 +309,10 @@ CYBERSECURITY_REVIEWER_SYS = (
 
 WEB_RULES = ("Output ONE complete self-contained HTML document starting with <!doctype html> and ending with </html> enclosed in an html code fence. Use Tailwind via "
              "<script src=\"https://cdn.tailwindcss.com\"></script>. Use dir=\"rtl\" lang=\"ar\" if the client is "
-             "Arabic. Mobile-first. No external images (use CSS gradients/emoji). Include every section in the brief. "
-             "No fake testimonials or invented numbers.")
+             "Arabic. Mobile-first with calm, eye-friendly base surfaces (#0b0f17 / #0f172a) and elegant neon accents/glows. "
+             "Ensure easy, intuitive usability across all devices (min-height 44px on touch targets, thumb-friendly actions). "
+             "Apply security protection filters: escape all dynamic variables, no unescaped innerHTML, and no external images (use CSS gradients/emoji). "
+             "Include every section in the brief. No fake testimonials or invented numbers.")
 REVIEW_TASK = ("Review this website HTML for: broken structure, missing sections from the brief, RTL/mobile issues, "
                "invented claims. First line must be exactly 'APPROVED' or 'REJECT: <reasons>'.\n\n")
 MOCK_HTML = ("```html\n<!doctype html><html lang=\"ar\" dir=\"rtl\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" "
@@ -392,23 +399,32 @@ async def run_job(job_id):
                 else:
                     log(job_id, "Frontend Developer generated code (parsing HTML document)")
             elif ag["name"] == "Cybersecurity Reviewer":
-                # Layer 3 & Layer 4: OWASP Top 10 Review + SAST Scan & Self-Correction
+                # Deep Learning Security Audit & Autonomous Feedback Remediation Loop
+                dl_audit = await security.deep_learning_security_audit(html or "", {"job_id": job_id})
                 sast_pre = security.run_sast_security_scan({}, html or "")
-                review_input = (
-                    f"{CYBERSECURITY_REVIEWER_SYS}\n\n"
-                    f"Automated SAST Scan Status: Score {sast_pre['score']}/100, Findings: {len(sast_pre['findings'])}\n"
-                    f"Code snippet for audit:\n{html[:8000] if html else 'Generated modular project'}"
-                )
-                text = await call_agent(ag, "", review_input, job_id)
-                needs_fix = "FIX REASON" in text.upper() or "REJECT" in text.upper() or sast_pre["score"] < 80
+                audit_score = min(dl_audit["score"], sast_pre["score"])
+                log(job_id, f"Deep Learning Security Model: Score {audit_score}/100 ({dl_audit['status']})")
+
+                needs_fix = dl_audit["status"] == "REMEDIATION_REQUIRED" or audit_score < 90 or len(sast_pre["findings"]) > 0
                 if needs_fix and html:
-                    fb = text.strip()[:500] if "FIX REASON" in text.upper() else f"SAST score {sast_pre['score']}/100 with findings"
-                    db.x("insert into feedback(agent,note,ts) values(?,?,?)", ("Frontend Developer", f"Security: {fb}", time.time()))
-                    log(job_id, f"Cybersecurity Reviewer requested remediation (Layer 4 Self-Correction): {fb[:120]}")
+                    fb = dl_audit["actionable_feedback"]
+                    if sast_pre["findings"]:
+                        fb += f"\nAdditional SAST Findings: {len(sast_pre['findings'])} issues detected."
+                    db.x("insert into feedback(agent,note,ts) values(?,?,?)", ("Frontend Developer", f"DL Security: {fb[:300]}", time.time()))
+                    log(job_id, f"Deep Learning Security Model requested autonomous remediation: {fb[:120]}")
                     fe = await ensure_agent("Frontend Developer", job_id)
-                    t2 = await call_agent(fe, ctx, f"Remediate security flaws reported by Cybersecurity Reviewer:\n{fb}\n\nPrevious HTML:\n{html[:8000]}\n\n{WEB_RULES}{LAYER_2_GUARDRAILS}", job_id)
-                    html = extract_html(t2) or html
-                    outputs.append({"role": "Frontend Developer (security-hardened)", "text": "Hardened code following Cybersecurity Reviewer audit."})
+                    t2 = await call_agent(
+                        fe,
+                        ctx,
+                        f"Remediate security flaws reported by Deep Learning Security Model:\n{fb}\n\nPrevious HTML:\n{html[:8000]}\n\n{WEB_RULES}{LAYER_2_GUARDRAILS}",
+                        job_id,
+                    )
+                    remediated_html = extract_html(t2)
+                    if remediated_html:
+                        html = remediated_html
+                        post_audit = await security.deep_learning_security_audit(html, {"job_id": job_id})
+                        log(job_id, f"Post-remediation Deep Learning Security Score: {post_audit['score']}/100 ({post_audit['status']})")
+                    outputs.append({"role": "Frontend Developer (security-hardened)", "text": f"Hardened code following Deep Learning Security audit (Score {audit_score} -> {post_audit['score'] if remediated_html else audit_score})."})
             elif ag["name"] == "Code Reviewer" and html:
                 text = await call_agent(ag, "", REVIEW_TASK + html[:12000], job_id)
                 if "REJECT" in text.strip()[:30].upper():

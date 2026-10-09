@@ -1787,3 +1787,78 @@ def test_enterprise_website_builder_skill_and_dashboard_parity():
     assert "enterprise-website-builder" in dev_txt
 
 
+def test_deep_learning_security_audit_and_remediation_loop(monkeypatch, tmp_path):
+    import asyncio
+    from app import security
+
+    # 1. Vulnerable HTML snippet
+    vulnerable_html = """<!doctype html><html lang="ar" dir="rtl"><head><title>Test</title></head>
+    <body>
+      <div id="out"></div>
+      <a href="https://example.com" target="_blank">External</a>
+      <script>
+        const data = location.hash;
+        document.getElementById('out').innerHTML = data + '<p>' + user_input + '</p>';
+        eval("console.log('insecure')");
+      </script>
+    </body></html>"""
+
+    # Run deep learning security audit
+    report = asyncio.run(security.deep_learning_security_audit(vulnerable_html))
+    assert report["status"] == "REMEDIATION_REQUIRED"
+    assert report["score"] < 90
+    assert any(v["type"] == "DOM_XSS" for v in report["vulnerabilities"])
+    assert any(v["type"] == "ARBITRARY_CODE_EXECUTION" for v in report["vulnerabilities"])
+    assert "DOM_XSS" in report["actionable_feedback"]
+
+    # 2. Hardened HTML snippet
+    hardened_html = """<!doctype html><html lang="ar" dir="rtl"><head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Safe Site</title></head>
+    <body>
+      <div id="out"></div>
+      <a href="https://example.com" target="_blank" rel="noopener noreferrer">External</a>
+      <script>
+        function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        document.getElementById('out').textContent = 'Safe Content';
+      </script>
+    </body></html>"""
+
+    safe_report = asyncio.run(security.deep_learning_security_audit(hardened_html))
+    assert safe_report["status"] == "APPROVED"
+    assert safe_report["score"] >= 90
+    assert len(safe_report["vulnerabilities"]) == 0
+
+
+def test_security_filter_middleware_blocks_malicious_query_and_injects_headers(monkeypatch, tmp_path):
+    configure_test_database(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        # Normal call passes and receives security headers
+        resp = client.get("/api/healthz")
+        assert resp.status_code == 200
+        assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+        assert resp.headers.get("X-Frame-Options") == "DENY"
+        assert resp.headers.get("X-XSS-Protection") == "1; mode=block"
+
+        # SQL Injection attempt in query param is blocked with 400
+        sqli_resp = client.get("/api/healthz?probe=1'%20UNION%20SELECT%20*%20FROM%20users--")
+        assert sqli_resp.status_code == 400
+        assert sqli_resp.json()["code"] == "security_filter_violation"
+
+        # XSS script injection in query param is blocked with 400
+        xss_resp = client.get("/api/healthz?search=<script>alert(1)</script>")
+        assert xss_resp.status_code == 400
+        assert xss_resp.json()["code"] == "security_filter_violation"
+
+
+def test_builder_calm_neon_palettes():
+    from app.builder import PALETTES
+
+    for key, pal in PALETTES.items():
+        assert "neon_accent" in pal, f"Palette {key} must define neon_accent"
+        assert "neon_glow" in pal, f"Palette {key} must define neon_glow"
+        assert pal["bg_light"].startswith("#"), f"Palette {key} bg_light must be a valid hex color"
+        # Ensure base colors are calm and eye-friendly
+        assert pal["primary"].startswith("#")
+
+

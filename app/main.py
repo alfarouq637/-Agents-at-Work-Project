@@ -35,6 +35,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import artifacts, audit, auth, builder, corp, db, llm, rate_limit, runtime, skills, tools, security
 from .body_limits import MAX_REQUEST_BODY_BYTES, RequestBodyLimitMiddleware
+from .security_filters import SecurityFilterMiddleware
 from .routers.operations import router as operations_router
 from .schemas import (
     AdminLoginRequest,
@@ -153,6 +154,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AutoCorp - AI agency for Egyptian SMEs", lifespan=lifespan)
 app.include_router(operations_router)
 app.add_middleware(RequestBodyLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
+app.add_middleware(SecurityFilterMiddleware)
 
 
 def api_error_response(
