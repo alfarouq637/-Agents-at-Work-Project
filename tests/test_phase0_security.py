@@ -1908,3 +1908,45 @@ def test_cookie_session_store_creation_without_bearer_header(monkeypatch, tmp_pa
         assert user_jobs[0]["id"] == jid
 
 
+def test_portfolio_multi_track_specialization_and_prepositions():
+    from app.main import extract_smart_brand
+
+    # AI Engineer track with Arabic preposition "للفاروق"
+    ai_prompt = "عايز اعمل بورتفوليو للفاروق ابراهيم مهندس AI"
+    ai_niche = builder.detect_niche(ai_prompt)
+    ai_brand = extract_smart_brand(ai_prompt, ai_niche)
+    assert ai_brand == "الفاروق ابراهيم | مهندس ذكاء اصطناعي | AI Engineer"
+    ai_track = builder.detect_portfolio_track(ai_prompt + " " + ai_brand)
+    assert ai_track == "ai"
+    ai_catalog = builder.get_default_catalog(ai_niche, ai_prompt + " " + ai_brand)
+    assert len(ai_catalog) >= 4
+    ai_html = builder.build_site_html(901, ai_brand, ai_prompt, settings={"brand_name": ai_brand}, items=[])
+    assert "AI & DEEP LEARNING ENGINEER" in ai_html
+    assert "TensorFlow Certified Developer" in ai_html
+    assert "Autonomous Agents & LLMs" in ai_html
+    assert "togglePortfolioLang" in ai_html
+
+    # Software Engineer track with preposition "لأحمد"
+    dev_prompt = "عايز بورتفوليو لأحمد محمود مهندس برمجيات"
+    dev_niche = builder.detect_niche(dev_prompt)
+    dev_brand = extract_smart_brand(dev_prompt, dev_niche)
+    assert "أحمد محمود" in dev_brand and "Software Engineer" in dev_brand
+    dev_track = builder.detect_portfolio_track(dev_prompt + " " + dev_brand)
+    assert dev_track == "dev"
+    dev_html = builder.build_site_html(902, dev_brand, dev_prompt, settings={"brand_name": dev_brand}, items=[])
+    assert "Full-Stack Web Development" in dev_html
+    assert "AWS Certified Solutions Architect" in dev_html
+
+    # Cybersecurity track with preposition "لياسين"
+    cyber_prompt = "عايز بورتفوليو لياسين احمد في السايبر سيكيورتي"
+    cyber_niche = builder.detect_niche(cyber_prompt)
+    cyber_brand = extract_smart_brand(cyber_prompt, cyber_niche)
+    assert "ياسين احمد" in cyber_brand and "Cybersecurity" in cyber_brand
+    cyber_track = builder.detect_portfolio_track(cyber_prompt + " " + cyber_brand)
+    assert cyber_track == "cyber"
+    cyber_html = builder.build_site_html(903, cyber_brand, cyber_prompt, settings={"brand_name": cyber_brand}, items=[])
+    assert "Penetration Testing" in cyber_html
+    assert "OSCP Certified" in cyber_html
+
+
+

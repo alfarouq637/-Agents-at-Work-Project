@@ -3050,6 +3050,40 @@ async def trigger_tick(x_cron_key: str = Header(default="")):
 def extract_smart_brand(prompt: str, niche: str) -> str:
     p = prompt.strip()
     
+    # 0. Intelligent Portfolio Name & Profession Extraction
+    if niche in ("portfolio", "cybersecurity") or any(k in p.lower() for k in ["بورتفوليو", "بروفايل", "cv", "سيرة ذاتية", "موقع شخصي"]):
+        port_m = re.search(r'(?:بورتفوليو|بروفايل|موقع\s*شخصي|cv|سيرة\s*ذاتية)\s+(?:لـ\s*|ل_\s*)?([^\n،,\.؛]+)', p, re.IGNORECASE)
+        if port_m:
+            target = port_m.group(1).strip()
+            # Clean Arabic preposition prefixes: "للفاروق" -> "الفاروق", "لياسين" -> "ياسين"
+            if target.startswith("لل"):
+                target = "ال" + target[2:]
+            elif target.startswith("ل") and not target.startswith("لا") and not any(target.startswith(k) for k in ["ليلى", "لطفي", "لقمان", "لؤي", "ليث"]):
+                target = target[1:].strip()
+
+            role_split_pat = r'\s+(?=(?:مهندس|مطور|مبرمج|خبير|مصمم|باحث|استشاري|دكتور|طبيب|كاتب|محلل|أخصائي|اخصائي|مدير|تقني|engineer|developer|designer|architect|specialist|consultant|scientist)\b)'
+            parts = re.split(role_split_pat, target, 1)
+            raw_name = parts[0].strip()
+            raw_name = re.split(r'\s+(?:في\s+مجال|في\s+ال|في|تخصص|شغال\s+في|شغال|بيشتغل|يعمل\s+في)\b', raw_name)[0].strip()
+            raw_role = parts[1].strip() if len(parts) > 1 else ""
+
+            prompt_context = (raw_role + " " + p).lower()
+            if any(k in prompt_context for k in ["ai", "ذكاء اصطناعي", "machine learning", "deep learning", "تعلم آلة", "ديب ليرنينج", "data science", "علم بيانات"]):
+                final_role = "مهندس ذكاء اصطناعي | AI Engineer"
+            elif any(k in prompt_context for k in ["سايبر", "سيكيورتي", "أمن سيبراني", "امن سيبراني", "اختراق", "pentest"]):
+                final_role = "مهندس أمن سيبراني | Cybersecurity Specialist"
+            elif any(k in prompt_context for k in ["برمج", "مطور", "مبرمج", "ويب", "software", "full stack", "frontend", "backend"]):
+                final_role = "مهندس برمجيات | Software Engineer"
+            elif any(k in prompt_context for k in ["تصميم", "مصمم", "ديزاينر", "ui", "ux", "جرافيك"]):
+                final_role = "مصمم واجهات | UI/UX Designer"
+            elif raw_role:
+                final_role = raw_role
+            else:
+                final_role = "مهندس برمجيات وحلول رقمية"
+
+            if len(raw_name) >= 3 and raw_name not in ("الموقع", "الشخصي", "واحد", "شخص", "حد"):
+                return f"{raw_name} | {final_role}"
+
     # 1. Explicit name patterns:
     patterns = [
         r'(?:اسم\s*الموقع|اسم\s*المتجر|اسم\s*البراند|البراند|الماركة|ماركة|براند)\s*(?:هو|يكون|:)?\s*([^\n،,\.؛]+)',
@@ -3063,6 +3097,11 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
             extracted = re.split(r'\s+(?:شغال|بيشتغل|تخصص|في\s+مجال|بيبيع|عايز|عاوز|يعمل|يقدم)\b', extracted)[0].strip()
             if len(extracted) >= 2 and extracted not in ("ايه", "اي", "كدا", "كذا", "الموقع", "المتجر"):
                 if niche in ("portfolio", "cybersecurity") and not any(k in extracted for k in ["خبير", "مهندس", "مطور"]):
+                    prompt_ctx = p.lower()
+                    if any(k in prompt_ctx for k in ["ai", "ذكاء اصطناعي"]):
+                        return f"{extracted} | مهندس ذكاء اصطناعي | AI Engineer"
+                    elif any(k in prompt_ctx for k in ["برمج", "مطور", "مبرمج"]):
+                        return f"{extracted} | مهندس برمجيات | Software Engineer"
                     return f"{extracted} | خبير الأمن السيبراني"
                 return extracted
 
@@ -3096,10 +3135,27 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
 
     # 4. Portfolio personal names heuristics
     if niche in ("portfolio", "cybersecurity") or any(k in p for k in ["سايبر", "سيكيورتي", "بورتفوليو", "بروفايل", "مبرمج"]):
-        name_m = re.search(r'\b(ياسين|أحمد|احمد|محمد|محمود|علي|عمر|خالد|إبراهيم|ابراهيم|فاروق|كريم|طارق|يوسف|سارة|نور)\s+([^\n،,\.؛\s]+)', p)
+        name_m = re.search(r'(?:لـ\s*|ل_\s*)?(للفاروق|الفاروق|لياسين|ياسين|أحمد|احمد|محمد|محمود|علي|عمر|خالد|إبراهيم|ابراهيم|فاروق|كريم|طارق|يوسف|سارة|نور)\s+([^\n،,\.؛\s]+)', p)
         if name_m:
-            return f"{name_m.group(0)} | خبير الأمن السيبراني"
-        return "بورتفوليو مهندس الأمن السيبراني"
+            first_name = name_m.group(1).strip()
+            if first_name.startswith("لل"):
+                first_name = "ال" + first_name[2:]
+            elif first_name.startswith("ل") and not any(first_name.startswith(k) for k in ["ليلى", "لطفي", "لقمان", "لؤي", "ليث"]):
+                first_name = first_name[1:]
+            second_name = name_m.group(2).strip()
+            if second_name in ("مهندس", "مطور", "مبرمج", "خبير", "مصمم"):
+                cand_name = first_name
+            else:
+                cand_name = f"{first_name} {second_name}"
+            prompt_ctx = p.lower()
+            if any(k in prompt_ctx for k in ["ai", "ذكاء اصطناعي", "machine learning", "deep learning"]):
+                return f"{cand_name} | مهندس ذكاء اصطناعي | AI Engineer"
+            elif any(k in prompt_ctx for k in ["برمج", "مطور", "مبرمج", "ويب", "software"]):
+                return f"{cand_name} | مهندس برمجيات | Software Engineer"
+            elif any(k in prompt_ctx for k in ["تصميم", "مصمم", "ديزاينر", "ui", "ux"]):
+                return f"{cand_name} | مصمم واجهات | UI/UX Designer"
+            return f"{cand_name} | خبير الأمن السيبراني"
+        return "بورتفوليو مهندس البرمجيات والذكاء الاصطناعي"
 
     # 5. Specialty Honey
     if niche == "honey" or any(k in p for k in ["عسل", "نحل", "سدر", "مناحل"]):
@@ -3551,7 +3607,7 @@ async def handle_telegram_update(u: dict):
                 pass
         
         # Insert default catalog items with real imagery
-        default_items = builder.DEFAULT_CATALOGS.get(niche, builder.DEFAULT_CATALOGS["general"])
+        default_items = builder.get_default_catalog(niche, text + " " + brand)
         for it in default_items:
             db.x("INSERT INTO site_items(job_id, title, price, category, description, badge, image_url, created_at) VALUES(?,?,?,?,?,?,?,?)",
                  (jid, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), it.get("image_url", ""), time.time()))
@@ -3577,10 +3633,18 @@ async def handle_telegram_update(u: dict):
         corp.spawn(corp.plan_job(jid))
 
         if niche == "portfolio":
+            p_track = builder.detect_portfolio_track(text + " " + brand)
+            if p_track == "ai":
+                prof_label = "هندسة الذكاء الاصطناعي والتعلم العميق (AI & Deep Learning)"
+            elif p_track == "dev":
+                prof_label = "هندسة البرمجيات وتطوير الحلول الرقمية (Software Engineering)"
+            else:
+                prof_label = "أمن سيبراني واختبار اختراق متقدم (Cybersecurity & Pentesting)"
+
             congrats_msg = (
                 f"🎉 تم استلام طلبك وبدء العمل على موقعك الشخصي (Portfolio) بنجاح! 🚀\n\n"
                 f"👤 الاسم: {brand}\n"
-                f"🛡️ التخصص: أمن سيبراني وهندسة برمجيات\n"
+                f"🛡️ التخصص: {prof_label}\n"
                 f"🤖 يقوم فريق وكلاء الذكاء الاصطناعي (CEO + Frontend Developer + تدقيق الأمان بنموذج Deep Learning + Code Reviewer) بفحص ومراجعة وتأمين موقعك الآن!\n\n"
                 f"🌐 رابط الموقع المباشر:\n{site_link}\n\n"
                 f"📊 يمكنك متابعة سجلات تنفيذ الوكلاء اللحظية مباشرة عبر لوحة تحكم AutoCorp."

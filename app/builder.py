@@ -377,6 +377,18 @@ DEFAULT_CATALOGS = {
         {"title": "تدقيق أمني للبنية التحتية والسيرفرات (Infra Audit)", "title_en": "Cloud Infrastructure & Server Hardening Audit", "price": 3500, "category": "خدمات الفحص الأمني", "category_en": "Security Auditing", "badge": "موصى به للشركات", "badge_en": "Recommended", "desc": "تقييم أمان الخوادم السحابية، جدران الحماية Firewall، وضبط تكوينات الحماية Hardening.", "desc_en": "Evaluation of cloud servers, firewall policies, IAM configurations, and container hardening."},
         {"title": "استشارة أمنية وتقييم المخاطر السيبرانية (Consultation)", "title_en": "Cybersecurity Strategy & Risk Consultation", "price": 1000, "category": "استشارات وتوجيه", "category_en": "Consulting", "badge": "فوري", "badge_en": "Instant", "desc": "جلسة فنية لتحليل بنيتك الرقمية ووضع خطة تأمين متكاملة متوافقة مع المعايير القياسية.", "desc_en": "Technical advisory session to assess digital architecture and map defense roadmaps."},
         {"title": "تأمين الحسابات ومكافحة الهندسة الاجتماعية (Hardening)", "title_en": "Account Security & Anti-Phishing Hardening", "price": 1200, "category": "حلول الحماية", "category_en": "Protection Solutions", "badge": "دعم فني", "badge_en": "Support", "desc": "تفعيل آليات 2FA/MFA، تدريب الفريق ضد رسائل التصيد Phishing، وتأمين البريد المؤسسي.", "desc_en": "MFA implementation, employee anti-phishing defense drills, and enterprise email security."},
+    ],
+    "portfolio_ai": [
+        {"title": "بناء وهندسة أنظمة الوكلاء الأذكياء (Autonomous AI Agents)", "title_en": "Autonomous AI Agents Architecture & Tool Calling", "price": 4500, "category": "أنظمة الذكاء الاصطناعي", "category_en": "AI Systems", "badge": "الأكثر طلباً", "badge_en": "Best Seller", "desc": "تصميم وبرمجة وكلاء أذكياء مستقلين لأتمتة المهام المعقدة، اتخاذ القرارات وربط النماذج بالأدوات وقواعد البيانات.", "desc_en": "Architecting autonomous multi-agent systems, decision engines, structured tool calling, and workflow automation."},
+        {"title": "تطوير وتدريب نماذج التعلم العميق (Deep Learning & Vision)", "title_en": "Deep Learning & Vision Transformer Training", "price": 6000, "category": "التعلم العميق", "category_en": "Deep Learning", "badge": "موصى به للمؤسسات", "badge_en": "Enterprise", "desc": "تدريب وتخصيص نماذج PyTorch و TensorFlow للرؤية الحاسوبية ومعالجة اللغات الطبيعية وحل المشكلات المعقدة.", "desc_en": "Training and fine-tuning PyTorch & TensorFlow models for computer vision, defect detection, and custom NLP."},
+        {"title": "بناء قواعد معرفية وأنظمة استرجاع متقدمة (Enterprise RAG)", "title_en": "Enterprise Vector DB & Hybrid RAG Pipelines", "price": 3800, "category": "حلول الذكاء الاصطناعي", "category_en": "AI Solutions", "badge": "فائق السرعة", "badge_en": "High Speed", "desc": "هندسة محركات بحث دلالي وقواعد بيانات متجهية (Vector Databases) للبحث في وثائق وبيانات الشركات بدقة عالية.", "desc_en": "Building semantic search engines and vector retrieval pipelines for reliable enterprise question-answering."},
+        {"title": "استشارات هندسة الذكاء الاصطناعي وتسريع الاستدلال (MLOps)", "title_en": "AI Architecture & MLOps Optimization Advisory", "price": 2000, "category": "استشارات وتوجيه", "category_en": "Consulting", "badge": "فوري", "badge_en": "Instant", "desc": "جلسة فنية لتقييم جدوى مشاريع الـ AI، تحسين سرعة النماذج عبر TensorRT، ونشرها على السحابة بأقل تكلفة.", "desc_en": "Technical advisory on model optimization, TensorRT inference speedup, and scalable cloud deployment."},
+    ],
+    "portfolio_dev": [
+        {"title": "تطوير منصات وتطبيقات الويب المتكاملة (Full-Stack Platforms)", "title_en": "Full-Stack Web Application Development", "price": 4000, "category": "تطوير برمجيات", "category_en": "Software Development", "badge": "شامل الواجهات والباك إند", "badge_en": "End-to-End", "desc": "برمجة منصات وتطبيقات سحابية كاملة من واجهات المستخدم التفاعلية الحديثة حتى خوادم الـ Backend وقواعد البيانات.", "desc_en": "End-to-end web platform engineering with modern reactive UIs, secure REST/GraphQL APIs, and resilient data layers."},
+        {"title": "بناء وتوثيق واجهات برمجة التطبيقات (High-Scale Microservices)", "title_en": "High-Performance API & Microservices Architecture", "price": 3000, "category": "هندسة الأنظمة", "category_en": "System Architecture", "badge": "عالي الأداء", "badge_en": "High Scale", "desc": "تصميم وبناء خدمات برمجية ميكروية فائقة السرعة بـ Python و Node.js مع توثيق OpenAPI/Swagger واختبارات شاملة.", "desc_en": "Designing resilient, scalable microservices and APIs with high concurrency, OpenAPI docs, and automated tests."},
+        {"title": "تسريع أداء التطبيقات وهيكلة قواعد البيانات (DB & Optimization)", "title_en": "Database Indexing & Performance Optimization", "price": 2200, "category": "تحسين الأداء", "category_en": "Performance", "badge": "تحسين 10x", "badge_en": "10x Speedup", "desc": "فحص الاختناقات وتسريع استعلامات SQL المعقدة، تطبيق آليات التخزين المؤقت Redis، وتحسين زمن الاستجابة.", "desc_en": "Eliminating bottlenecks, SQL query profiling, Redis caching implementation, and sub-50ms latency tuning."},
+        {"title": "مراجعة الأكواد والاستشارات المعمارية (Code Review & Advisory)", "title_en": "Software Architecture Consulting & Code Review", "price": 1500, "category": "استشارات برمجية", "category_en": "Dev Advisory", "badge": "تقرير جودة", "badge_en": "Audit Report", "desc": "مراجعة تفصيلية لجودة الكود، تطبيق مبادئ Clean Architecture و SOLID، وخطة للتوسع المستقبلي.", "desc_en": "In-depth code quality audit, Clean Architecture guidelines, refactoring roadmaps, and security best practices."},
     ]
 }
 
@@ -451,6 +463,15 @@ CATEGORY_TRANS = {
     "الخدمات الأساسية": "Core Services",
     "باقات احترافية": "Pro Packages",
     "خدمات سريعة": "Express Services",
+    # AI Portfolio
+    "أنظمة الذكاء الاصطناعي": "AI Systems",
+    "التعلم العميق": "Deep Learning",
+    "حلول الذكاء الاصطناعي": "AI Solutions",
+    # Dev Portfolio
+    "تطوير برمجيات": "Software Development",
+    "هندسة الأنظمة": "System Architecture",
+    "تحسين الأداء": "Performance",
+    "استشارات برمجية": "Dev Advisory",
     "الكل": "All",
     "عام": "General",
 }
@@ -458,6 +479,14 @@ CATEGORY_TRANS = {
 BADGE_TRANS = {
     "الأكثر طلباً": "Most Popular",
     "الأكثر مبيعاً": "Best Seller",
+    "شامل التقرير": "Full Report",
+    "موصى به للشركات": "Recommended",
+    "موصى به للمؤسسات": "Enterprise",
+    "شامل الواجهات والباك إند": "End-to-End",
+    "عالي الأداء": "High Scale",
+    "تحسين 10x": "10x Speedup",
+    "تقرير جودة": "Audit Report",
+    "فائق السرعة": "High Speed",
     "الأعلى تقييماً": "Top Rated",
     "تسليم فوري": "In Stock",
     "شحن سريع": "Fast Delivery",
@@ -676,6 +705,37 @@ def detect_niche(text: str) -> str:
     return "general"
 
 
+def detect_portfolio_track(context: str) -> str:
+    """Infers the specialized professional track for a portfolio: 'ai', 'dev', or 'cyber'."""
+    ctx = (context or "").lower()
+    if any(k in ctx for k in [
+        "ai", "ذكاء اصطناعي", "machine learning", "deep learning",
+        "تعلم آلة", "تعلم العميق", "ديب ليرنينج", "data science",
+        "علم بيانات", "وكلاء ذكاء", "وكيل ذكي", "وكلاء مستقلين",
+        "llm", "neural", "vision transformer", "nlp"
+    ]):
+        return "ai"
+    elif any(k in ctx for k in [
+        "برمج", "مطور", "مبرمج", "ويب", "software", "developer",
+        "full stack", "fullstack", "frontend", "backend", "كود",
+        "حلول رقمية", "تطوير تطبيقات", "mobile app"
+    ]) and not any(k in ctx for k in ["سايبر", "سيكيورتي", "أمن", "امن", "اختراق", "pentest"]):
+        return "dev"
+    return "cyber"
+
+
+def get_default_catalog(niche: str, context: str = "") -> list:
+    """Retrieves default catalog items tailored to niche and portfolio specialization track."""
+    if niche == "portfolio":
+        track = detect_portfolio_track(context)
+        if track == "ai":
+            return DEFAULT_CATALOGS.get("portfolio_ai", DEFAULT_CATALOGS["portfolio"])
+        elif track == "dev":
+            return DEFAULT_CATALOGS.get("portfolio_dev", DEFAULT_CATALOGS["portfolio"])
+        return DEFAULT_CATALOGS["portfolio"]
+    return DEFAULT_CATALOGS.get(niche, DEFAULT_CATALOGS["general"])
+
+
 def build_site_html(job_id: int, client: str, request: str, settings: dict = None, items: list = None) -> str:
     """Master synthesizer: delegates to specialized archetype generators."""
     settings = settings or {}
@@ -695,16 +755,19 @@ def build_site_html(job_id: int, client: str, request: str, settings: dict = Non
 
 
 def build_portfolio_html(job_id: int, client: str, request: str, settings: dict = None, items: list = None) -> str:
-    """Generates an elite dark/light mode Cybersecurity & Tech Portfolio SPA with bilingual support."""
+    """Generates an elite dark/light mode Cybersecurity, AI & Tech Portfolio SPA with bilingual support."""
     settings = settings or {}
     items = items or []
 
-    # Extract candidate name
-    brand_name = _safe_text(settings.get("brand_name") or client, "ياسين أحمد | Yaseen Ahmed", 120)
-    if brand_name.startswith("tg:"):
-        brand_name = "ياسين أحمد | Yaseen Ahmed"
+    # Detect professional track: ai, dev, or cyber
+    ctx_full = f"{request} {client} {settings.get('brand_name') or ''} {settings.get('category') or ''}".strip()
+    track = detect_portfolio_track(ctx_full)
 
-    slogan = _safe_text(settings.get("slogan"), "خبير الأمن السيبراني واختبار الاختراق وتأمين الأنظمة السحابية", 500)
+    # Extract candidate name
+    default_name = "ياسين أحمد | Yaseen Ahmed" if track == "cyber" else ("الفاروق إبراهيم | Alfarouq Ibrahim" if track == "ai" else "أحمد محمود | Ahmed Mahmoud")
+    brand_name = _safe_text(settings.get("brand_name") or client, default_name, 120)
+    if brand_name.startswith("tg:"):
+        brand_name = default_name
 
     pal = PALETTES["cyber"]
     primary = _safe_hex_color(settings.get("color_primary"), pal["primary"])
@@ -726,7 +789,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         portfolio_footer_contact = '''<span class="font-bold" data-i18n="contact_pending">بيانات التواصل قيد الإعداد</span>'''
 
     if not items:
-        raw_items = DEFAULT_CATALOGS["portfolio"]
+        raw_items = get_default_catalog("portfolio", ctx_full)
         items = []
         for i, it in enumerate(raw_items):
             items.append({
@@ -746,7 +809,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         for i, it in enumerate(items):
             it_dict = dict(it)
             t_ar = str(it_dict.get("title") or f"خدمة {i+1}").strip()
-            c_ar = str(it_dict.get("category") or "خدمات الفحص الأمني").strip()
+            c_ar = str(it_dict.get("category") or ("استشارات ذكاء اصطناعي" if track == "ai" else ("تطوير برمجيات" if track == "dev" else "خدمات الفحص الأمني"))).strip()
             b_ar = str(it_dict.get("badge") or "").strip()
             d_ar = str(it_dict.get("description") or it_dict.get("desc") or "").strip()
             normalized_items.append({
@@ -763,6 +826,192 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
             })
         items = normalized_items
 
+    # Track-specific configuration
+    if track == "ai":
+        track_icon = "🧠"
+        default_slogan = "مهندس ذكاء اصطناعي وتطوير نماذج التعلم العميق والوكلاء المستقلين"
+        default_slogan_en = "AI & Deep Learning Engineer • Autonomous Agents & LLM Systems"
+        role_sub_ar = "مهندس ذكاء اصطناعي وتعلم عميق"
+        role_sub_en = "AI & DEEP LEARNING ENGINEER"
+        hero_tag_ar = "⚡ مهندس ذكاء اصطناعي • نماذج تعلم عميق ووكلاء أذكياء"
+        hero_tag_en = "⚡ AI & DEEP LEARNING ENGINEER • AUTONOMOUS AGENTS"
+        hero_desc_ar = "متخصص في بناء وتدريب نماذج التعلم العميق (Deep Learning)، وهندسة الوكلاء الأذكياء المستقلين (Autonomous AI Agents)، وتطبيقات الذكاء الاصطناعي التوليدي والـ LLMs ونشرها على البنى السحابية عالية الأداء."
+        hero_desc_en = "Specializing in deep learning architectures, LLM systems, autonomous AI agent pipelines, and high-performance MLOps cloud deployments."
+        cta_audit_ar = "🤖 اطلب استشارة أو بناء نظام AI"
+        cta_audit_en = "🤖 Request AI System / Consultation"
+        stat_1_val, stat_1_ar, stat_1_en = "+35", "نماذج ووكلاء منشورة", "AI Models & Agents"
+        stat_2_val, stat_2_ar, stat_2_en = "99.4%", "دقة النماذج في الإنتاج", "Production Accuracy"
+        stat_3_val, stat_3_ar, stat_3_en = "0", "أخطاء استدلال النماذج", "Inference Failures"
+        stat_4_val, stat_4_ar, stat_4_en = "+5", "سنوات خبرة في الذكاء الاصطناعي", "Years AI Experience"
+        skills_arsenal_tag = "AI ARSENAL & MLOPS"
+        skills_title_ar = "المهارات والشهادات المعتمدة في الذكاء الاصطناعي"
+        skills_title_en = "Verified AI Skills & Certifications"
+        skill_1_icon = "🤖"
+        skill_1_t_ar = "Autonomous Agents & LLMs"
+        skill_1_t_en = "Autonomous Agents & LLMs"
+        skill_1_d_ar = "بناء أنظمة وكلاء مستقلين، تكامل RAG، وهندسة الأوامر المتقدمة واستدعاء الأدوات وقواعد البيانات."
+        skill_1_d_en = "Autonomous agent architectures, RAG pipelines, fine-tuning, and structured tool calling."
+        skill_2_icon = "🧠"
+        skill_2_t_ar = "Deep Learning & Vision/NLP"
+        skill_2_t_en = "Deep Learning & Vision/NLP"
+        skill_2_d_ar = "تدريب شبكات CNNs و Transformers و PyTorch على الرؤية الحاسوبية ومعالجة النصوص بدقة فائقة."
+        skill_2_d_en = "Training Vision Transformers, PyTorch deep neural nets, and production NLP pipelines."
+        skill_3_icon = "⚡"
+        skill_3_t_ar = "MLOps & Scalable Inference"
+        skill_3_t_en = "MLOps & Scalable Inference"
+        skill_3_d_ar = "تسريع الاستدلال عبر TensorRT و Triton، ونشر النماذج عبر Docker و Kubernetes و Cloud APIs."
+        skill_3_d_en = "Low-latency model serving with TensorRT, Triton, Docker containers, and Cloud APIs."
+        certs = [
+            ("🎖️ TensorFlow Certified Developer", "🎖️ TensorFlow Certified Developer"),
+            ("🧠 PyTorch Deep Learning Specialist", "🧠 PyTorch Deep Learning Specialist"),
+            ("⚡ AWS Machine Learning Specialty", "⚡ AWS Machine Learning Specialty"),
+            ("🤖 NVIDIA Deep Learning Institute", "🤖 NVIDIA Deep Learning Institute"),
+        ]
+        projects_tag = "AI CASE STUDIES"
+        projects_title_ar = "أبرز مشاريع وأنظمة الذكاء الاصطناعي"
+        projects_title_en = "Featured AI Case Studies & Deployments"
+        proj_1_tag = "AUTONOMOUS AGENTS"
+        proj_1_t_ar = "منظومة وكلاء أذكياء متعددة المهام للمؤسسات"
+        proj_1_t_en = "Enterprise Autonomous Multi-Agent Platform"
+        proj_1_d_ar = "بناء منصة وكلاء ذاتية اتخاذ القرارات لأتمتة العمليات التجارية، التحليل التنبؤي، والتكامل الآمن مع قواعد البيانات والـ APIs."
+        proj_1_d_en = "Designed and deployed an autonomous agent platform automating enterprise workflows and complex data synthesis."
+        proj_1_b_ar = "✅ إنتاجية مضاعفة بنسبة 400% واستجابة فورية"
+        proj_1_b_en = "✅ 400% Productivity Boost & Sub-Second Latency"
+        proj_2_tag = "DEEP LEARNING VISION"
+        proj_2_t_ar = "نظام فحص أمني وبصري فوري بالتعلم العميق"
+        proj_2_t_en = "Real-Time Deep Learning Vision Inspection System"
+        proj_2_d_ar = "تدريب نموذج Vision Transformer لتصنيف واكتشاف الأنماط والعيوب بدقة 99.4% في زمن استدلال أقل من 15ms في خطوط الإنتاج."
+        proj_2_d_en = "Trained a custom Vision Transformer achieving 99.4% defect classification accuracy under 15ms latency."
+        proj_2_b_ar = "✅ دقة استدلال 99.4% وتشغيل إنتاجي لحظي"
+        proj_2_b_en = "✅ 99.4% Accuracy with Production-Grade Real-Time Inference"
+        modal_hire_title_ar = "طلب استشارة أو بناء نظام ذكاء اصطناعي 🤖"
+        modal_hire_title_en = "Request AI Advisory or System Development 🤖"
+        modal_hire_sub_ar = "أدخل بياناتك وسيتم التواصل وتأكيد التعاقد فوراً"
+        modal_hire_sub_en = "Submit your details for immediate technical onboarding and scoping."
+    elif track == "dev":
+        track_icon = "💻"
+        default_slogan = "مهندس برمجيات وتطوير الحلول الرقمية المتكاملة والأنظمة السحابية"
+        default_slogan_en = "Full-Stack Software Engineer & Distributed Cloud Systems Architect"
+        role_sub_ar = "مهندس برمجيات وتطوير حلول سحابية"
+        role_sub_en = "SOFTWARE ARCHITECT & CLOUD DEV"
+        hero_tag_ar = "⚡ مهندس برمجيات • منصات سحابية وحلول متكاملة"
+        hero_tag_en = "⚡ FULL-STACK SOFTWARE ARCHITECT & CLOUD DEVELOPER"
+        hero_desc_ar = "متخصص في بناء المنصات السحابية المتكاملة، هندسة النظم الموزعة، تطوير واجهات المستخدم التفاعلية والـ APIs فائقة الأداء، وضمان أعلى معايير الجودة والأمان البرمجي."
+        hero_desc_en = "Architecting robust web applications, high-performance distributed systems, modern frontend UIs, and resilient cloud architectures."
+        cta_audit_ar = "💻 اطلب استشارة أو تطوير منصة"
+        cta_audit_en = "💻 Request Platform Development"
+        stat_1_val, stat_1_ar, stat_1_en = "+50", "تطبيق ومنصة منشورة", "Shipped Platforms"
+        stat_2_val, stat_2_ar, stat_2_en = "99.9%", "جاهزية واستقرار الأنظمة", "System Uptime"
+        stat_3_val, stat_3_ar, stat_3_en = "100%", "تغطية اختبارات الكود", "Test Coverage"
+        stat_4_val, stat_4_ar, stat_4_en = "+6", "سنوات خبرة برمجية", "Years Dev Experience"
+        skills_arsenal_tag = "DEV STACK & ARCHITECTURE"
+        skills_title_ar = "المهارات والشهادات البرمجية المعتمدة"
+        skills_title_en = "Verified Dev Skills & Certifications"
+        skill_1_icon = "💻"
+        skill_1_t_ar = "Full-Stack Web Development"
+        skill_1_t_en = "Full-Stack Web Development"
+        skill_1_d_ar = "تطوير الواجهات بـ React/Next.js وبناء خدمات الـ Backend المتقدمة بـ Python و Node.js و Go."
+        skill_1_d_en = "Modern frontend with React/Next.js and scalable backend microservices with Python, Node.js, and Go."
+        skill_2_icon = "☁️"
+        skill_2_t_ar = "Cloud & DevOps CI/CD"
+        skill_2_t_en = "Cloud & DevOps CI/CD"
+        skill_2_d_ar = "إدارة البنى التحتية بـ Docker و Kubernetes، وأتمتة خطوط الاختبار والنشر المستمر CI/CD."
+        skill_2_d_en = "Container orchestration with Docker & K8s, automated CI/CD pipelines, and cloud monitoring."
+        skill_3_icon = "🗄️"
+        skill_3_t_ar = "Database & System Architecture"
+        skill_3_t_en = "Database & System Architecture"
+        skill_3_d_ar = "تصميم قواعد البيانات العلائقية وتحسين استعلامات SQL وأداء التخزين المؤقت Redis."
+        skill_3_d_en = "Schema design, query optimization for PostgreSQL/MySQL, and high-speed Redis caching."
+        certs = [
+            ("🎖️ AWS Certified Solutions Architect", "🎖️ AWS Certified Solutions Architect"),
+            ("💻 Certified Kubernetes Administrator", "💻 Certified Kubernetes Administrator"),
+            ("⚡ Professional Scrum Master", "⚡ Professional Scrum Master"),
+            ("🚀 GitHub Certified Developer", "🚀 GitHub Certified Developer"),
+        ]
+        projects_tag = "ENGINEERING PROJECTS"
+        projects_title_ar = "أبرز المنصات والأنظمة المنفذة"
+        projects_title_en = "Featured Software Platforms & Engineering"
+        proj_1_tag = "HIGH-SCALE SAAS"
+        proj_1_t_ar = "تطوير منصة سحابية لإدارة المعاملات الضخمة"
+        proj_1_t_en = "High-Scale Cloud Transaction Platform"
+        proj_1_d_ar = "بناء بنية Microservices متقدمة تتحمل أكثر من 100,000 طلب في الدقيقة مع مزامنة لحظية لقواعد البيانات."
+        proj_1_d_en = "Architected a high-concurrency microservices platform handling 100k+ requests/min with sub-20ms latency."
+        proj_1_b_ar = "✅ معمارية مرنة بزمن استجابة أقل من 20ms"
+        proj_1_b_en = "✅ High Availability & Sub-20ms Response Time"
+        proj_2_tag = "FINTECH & COMMERCE"
+        proj_2_t_ar = "بوابة دفع رقمية وتكامل بوابات التجارة الإلكترونية"
+        proj_2_t_en = "FinTech Payment Gateway & Merchant Platform"
+        proj_2_d_ar = "تطوير نظام دفع إلكتروني متكامل يدعم المحافظ الإلكترونية والمصادقة متعددة العوامل بحماية تامة."
+        proj_2_d_en = "Engineered secure payment infrastructure with multi-tenant isolation, idempotency, and audit trails."
+        proj_2_b_ar = "✅ نظام مؤمن بنسبة 100% ضد الأخطاء المزدوجة"
+        proj_2_b_en = "✅ 100% Idempotent & Fault-Tolerant"
+        modal_hire_title_ar = "طلب استشارة برمجية أو تطوير منصة 💻"
+        modal_hire_title_en = "Request Software Advisory or Platform Engineering 💻"
+        modal_hire_sub_ar = "أدخل بياناتك وسيتم التواصل وتأكيد التعاقد فوراً"
+        modal_hire_sub_en = "Submit your requirements for swift architecture review and planning."
+    else:  # "cyber"
+        track_icon = "🛡️"
+        default_slogan = "خبير الأمن السيبراني واختبار الاختراق وتأمين الأنظمة السحابية"
+        default_slogan_en = "Certified Cybersecurity Expert & Cloud Penetration Specialist"
+        role_sub_ar = "أمن سيبراني وهندسة برمجيات"
+        role_sub_en = "CYBERSECURITY & DEV"
+        hero_tag_ar = "⚡ فريق أحمر وتأمين سحابي • هاكر أخلاقي معتمد"
+        hero_tag_en = "⚡ RED TEAM & CLOUD DEFENDER • ETHICAL HACKER"
+        hero_desc_ar = "متخصص في حماية أصول الشركات الرقمية، اختبار اختراق الويب وتطبيقات الهاتف، تحليل وكشف الثغرات الأمنية (Vulnerability Assessment)، وتأمين البنية التحتية السحابية لضمان استمرارية الأعمال بأمان تام."
+        hero_desc_en = "Dedicated to safeguarding enterprise digital assets, web/mobile application penetration testing, vulnerability assessment, and cloud infrastructure hardening for zero-downtime resilience."
+        cta_audit_ar = "🛡️ احجز فحصاً أمنياً لنظامك"
+        cta_audit_en = "🛡️ Book Security Assessment"
+        stat_1_val, stat_1_ar, stat_1_en = "+45", "فحص أمني ناجح", "Successful Audits"
+        stat_2_val, stat_2_ar, stat_2_en = "100%", "كشف ومعالجة الثغرات", "Vulnerability Remediation"
+        stat_3_val, stat_3_ar, stat_3_en = "0", "اختراقات بعد التأمين", "Post-Hardening Breaches"
+        stat_4_val, stat_4_ar, stat_4_en = "+5", "سنوات خبرة متقدمة", "Years Experience"
+        skills_arsenal_tag = "TECHNICAL ARSENAL"
+        skills_title_ar = "المهارات والشهادات المعتمدة"
+        skills_title_en = "Verified Skills & Certifications"
+        skill_1_icon = "🔍"
+        skill_1_t_ar = "Penetration Testing"
+        skill_1_t_en = "Penetration Testing"
+        skill_1_d_ar = "اختبار اختراق تطبيقات الويب (OWASP Top 10)، فحص الـ APIs، الهندسة العكسية، وتحليل حركة البيانات المشفرة."
+        skill_1_d_en = "Web application testing (OWASP Top 10), API security assessments, reverse engineering, and encrypted traffic analysis."
+        skill_2_icon = "☁️"
+        skill_2_t_ar = "Cloud & Infra Hardening"
+        skill_2_t_en = "Cloud & Infra Hardening"
+        skill_2_d_ar = "تأمين خوادم لينكس والـ Docker، إدارة جدران الحماية، ضبط صلاحيات IAM، وحماية البنى السحابية في AWS و GCP."
+        skill_2_d_en = "Hardening Linux & Docker hosts, firewall orchestration, fine-grained IAM policies across AWS & Google Cloud Platform."
+        skill_3_icon = "🚨"
+        skill_3_t_ar = "Incident Response"
+        skill_3_t_en = "Incident Response"
+        skill_3_d_ar = "التحقيق الجنائي الرقمي (DFIR)، تتبع الاختراقات، صد هجمات DDoS، وتحليل البرمجيات الخبيثة Malware Analysis."
+        skill_3_d_en = "Digital forensics & incident response (DFIR), intrusion containment, DDoS mitigation, and advanced malware analysis."
+        certs = [
+            ("🎖️ OSCP Certified", "🎖️ OSCP Certified"),
+            ("🛡️ CEH v12 (Ethical Hacker)", "🛡️ CEH v12 (Ethical Hacker)"),
+            ("📜 CompTIA Security+", "📜 CompTIA Security+"),
+            ("🔒 CISSP Candidate", "🔒 CISSP Candidate"),
+        ]
+        projects_tag = "SECURITY PORTFOLIO"
+        projects_title_ar = "أبرز العمليات والمشاريع الأمنية"
+        projects_title_en = "Featured Security Engagements"
+        proj_1_tag = "FINTECH PENTEST"
+        proj_1_t_ar = "تدقيق أمان منصة دفع ومحفظة رقمية"
+        proj_1_t_en = "FinTech Payment Gateway & Wallet Security Audit"
+        proj_1_d_ar = "إجراء فحص أمني شامل لبوابة دفع مالية مصرية، واكتشاف 6 ثغرات في منطق الأعمال (Business Logic) وتأمين تدفق عمليات السحب والتحويل."
+        proj_1_d_en = "Conducted exhaustive pentesting for an Egyptian payment gateway; identified 6 critical business logic flaws and secured transfer flows."
+        proj_1_b_ar = "✅ تم إغلاق جميع الثغرات وحصول العميل على شهادة امتثال"
+        proj_1_b_en = "✅ 100% Remediation & Certified Compliance Achieved"
+        proj_2_tag = "CLOUD SECURITY"
+        proj_2_t_ar = "تأمين بنية تحتية سحابية لشركة كبرى"
+        proj_2_t_en = "Enterprise Cloud Infrastructure Hardening"
+        proj_2_d_ar = "إعادة هيكلة سياسات IAM وجدران الحماية، وعزل قواعد البيانات الحساسة خلف شبكات VPC خاصة مع تفعيل المراقبة اللحظية 24/7."
+        proj_2_d_en = "Restructured IAM controls, isolated sensitive production databases behind isolated VPC subnets with 24/7 telemetry."
+        proj_2_b_ar = "✅ منع محاولات الاختراق الخارجية بنسبة 100%"
+        proj_2_b_en = "✅ 100% External Intrusion Prevention Rate"
+        modal_hire_title_ar = "طلب استشارة أو فحص أمني 🛡️"
+        modal_hire_title_en = "Request Advisory or Security Assessment 🛡️"
+        modal_hire_sub_ar = "أدخل بياناتك وسيتم التواصل وتأكيد التعاقد فوراً"
+        modal_hire_sub_en = "Submit your engagement details for immediate scheduling and onboarding."
+
+    slogan = _safe_text(settings.get("slogan"), default_slogan, 500)
     items_json = _json_for_script(items)
 
     service_cards = []
@@ -775,7 +1024,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         service_cards.append(f"""
         <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-cyan-500 flex flex-col justify-between transition group hover:-translate-y-1">
           <div>
-            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xl mb-4">🛡️</div>
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xl mb-4">{track_icon}</div>
             <h4 class="font-bold text-white text-base mb-2 group-hover:text-cyan-400 transition">{title}</h4>
             <p class="text-xs text-slate-400 font-readex leading-relaxed mb-6">{desc}</p>
           </div>
@@ -788,6 +1037,11 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         </div>
         """)
     services_markup = "\n".join(service_cards)
+
+    cert_badges_html = " ".join([
+        f'<span class="px-4 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-cyan-300 font-mono text-xs font-bold">{c[0]}</span>'
+        for c in certs
+    ])
 
     return f"""<!doctype html>
 <html lang="ar" dir="rtl" class="scroll-smooth dark">
@@ -913,11 +1167,11 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-11 h-11 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-xl text-cyan-400 shadow-md">
-          🛡️
+          {track_icon}
         </div>
         <div>
           <h1 class="text-lg sm:text-xl font-black text-white tracking-wide" data-i18n="brand_title">{html.escape(brand_name)}</h1>
-          <p class="text-xs text-cyan-400 font-mono" data-i18n="port_role_sub">CYBERSECURITY & DEV</p>
+          <p class="text-xs text-cyan-400 font-mono" data-i18n="port_role_sub">{role_sub_en}</p>
         </div>
       </div>
 
@@ -942,7 +1196,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
   <section class="py-16 sm:py-24 relative overflow-hidden" id="about">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
       <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono font-bold bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 mb-6">
-        <span data-i18n="port_hero_tag">⚡ RED TEAM & CLOUD DEFENDER • ETHICAL HACKER</span>
+        <span data-i18n="port_hero_tag">{hero_tag_ar}</span>
       </div>
 
       <h2 class="text-3xl sm:text-5xl lg:text-6xl font-black text-white leading-tight max-w-4xl mx-auto mb-6" data-i18n="port_hero_headline">
@@ -950,12 +1204,12 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
       </h2>
 
       <p class="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto font-readex leading-relaxed mb-10" data-i18n="port_hero_desc">
-        متخصص في حماية أصول الشركات الرقمية، اختبار اختراق الويب وتطبيقات الهاتف، تحليل وكشف الثغرات الأمنية (Vulnerability Assessment)، وتأمين البنية التحتية السحابية لضمان استمرارية الأعمال بأمان تام.
+        {hero_desc_ar}
       </p>
 
       <div class="flex flex-wrap items-center justify-center gap-4">
         <button onclick="openHireModal()" class="px-8 py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-sm shadow-xl shadow-cyan-500/25 transition hover:scale-105 active:scale-95" data-i18n="port_cta_audit">
-          🛡️ احجز فحصاً أمنياً لنظامك
+          {cta_audit_ar}
         </button>
         {portfolio_contact_cta}
       </div>
@@ -963,20 +1217,20 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
       <!-- Stats Bar -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto mt-16 pt-8 border-t border-slate-800/80">
         <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div class="text-2xl sm:text-3xl font-black text-cyan-400 font-mono">+45</div>
-          <div class="text-xs text-slate-400 font-readex mt-1" data-i18n="stat_1">فحص أمني ناجح</div>
+          <div class="text-2xl sm:text-3xl font-black text-cyan-400 font-mono">{stat_1_val}</div>
+          <div class="text-xs text-slate-400 font-readex mt-1" data-i18n="stat_1">{stat_1_ar}</div>
         </div>
         <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div class="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">100%</div>
-          <div class="text-xs text-slate-400 font-readex mt-1" data-i18n="stat_2">كشف ومعالجة الثغرات</div>
+          <div class="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">{stat_2_val}</div>
+          <div class="text-xs text-slate-400 font-readex mt-1" data-i18n="stat_2">{stat_2_ar}</div>
         </div>
         <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div class="text-2xl sm:text-3xl font-black text-amber-400 font-mono">0</div>
-          <div class="text-xs text-slate-400 font-readex mt-1" data-i18n="stat_3">اختراقات بعد التأمين</div>
+          <div class="text-2xl sm:text-3xl font-black text-amber-400 font-mono">{stat_3_val}</div>
+          <div class="text-xs text-slate-400 font-readex mt-1" data-i18n="stat_3">{stat_3_ar}</div>
         </div>
         <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div class="text-2xl sm:text-3xl font-black text-purple-400 font-mono">+5</div>
-          <div class="text-xs text-slate-400 font-readex mt-1" data-i18n="stat_4">سنوات خبرة متقدمة</div>
+          <div class="text-2xl sm:text-3xl font-black text-purple-400 font-mono">{stat_4_val}</div>
+          <div class="text-xs text-slate-400 font-readex mt-1" data-i18n="stat_4">{stat_4_ar}</div>
         </div>
       </div>
     </div>
@@ -986,40 +1240,37 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
   <section id="skills" class="py-16 bg-slate-950/60 border-y border-slate-800">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12">
-        <span class="text-xs font-mono font-bold text-cyan-400 tracking-wider">TECHNICAL ARSENAL</span>
-        <h3 class="text-2xl sm:text-3xl font-black text-white mt-1" data-i18n="skills_title">المهارات والشهادات المعتمدة</h3>
+        <span class="text-xs font-mono font-bold text-cyan-400 tracking-wider">{skills_arsenal_tag}</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-white mt-1" data-i18n="skills_title">{skills_title_ar}</h3>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <div class="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 transition">
-          <div class="text-3xl mb-3">🔍</div>
-          <h4 class="font-bold text-lg text-white mb-2" data-i18n="skill_1_title">Penetration Testing</h4>
+          <div class="text-3xl mb-3">{skill_1_icon}</div>
+          <h4 class="font-bold text-lg text-white mb-2" data-i18n="skill_1_title">{skill_1_t_ar}</h4>
           <p class="text-xs text-slate-400 font-readex leading-relaxed" data-i18n="skill_1_desc">
-            اختبار اختراق تطبيقات الويب (OWASP Top 10)، فحص الـ APIs، الهندسة العكسية، وتحليل حركة البيانات المشفرة.
+            {skill_1_d_ar}
           </p>
         </div>
         <div class="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 transition">
-          <div class="text-3xl mb-3">☁️</div>
-          <h4 class="font-bold text-lg text-white mb-2" data-i18n="skill_2_title">Cloud & Infra Hardening</h4>
+          <div class="text-3xl mb-3">{skill_2_icon}</div>
+          <h4 class="font-bold text-lg text-white mb-2" data-i18n="skill_2_title">{skill_2_t_ar}</h4>
           <p class="text-xs text-slate-400 font-readex leading-relaxed" data-i18n="skill_2_desc">
-            تأمين خوادم لينكس والـ Docker، إدارة جدران الحماية، ضبط صلاحيات IAM، وحماية البنى السحابية في AWS و GCP.
+            {skill_2_d_ar}
           </p>
         </div>
         <div class="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 transition">
-          <div class="text-3xl mb-3">🚨</div>
-          <h4 class="font-bold text-lg text-white mb-2" data-i18n="skill_3_title">Incident Response</h4>
+          <div class="text-3xl mb-3">{skill_3_icon}</div>
+          <h4 class="font-bold text-lg text-white mb-2" data-i18n="skill_3_title">{skill_3_t_ar}</h4>
           <p class="text-xs text-slate-400 font-readex leading-relaxed" data-i18n="skill_3_desc">
-            التحقيق الجنائي الرقمي (DFIR)، تتبع الاختراقات، صد هجمات DDoS، وتحليل البرمجيات الخبيثة Malware Analysis.
+            {skill_3_d_ar}
           </p>
         </div>
       </div>
 
       <!-- Certifications Badges -->
       <div class="flex flex-wrap items-center justify-center gap-3">
-        <span class="px-4 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-cyan-300 font-mono text-xs font-bold">🎖️ OSCP Certified</span>
-        <span class="px-4 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 font-mono text-xs font-bold">🛡️ CEH v12 (Ethical Hacker)</span>
-        <span class="px-4 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 font-mono text-xs font-bold">📜 CompTIA Security+</span>
-        <span class="px-4 py-2 rounded-xl bg-slate-900 border border-purple-500/40 text-purple-300 font-mono text-xs font-bold">🔒 CISSP Candidate</span>
+        {cert_badges_html}
       </div>
     </div>
   </section>
@@ -1027,33 +1278,33 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
   <!-- Featured Projects Showcase -->
   <section id="projects" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12">
-      <span class="text-xs font-mono font-bold text-cyan-400 tracking-wider">SECURITY PORTFOLIO</span>
-      <h3 class="text-2xl sm:text-3xl font-black text-white mt-1" data-i18n="projects_title">أبرز العمليات والمشاريع الأمنية</h3>
+      <span class="text-xs font-mono font-bold text-cyan-400 tracking-wider">{projects_tag}</span>
+      <h3 class="text-2xl sm:text-3xl font-black text-white mt-1" data-i18n="projects_title">{projects_title_ar}</h3>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-cyan-500 transition">
         <div class="flex items-center justify-between mb-3">
-          <span class="px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-cyan-500/20 text-cyan-300">FINTECH PENTEST</span>
+          <span class="px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-cyan-500/20 text-cyan-300">{proj_1_tag}</span>
           <span class="text-xs text-slate-400 font-mono">2026</span>
         </div>
-        <h4 class="text-lg font-black text-white mb-2" data-i18n="proj_1_title">تدقيق أمان منصة دفع ومحفظة رقمية</h4>
+        <h4 class="text-lg font-black text-white mb-2" data-i18n="proj_1_title">{proj_1_t_ar}</h4>
         <p class="text-xs text-slate-300 font-readex leading-relaxed mb-4" data-i18n="proj_1_desc">
-          إجراء فحص أمني شامل لبوابة دفع مالية مصرية، واكتشاف 6 ثغرات في منطق الأعمال (Business Logic) وتأمين تدفق عمليات السحب والتحويل.
+          {proj_1_d_ar}
         </p>
-        <span class="text-xs text-emerald-400 font-bold" data-i18n="proj_1_badge">✅ تم إغلاق جميع الثغرات وحصول العميل على شهادة امتثال</span>
+        <span class="text-xs text-emerald-400 font-bold" data-i18n="proj_1_badge">{proj_1_b_ar}</span>
       </div>
 
       <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-cyan-500 transition">
         <div class="flex items-center justify-between mb-3">
-          <span class="px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-purple-500/20 text-purple-300">CLOUD SECURITY</span>
+          <span class="px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-purple-500/20 text-purple-300">{proj_2_tag}</span>
           <span class="text-xs text-slate-400 font-mono">2026</span>
         </div>
-        <h4 class="text-lg font-black text-white mb-2" data-i18n="proj_2_title">تأمين بنية تحتية سحابية لشركة كبرى</h4>
+        <h4 class="text-lg font-black text-white mb-2" data-i18n="proj_2_title">{proj_2_t_ar}</h4>
         <p class="text-xs text-slate-300 font-readex leading-relaxed mb-4" data-i18n="proj_2_desc">
-          إعادة هيكلة سياسات IAM وجدران الحماية، وعزل قواعد البيانات الحساسة خلف شبكات VPC خاصة مع تفعيل المراقبة اللحظية 24/7.
+          {proj_2_d_ar}
         </p>
-        <span class="text-xs text-emerald-400 font-bold" data-i18n="proj_2_badge">✅ منع محاولات الاختراق الخارجية بنسبة 100%</span>
+        <span class="text-xs text-emerald-400 font-bold" data-i18n="proj_2_badge">{proj_2_b_ar}</span>
       </div>
     </div>
   </section>
@@ -1092,8 +1343,8 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative text-right">
       <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
         <div>
-          <h3 class="text-lg font-black text-white" data-i18n="modal_hire_title">طلب استشارة أو فحص أمني 🛡️</h3>
-          <p class="text-xs text-slate-400 font-readex" data-i18n="modal_hire_sub">أدخل بياناتك وسيتم التواصل وتأكيد التعاقد فوراً</p>
+          <h3 class="text-lg font-black text-white" data-i18n="modal_hire_title">{modal_hire_title_ar}</h3>
+          <p class="text-xs text-slate-400 font-readex" data-i18n="modal_hire_sub">{modal_hire_sub_ar}</p>
         </div>
         <button onclick="closeHireModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold">✕</button>
       </div>
@@ -1109,11 +1360,11 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-1" data-i18n="lbl_service">الخدمة المطلوبة *</label>
-          <input type="text" id="h-service" required placeholder="مثال: اختبار اختراق موقع الويب" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-cyan-500">
+          <input type="text" id="h-service" required placeholder="مثال: استشارة وتطوير نظام ذكاء اصطناعي" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-cyan-500">
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-300 mb-1" data-i18n="lbl_scope">تفاصيل النطاق / الهدف المراد فحصه *</label>
-          <textarea id="h-scope" required placeholder="رابط الموقع أو نوع النظام وعدد السيرفرات المراد تأمينها" rows="2" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-cyan-500"></textarea>
+          <label class="block text-xs font-bold text-slate-300 mb-1" data-i18n="lbl_scope">تفاصيل النطاق / الهدف المطلوب *</label>
+          <textarea id="h-scope" required placeholder="وصف المشروع، الأنظمة المطلوبة، ونطاق التنفيذ" rows="2" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-cyan-500"></textarea>
         </div>
 
         <button type="submit" id="h-submit-btn" class="w-full py-3.5 rounded-xl font-black text-slate-950 bg-cyan-500 hover:bg-cyan-400 text-sm shadow-lg shadow-cyan-500/25 transition" data-i18n="btn_submit_hire">
@@ -1140,47 +1391,48 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         theme_light: 'نهاري',
         lang_btn: 'English',
         port_location: 'LOCATION: CAIRO, EG',
-        port_role_sub: 'CYBERSECURITY & DEV',
+        port_role_sub: '{role_sub_en}',
         port_nav_about: 'عن الخبير',
         port_nav_skills: 'المهارات والشهادات',
         port_nav_projects: 'المشاريع المنفذة',
         port_nav_services: 'الخدمات والأسعار',
         port_nav_contact: 'تواصل معي',
         port_hire_btn: '💼 طلب استشارة / توظيف',
-        port_hero_tag: '⚡ RED TEAM & CLOUD DEFENDER • ETHICAL HACKER',
+        port_hero_tag: '{hero_tag_ar}',
         port_hero_headline: {html.escape(_json_for_script(slogan))},
-        port_hero_desc: 'متخصص في حماية أصول الشركات الرقمية، اختبار اختراق الويب وتطبيقات الهاتف، تحليل وكشف الثغرات الأمنية (Vulnerability Assessment)، وتأمين البنية التحتية السحابية لضمان استمرارية الأعمال بأمان تام.',
-        port_cta_audit: '🛡️ احجز فحصاً أمنياً لنظامك',
+        port_hero_desc: '{hero_desc_ar}',
+        port_cta_audit: '{cta_audit_ar}',
         hero_wa_cta: '💬 محادثة واتساب مباشرة',
         contact_pending: 'بيانات التواصل قيد الإعداد',
-        stat_1: 'فحص أمني ناجح',
-        stat_2: 'كشف ومعالجة الثغرات',
-        stat_3: 'اختراقات بعد التأمين',
-        stat_4: 'سنوات خبرة متقدمة',
-        skills_title: 'المهارات والشهادات المعتمدة',
-        skill_1_title: 'Penetration Testing',
-        skill_1_desc: 'اختبار اختراق تطبيقات الويب (OWASP Top 10)، فحص الـ APIs، الهندسة العكسية، وتحليل حركة البيانات المشفرة.',
-        skill_2_title: 'Cloud & Infra Hardening',
-        skill_2_desc: 'تأمين خوادم لينكس والـ Docker، إدارة جدران الحماية، ضبط صلاحيات IAM، وحماية البنى السحابية في AWS و GCP.',
-        skill_3_title: 'Incident Response',
-        skill_3_desc: 'التحقيق الجنائي الرقمي (DFIR)، تتبع الاختراقات، صد هجمات DDoS، وتحليل البرمجيات الخبيثة Malware Analysis.',
-        projects_title: 'أبرز العمليات والمشاريع الأمنية',
-        proj_1_title: 'تدقيق أمان منصة دفع ومحفظة رقمية',
-        proj_1_desc: 'إجراء فحص أمني شامل لبوابة دفع مالية مصرية، واكتشاف 6 ثغرات في منطق الأعمال (Business Logic) وتأمين تدفق عمليات السحب والتحويل.',
-        proj_1_badge: '✅ تم إغلاق جميع الثغرات وحصول العميل على شهادة امتثال',
-        proj_2_title: 'تأمين بنية تحتية سحابية لشركة كبرى',
-        proj_2_desc: 'إعادة هيكلة سياسات IAM وجدران الحماية، وعزل قواعد البيانات الحساسة خلف شبكات VPC خاصة مع تفعيل المراقبة اللحظية 24/7.',
-        proj_2_badge: '✅ منع محاولات الاختراق الخارجية بنسبة 100%',
+        stat_1: '{stat_1_ar}',
+        stat_2: '{stat_2_ar}',
+        stat_3: '{stat_3_ar}',
+        stat_4: '{stat_4_ar}',
+        skills_title: '{skills_title_ar}',
+        skill_1_title: '{skill_1_t_ar}',
+        skill_1_desc: '{skill_1_d_ar}',
+        skill_2_title: '{skill_2_t_ar}',
+        skill_2_desc: '{skill_2_d_ar}',
+        skill_3_title: '{skill_3_t_ar}',
+        skill_3_desc: '{skill_3_d_ar}',
+        projects_title: '{projects_title_ar}',
+        proj_1_title: '{proj_1_t_ar}',
+        proj_1_desc: '{proj_1_d_ar}',
+        proj_1_badge: '{proj_1_b_ar}',
+        proj_2_title: '{proj_2_t_ar}',
+        proj_2_desc: '{proj_2_d_ar}',
+        proj_2_badge: '{proj_2_b_ar}',
         services_title: 'باقات الخدمات والتعاقد الفوري',
         btn_request_contract: '🛡️ طلب الخدمة والتعاقد',
+        rate_expected: 'الاستثمار المتوقع:',
         currency: 'ج.م',
         port_footer_rights: 'جميع الحقوق محفوظة © 2026 — مصمم ومنشور عبر وكالة AutoCorp الذاتية',
-        modal_hire_title: 'طلب استشارة أو فحص أمني 🛡️',
-        modal_hire_sub: 'أدخل بياناتك وسيتم التواصل وتأكيد التعاقد فوراً',
+        modal_hire_title: '{modal_hire_title_ar}',
+        modal_hire_sub: '{modal_hire_sub_ar}',
         lbl_name: 'الاسم أو اسم المؤسسة *',
         lbl_phone: 'رقم الهاتف / واتساب *',
         lbl_service: 'الخدمة المطلوبة *',
-        lbl_scope: 'تفاصيل النطاق / الهدف المراد فحصه *',
+        lbl_scope: 'تفاصيل النطاق / الهدف المطلوب *',
         btn_submit_hire: '🚀 إرسال طلب التعاقد الآن'
       }},
       en: {{
@@ -1189,43 +1441,44 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         theme_light: 'Light',
         lang_btn: 'العربية',
         port_location: 'LOCATION: CAIRO, EG',
-        port_role_sub: 'CYBERSECURITY & DEV',
+        port_role_sub: '{role_sub_en}',
         port_nav_about: 'About',
         port_nav_skills: 'Skills & Certs',
         port_nav_projects: 'Projects',
         port_nav_services: 'Services & Rates',
         port_nav_contact: 'Contact',
         port_hire_btn: '💼 Request Advisory / Hire',
-        port_hero_tag: '⚡ RED TEAM & CLOUD DEFENDER • ETHICAL HACKER',
-        port_hero_headline: 'Certified Cybersecurity Expert & Cloud Penetration Specialist',
-        port_hero_desc: 'Dedicated to safeguarding enterprise digital assets, web/mobile application penetration testing, vulnerability assessment, and cloud infrastructure hardening for zero-downtime resilience.',
-        port_cta_audit: '🛡️ Book Security Assessment',
+        port_hero_tag: '{hero_tag_en}',
+        port_hero_headline: '{default_slogan_en}',
+        port_hero_desc: '{hero_desc_en}',
+        port_cta_audit: '{cta_audit_en}',
         hero_wa_cta: '💬 Direct WhatsApp Chat',
         contact_pending: 'Contact Info In Progress',
-        stat_1: 'Successful Audits',
-        stat_2: 'Vulnerability Remediation',
-        stat_3: 'Post-Hardening Breaches',
-        stat_4: 'Years Experience',
-        skills_title: 'Verified Skills & Certifications',
-        skill_1_title: 'Penetration Testing',
-        skill_1_desc: 'Web application testing (OWASP Top 10), API security assessments, reverse engineering, and encrypted traffic analysis.',
-        skill_2_title: 'Cloud & Infra Hardening',
-        skill_2_desc: 'Hardening Linux & Docker hosts, firewall orchestration, fine-grained IAM policies across AWS & Google Cloud Platform.',
-        skill_3_title: 'Incident Response',
-        skill_3_desc: 'Digital forensics & incident response (DFIR), intrusion containment, DDoS mitigation, and advanced malware analysis.',
-        projects_title: 'Featured Security Engagements',
-        proj_1_title: 'FinTech Payment Gateway & Wallet Security Audit',
-        proj_1_desc: 'Conducted exhaustive pentesting for an Egyptian payment gateway; identified 6 critical business logic flaws and secured transfer flows.',
-        proj_1_badge: '✅ 100% Remediation & Certified Compliance Achieved',
-        proj_2_title: 'Enterprise Cloud Infrastructure Hardening',
-        proj_2_desc: 'Restructured IAM controls, isolated sensitive production databases behind isolated VPC subnets with 24/7 telemetry.',
-        proj_2_badge: '✅ 100% External Intrusion Prevention Rate',
+        stat_1: '{stat_1_en}',
+        stat_2: '{stat_2_en}',
+        stat_3: '{stat_3_en}',
+        stat_4: '{stat_4_en}',
+        skills_title: '{skills_title_en}',
+        skill_1_title: '{skill_1_t_en}',
+        skill_1_desc: '{skill_1_d_en}',
+        skill_2_title: '{skill_2_t_en}',
+        skill_2_desc: '{skill_2_d_en}',
+        skill_3_title: '{skill_3_t_en}',
+        skill_3_desc: '{skill_3_d_en}',
+        projects_title: '{projects_title_en}',
+        proj_1_title: '{proj_1_t_en}',
+        proj_1_desc: '{proj_1_d_en}',
+        proj_1_badge: '{proj_1_b_en}',
+        proj_2_title: '{proj_2_t_en}',
+        proj_2_desc: '{proj_2_d_en}',
+        proj_2_badge: '{proj_2_b_en}',
         services_title: 'Service Packages & Contracts',
         btn_request_contract: '🛡️ Request Service & Contract',
+        rate_expected: 'Estimated Investment:',
         currency: 'EGP',
         port_footer_rights: 'All rights reserved © 2026 — Designed & deployed autonomously by AutoCorp AI',
-        modal_hire_title: 'Request Advisory or Security Assessment 🛡️',
-        modal_hire_sub: 'Submit your engagement details for immediate scheduling and onboarding.',
+        modal_hire_title: '{modal_hire_title_en}',
+        modal_hire_sub: '{modal_hire_sub_en}',
         lbl_name: 'Your Name or Organization *',
         lbl_phone: 'Phone / WhatsApp *',
         lbl_service: 'Target Service *',
@@ -1247,7 +1500,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         const title = escapeHtml(isEn && it.title_en ? it.title_en : it.title);
         const cat = escapeHtml(isEn && it.category_en ? it.category_en : (it.category || 'Service'));
         const badge = escapeHtml(isEn && it.badge_en ? it.badge_en : (it.badge || 'Recommended'));
-        const desc = escapeHtml(isEn && it.desc_en ? it.desc_en : (it.description || 'Certified security offering.'));
+        const desc = escapeHtml(isEn && it.desc_en ? it.desc_en : (it.description || 'Specialized professional service.'));
         const price = Number(it.price) || 0;
         const priceDisplay = price > 0 ? (price.toLocaleString() + ' ' + dict.currency) : (isEn ? 'Per project scope' : 'حسب نطاق المشروع');
         return `

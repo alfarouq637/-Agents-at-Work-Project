@@ -481,7 +481,7 @@ async def run_job(job_id):
             or "product-placeholder" in html
             or "[ضع " in html or "[أدخل " in html or "[رابط" in html
             or "نصوص مسودة" in html
-            or ("cart" not in html.lower() and "order" not in html.lower())
+            or ("cart" not in html.lower() and "order" not in html.lower() and "portfolio" not in html.lower() and "hire" not in html.lower())
         )
         if is_bad_artifact:
             job_row = db.one("select * from jobs where id=?", (job_id,)) or {}
@@ -490,8 +490,9 @@ async def run_job(job_id):
             
             # Populate default site_items in DB if empty
             if not items_rows:
-                niche = builder.detect_niche((job_row.get("request") or "") + " " + (job_row.get("client") or ""))
-                for it in builder.DEFAULT_CATALOGS.get(niche, builder.DEFAULT_CATALOGS["general"]):
+                job_ctx = (job_row.get("request") or "") + " " + (job_row.get("client") or "")
+                niche = builder.detect_niche(job_ctx)
+                for it in builder.get_default_catalog(niche, job_ctx):
                     db.x("insert into site_items(job_id, title, price, category, description, badge, image_url, created_at) values(?,?,?,?,?,?,?,?)",
                          (job_id, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), it.get("image_url", ""), time.time()))
                 items_rows = db.q("select * from site_items where job_id=?", (job_id,))
