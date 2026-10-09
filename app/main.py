@@ -3066,18 +3066,46 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
                     return f"{extracted} | خبير الأمن السيبراني"
                 return extracted
 
-    # 2. Portfolio personal names heuristics
+    # 2. Extract specific subject/topic from phrase like "موقع لبيع السيارات الكهربائية":
+    concept_match = re.search(r'(?:موقع|متجر|معرض|منصة|شركة)\s+(?:لـ|ل)?(?:بيع|عرض|تسويق|شراء|تجارة|صيانة|خدمات)?\s*([^\n،,\.؛]+)', p)
+    if concept_match:
+        concept = concept_match.group(1).strip()
+        concept = re.split(r'\s+(?:عايز|عاوز|علشان|عشان|بسرعة|في\s+مصر)\b', concept)[0].strip()
+        if len(concept) >= 3 and not any(concept == stop for stop in ["الموقع", "المتجر", "موقع", "متجر", "اي حاجة", "اي حاجه"]):
+            if any(k in concept for k in ["سيار", "مركبات", "عربيات"]):
+                return f"معرض {concept}"
+            if any(k in concept for k in ["عطور", "بخور"]):
+                return f"متجر {concept}"
+            if any(k in concept for k in ["اثاث", "أثاث", "مفروشات"]):
+                return f"معرض {concept}"
+            return f"متجر {concept}"
+
+    # 3. Specific domain keywords:
+    if any(k in p for k in ["سيار", "سيارة", "عربيات", "مركبات", "قطع غيار"]):
+        return "إلكتريك درايف | معرض السيارات الكهربائية" if any(k in p for k in ["كهربائ", "ev"]) else "معرض أوتو موتورز للسيارات"
+    if any(k in p for k in ["عطور", "عطر", "بخور", "عود", "مسك"]):
+        return "دار العود | متجر العطور الفاخرة"
+    if any(k in p for k in ["اثاث", "أثاث", "مفروشات", "ديكور"]):
+        return "غاليري الأثاث والديكور العصري"
+    if any(k in p for k in ["كتب", "روايات", "مكتبة"]):
+        return "مكتبة دار المعرفة للكتب والروايات"
+    if any(k in p for k in ["جيم", "مكملات", "بروتين", "لياقة"]):
+        return "تيتانيوم فيتنس | مكملات وأجهزة رياضية"
+    if any(k in p for k in ["حيوانات", "قطط", "كلاب", "بت شوب"]):
+        return "بت لاند | مستلزمات وأغذية الحيوانات الأليفة"
+
+    # 4. Portfolio personal names heuristics
     if niche in ("portfolio", "cybersecurity") or any(k in p for k in ["سايبر", "سيكيورتي", "بورتفوليو", "بروفايل", "مبرمج"]):
         name_m = re.search(r'\b(ياسين|أحمد|احمد|محمد|محمود|علي|عمر|خالد|إبراهيم|ابراهيم|فاروق|كريم|طارق|يوسف|سارة|نور)\s+([^\n،,\.؛\s]+)', p)
         if name_m:
             return f"{name_m.group(0)} | خبير الأمن السيبراني"
         return "بورتفوليو مهندس الأمن السيبراني"
 
-    # 3. Specialty Honey
+    # 5. Specialty Honey
     if niche == "honey" or any(k in p for k in ["عسل", "نحل", "سدر", "مناحل"]):
         return "مناحل الشفاء | متجر العسل الطبيعي الأصلي"
 
-    # 4. Standard business niches
+    # 6. Standard business niches
     if any(k in p for k in ["اجهز", "الكترون", "موبايل", "هواتف", "سماعات", "شواحن", "لابتوب"]):
         return "تكنو زون للأجهزة والإلكترونيات"
     if "كبابجي" in p or "مشويات" in p or "حواوشي" in p:
@@ -3086,7 +3114,7 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
         return "سوق الخضار والفواكه الطازجة"
     if "سوبرماركت" in p or "بقالة" in p or "ماركت" in p:
         return "سوبرماركت البركة ماركت"
-    if "كافيه" in p or "قهوة" in p or "مقهى" in p or "بن" in p:
+    if "كافيه" in p or "قهوة" in p or "مقهى" in p or re.search(r'\bبن\b', p):
         return "كافيه ومقهى الرواق"
     if "ملابس" in p or "ازياء" in p or "فاشون" in p or "بوتيك" in p:
         return "بوتيك الأناقة للملابس"
@@ -3102,6 +3130,18 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
         return "مطعم ومأكولات بحرية الصياد"
     if "برجر" in p or "بيتزا" in p or "شاورما" in p:
         return "مطعم برجر وشاورما شيف"
+    if niche == "automotive":
+        return "معرض أوتو إليكتريك للسيارات"
+    if niche == "perfumes":
+        return "متجر لافندر للعطور الفاخرة"
+    if niche == "furniture":
+        return "معرض هوم ستايل للأثاث"
+    if niche == "books":
+        return "مكتبة القراء للكتب"
+    if niche == "gym":
+        return "باور جيم للمستلزمات الرياضية"
+    if niche == "pets":
+        return "متجر بتس كير للحيوانات الأليفة"
     if niche == "electronics":
         return "تكنو زون للأجهزة والإلكترونيات"
     if niche == "restaurant":
@@ -3449,7 +3489,7 @@ async def handle_telegram_update(u: dict):
             )
             return
 
-        pal_key = "cyber" if niche == "portfolio" else "amber" if niche == "honey" else "sunset" if niche == "restaurant" else "emerald" if niche == "vegetables" else "teal" if niche == "clinic" else "indigo" if niche == "agency" else "ocean"
+        pal_key = niche if niche in builder.PALETTES else ("cyber" if niche == "portfolio" else "emerald")
         pal = builder.PALETTES.get(pal_key, builder.PALETTES["emerald"])
         
         # Prevent rapid duplicates
@@ -3461,9 +3501,9 @@ async def handle_telegram_update(u: dict):
             print(f"[TG DEDUP] Skipping duplicate creation for {brand} (Job #{recent['id']})")
             return
 
-        # Create job in DB with delivered status
+        # Create job in DB with created status so agents plan and execute
         jid = db.x(
-            "INSERT INTO jobs(client, request, status, user_id, price, cost, created_at) VALUES(?, ?, 'delivered', ?, 299.0, 0.0, ?)",
+            "INSERT INTO jobs(client, request, status, user_id, price, cost, created_at) VALUES(?, ?, 'created', ?, 299.0, 0.0, ?)",
             (brand[:80], text[:4000], user_id, time.time())
         )
         
@@ -3510,15 +3550,15 @@ async def handle_telegram_update(u: dict):
             except Exception:
                 pass
         
-        # Insert default catalog items
+        # Insert default catalog items with real imagery
         default_items = builder.DEFAULT_CATALOGS.get(niche, builder.DEFAULT_CATALOGS["general"])
         for it in default_items:
-            db.x("INSERT INTO site_items(job_id, title, price, category, description, badge, created_at) VALUES(?,?,?,?,?,?,?)",
-                 (jid, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), time.time()))
+            db.x("INSERT INTO site_items(job_id, title, price, category, description, badge, image_url, created_at) VALUES(?,?,?,?,?,?,?,?)",
+                 (jid, it["title"], it["price"], it["category"], it["desc"], it.get("badge", ""), it.get("image_url", ""), time.time()))
                  
         db_items = db.q("SELECT * FROM site_items WHERE job_id = ? ORDER BY id", (jid,))
         
-        # Synthesize HTML immediately (< 5ms execution!)
+        # Synthesize HTML immediately so live link is immediately valid
         html_code = builder.build_site_html(jid, brand, text, settings=settings, items=db_items)
         db.x("INSERT OR REPLACE INTO site_pages(job_id, html, created_at) VALUES(?, ?, ?)", (jid, html_code, time.time()))
         
@@ -3533,25 +3573,27 @@ async def handle_telegram_update(u: dict):
         site_link = f"{base_url}/sites/{slug}/"
         db.x("UPDATE jobs SET site_url = ? WHERE id = ?", (f"/sites/{slug}/", jid))
 
+        # Launch AutoCorp AI Agents Team (CEO, Frontend Developer, Deep Learning Cybersecurity Reviewer, Code Reviewer)
+        corp.spawn(corp.plan_job(jid))
+
         if niche == "portfolio":
             congrats_msg = (
-                f"🎉 تم إطلاق وبرمجة موقعك الشخصي (Portfolio) بنجاح وهو الآن شغال 100%! 🚀\n\n"
-                f"👤 الاسم والمهنة: {brand}\n"
-                f"🛡️ التخصص: أمن سيبراني واختبار اختراق متقدم\n"
-                f"🎨 الهوية: ثيم تقني داكن عالي الاحترافية (Cyber Dark Mode)\n"
-                f"💼 المميزات: معرض أعمال، مصفوفة مهارات وشهادات معتمدة، ونظام حجز واستشارة فوري!\n\n"
-                f"🌐 رابط موقعك المباشر:\n{site_link}\n\n"
-                f"💡 يمكنك فتح الرابط ومشاركته فوراً، أو تحميل حزمة هوستينجر / ربط دومين خاص من لوحة تحكم الويب."
+                f"🎉 تم استلام طلبك وبدء العمل على موقعك الشخصي (Portfolio) بنجاح! 🚀\n\n"
+                f"👤 الاسم: {brand}\n"
+                f"🛡️ التخصص: أمن سيبراني وهندسة برمجيات\n"
+                f"🤖 يقوم فريق وكلاء الذكاء الاصطناعي (CEO + Frontend Developer + تدقيق الأمان بنموذج Deep Learning + Code Reviewer) بفحص ومراجعة وتأمين موقعك الآن!\n\n"
+                f"🌐 رابط الموقع المباشر:\n{site_link}\n\n"
+                f"📊 يمكنك متابعة سجلات تنفيذ الوكلاء اللحظية مباشرة عبر لوحة تحكم AutoCorp."
             )
         else:
             congrats_msg = (
-                f"🎉 تم إطلاق وبرمجة متجرك الإلكتروني بنجاح وهو الآن شغال 100%! 🚀\n\n"
+                f"🎉 تم استلام طلبك وبدء العمل على متجرك الإلكتروني بنجاح! 🚀\n\n"
                 f"🏷️ اسم المتجر: {brand}\n"
                 f"🛒 نوع النشاط: {niche}\n"
-                f"🎨 الهوية: تم تفعيل باليت ألوان عصرية متناسقة ({pal_key})\n"
-                f"💳 الطلبات ستبقى بانتظار تأكيد التاجر؛ لم تتم معالجة أي دفعة.\n\n"
+                f"🎨 الهوية: تم تخصيص ألوان وتصميم متناسق لنشاطك ({pal_key})\n"
+                f"🤖 يقوم فريق وكلاء AutoCorp (CEO + مطور الواجهات + فحص الأمان بنموذج Deep Learning + مراجع الأكواد) بتطوير وتأمين المتجر الآن!\n\n"
                 f"🌐 رابط متجرك المباشر:\n{site_link}\n\n"
-                f"💡 يمكنك فتح المتجر، تجربة إضافة المنتجات للسلة، أو تسجيل الدخول على لوحة التحكم وإدارته بحسابك ({user_name})!"
+                f"💡 يمكنك فتح الرابط ومتابعة تقدم الوكلاء في سجل العمليات (Events Ledger) من لوحة التحكم."
             )
             
         await corp.tg_send(chat_id, congrats_msg)
@@ -3589,6 +3631,7 @@ async def handle_telegram_update(u: dict):
 PROCESSED_TG_UPDATES = set()
 
 @app.post("/telegram")
+@app.post("/api/telegram")
 async def telegram_webhook(req: Request):
     secret = (os.getenv("TELEGRAM_SECRET") or "autocorp_webhook_secret_2026_x7k9").strip()
     supplied_secret = req.headers.get("x-telegram-bot-api-secret-token", "")

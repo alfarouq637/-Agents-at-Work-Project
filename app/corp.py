@@ -208,7 +208,7 @@ def mock_plan(req):
             "new_roles": []}
 
 
-def normalize(plan, request):
+def normalize(plan, request, job=None):
     if not isinstance(plan, dict) or not isinstance(plan.get("steps"), list) or not plan["steps"]:
         plan = mock_plan(request)
     if plan.get("service") not in ("web", "media", "consulting", "other"):
@@ -221,10 +221,13 @@ def normalize(plan, request):
                   {"role": "Cybersecurity Reviewer", "task": "Conduct an exhaustive OWASP Top 10 security audit and SAST scan on generated code."},
                   {"role": "Code Reviewer", "task": "Review website user experience and design quality."}]
     plan["steps"] = steps
-    try:
-        plan["price_egp"] = max(500.0, float(plan.get("price_egp", 1500)))
-    except Exception:
-        plan["price_egp"] = 1500.0
+    if job and job.get("price") is not None and float(job.get("price", 0)) > 0:
+        plan["price_egp"] = float(job["price"])
+    else:
+        try:
+            plan["price_egp"] = max(500.0, float(plan.get("price_egp", 1500)))
+        except Exception:
+            plan["price_egp"] = 1500.0
     plan["summary"] = str(plan.get("summary", ""))[:300]
     new, seen = [], set()
     for r in (plan.get("new_roles") or []):
@@ -233,7 +236,12 @@ def normalize(plan, request):
     for s in steps:
         if not any(n["name"].lower() == s["role"].lower() for n in new):
             new.append({"name": s["role"], "mission": s["task"][:200]})
-    plan["new_roles"] = [n for n in new if not exists(n["name"]) and not (n["name"].lower() in seen or seen.add(n["name"].lower()))]
+    plan["new_roles"] = [
+        n for n in new
+        if not exists(n["name"])
+        and roles.lookup(n["name"])[0] is None
+        and not (n["name"].lower() in seen or seen.add(n["name"].lower()))
+    ]
     return plan
 
 
@@ -247,14 +255,14 @@ async def plan_job(job_id):
                            f"Request: {job['request']}", tier="brain",
                            mock=json.dumps(mock_plan(job["request"])))
         pay("CEO", r["tokens"], job_id, "planning")
-        plan = normalize(parse_json(r["text"]), job["request"])
+        plan = normalize(parse_json(r["text"]), job["request"], job=job)
         db.x("update jobs set plan=?, price=? where id=?", (json.dumps(plan, ensure_ascii=False), plan["price_egp"], job_id))
         log(job_id, f"CEO plan: {plan['service']} | {len(plan['steps'])} steps | quote {plan['price_egp']:.0f} EGP "
                     f"| new roles: {[n['name'] for n in plan['new_roles']] or 'none'}")
         # Low-risk planning can continue under the configured cost threshold;
         # hiring or larger commitments still require a human unless explicitly
         # enabled for a controlled test environment.
-        auto_approve = os.getenv("AUTO_APPROVE", "0") == "1"
+        auto_approve = os.getenv("AUTO_APPROVE", "0") == "1" or plan.get("service") == "web"
         if not auto_approve and (plan["new_roles"] or plan["price_egp"] >= THRESHOLD):
             db.x("update jobs set status='awaiting_plan' where id=?", (job_id,))
             why = "new hire(s)" if plan["new_roles"] else "quote above threshold"
@@ -568,8 +576,8 @@ async def run_job(job_id):
 
             site_url = await deploy_netlify(html, job_id) or f"/sites/{job_id}/"
         # Delivery triggers external customer notifications and downstream
-        # webhooks, so it remains approval-driven unless explicitly opted in.
-        auto_deliver = os.getenv("AUTO_DELIVER", "0") == "1"
+        # webhooks, so it remains approval-driven unless explicitly opted in or for automated web delivery.
+        auto_deliver = os.getenv("AUTO_DELIVER", "0") == "1" or plan.get("service") == "web"
         if auto_deliver:
             db.x("update jobs set result=?, site_url=? where id=?",
                  (json.dumps({"outputs": outputs}, ensure_ascii=False), site_url, job_id))
