@@ -413,7 +413,8 @@ def init():
             "ALTER TABLE idempotency_records ADD COLUMN order_id INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE site_orders ADD COLUMN idempotency_key TEXT",
             "ALTER TABLE site_orders ADD COLUMN request_hash TEXT",
-            "ALTER TABLE audit_events ADD COLUMN request_id TEXT"
+            "ALTER TABLE audit_events ADD COLUMN request_id TEXT",
+            "ALTER TABLE site_pages ADD COLUMN slug TEXT"
         ]:
             try:
                 _turso_request([_make_stmt(col_sql)])
@@ -431,14 +432,15 @@ def init():
             c.commit()
             for col_sql in [
                 "ALTER TABLE jobs ADD COLUMN user_id INTEGER",
-            "ALTER TABLE jobs ADD COLUMN is_paid INTEGER DEFAULT 0",
-            "ALTER TABLE jobs ADD COLUMN subscription_plan TEXT DEFAULT 'trial'",
-            "ALTER TABLE jobs ADD COLUMN idempotency_key TEXT",
-            "ALTER TABLE jobs ADD COLUMN request_hash TEXT",
-            "ALTER TABLE idempotency_records ADD COLUMN order_id INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE site_orders ADD COLUMN idempotency_key TEXT",
-            "ALTER TABLE site_orders ADD COLUMN request_hash TEXT",
-            "ALTER TABLE audit_events ADD COLUMN request_id TEXT"
+                "ALTER TABLE jobs ADD COLUMN is_paid INTEGER DEFAULT 0",
+                "ALTER TABLE jobs ADD COLUMN subscription_plan TEXT DEFAULT 'trial'",
+                "ALTER TABLE jobs ADD COLUMN idempotency_key TEXT",
+                "ALTER TABLE jobs ADD COLUMN request_hash TEXT",
+                "ALTER TABLE idempotency_records ADD COLUMN order_id INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE site_orders ADD COLUMN idempotency_key TEXT",
+                "ALTER TABLE site_orders ADD COLUMN request_hash TEXT",
+                "ALTER TABLE audit_events ADD COLUMN request_id TEXT",
+                "ALTER TABLE site_pages ADD COLUMN slug TEXT"
             ]:
                 try:
                     c.execute(col_sql)

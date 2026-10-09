@@ -346,17 +346,35 @@ async def subdomain_middleware(request: Request, call_next):
                 )
     host = request.headers.get("host", "").split(":")[0].lower()
     parts = host.split(".")
+    public_host = ""
+    public_url = os.getenv("PUBLIC_URL", "").strip()
+    if public_url:
+        try:
+            public_host = urlparse(public_url).netloc.split(":")[0].lower()
+        except Exception:
+            public_host = ""
+
+    is_platform_host = (
+        (public_host and host == public_host)
+        or (host.endswith(".vercel.app") and len(parts) <= 3)
+        or (host.endswith(".onrender.com") and len(parts) <= 3)
+        or (host.endswith(".railway.app") and len(parts) <= 3)
+    )
+
     # If host has subdomain e.g. 'site-3' or 'koshary'
-    if len(parts) >= 2 and parts[0] not in ("www", "api", "admin", "localhost", "127"):
+    if not is_platform_host and len(parts) >= 2 and parts[0] not in ("www", "api", "admin", "localhost", "127"):
         sub = parts[0]
         if sub.isdigit() and not request.url.path.startswith(f"/sites/{sub}") and not request.url.path.startswith("/api/"):
             request.scope["path"] = f"/sites/{sub}" + request.url.path
         elif not request.url.path.startswith("/api/") and not request.url.path.startswith("/sites/"):
             # Check slug
-            row = db.one("select job_id from site_pages where slug=?", (sub,))
-            if row:
-                jid = row["job_id"]
-                request.scope["path"] = f"/sites/{jid}" + request.url.path
+            try:
+                row = db.one("select job_id from site_pages where slug=?", (sub,))
+                if row:
+                    jid = row["job_id"]
+                    request.scope["path"] = f"/sites/{jid}" + request.url.path
+            except Exception:
+                pass
     audit_context = audit.bind_request_id(request_id)
     try:
         response = await call_next(request)
