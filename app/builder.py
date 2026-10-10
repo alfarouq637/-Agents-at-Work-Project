@@ -389,6 +389,12 @@ DEFAULT_CATALOGS = {
         {"title": "بناء وتوثيق واجهات برمجة التطبيقات (High-Scale Microservices)", "title_en": "High-Performance API & Microservices Architecture", "price": 3000, "category": "هندسة الأنظمة", "category_en": "System Architecture", "badge": "عالي الأداء", "badge_en": "High Scale", "desc": "تصميم وبناء خدمات برمجية ميكروية فائقة السرعة بـ Python و Node.js مع توثيق OpenAPI/Swagger واختبارات شاملة.", "desc_en": "Designing resilient, scalable microservices and APIs with high concurrency, OpenAPI docs, and automated tests."},
         {"title": "تسريع أداء التطبيقات وهيكلة قواعد البيانات (DB & Optimization)", "title_en": "Database Indexing & Performance Optimization", "price": 2200, "category": "تحسين الأداء", "category_en": "Performance", "badge": "تحسين 10x", "badge_en": "10x Speedup", "desc": "فحص الاختناقات وتسريع استعلامات SQL المعقدة، تطبيق آليات التخزين المؤقت Redis، وتحسين زمن الاستجابة.", "desc_en": "Eliminating bottlenecks, SQL query profiling, Redis caching implementation, and sub-50ms latency tuning."},
         {"title": "مراجعة الأكواد والاستشارات المعمارية (Code Review & Advisory)", "title_en": "Software Architecture Consulting & Code Review", "price": 1500, "category": "استشارات برمجية", "category_en": "Dev Advisory", "badge": "تقرير جودة", "badge_en": "Audit Report", "desc": "مراجعة تفصيلية لجودة الكود، تطبيق مبادئ Clean Architecture و SOLID، وخطة للتوسع المستقبلي.", "desc_en": "In-depth code quality audit, Clean Architecture guidelines, refactoring roadmaps, and security best practices."},
+    ],
+    "portfolio_design": [
+        {"title": "تصميم أنظمة وتطبيقات متكاملة (UI/UX & Design Systems)", "title_en": "Full Product UI/UX Design & Design Systems", "price": 3500, "category": "تصميم واجهات وتجربة المستخدم", "category_en": "UI/UX Design", "badge": "الأكثر طلباً", "badge_en": "Best Seller", "desc": "بناء تجارب مستخدم متكاملة على Figma، شاشات متجاوبة، ومكونات تصميمية قابلة لإعادة الاستخدام مع إرشادات التسليم للمطورين.", "desc_en": "End-to-end Figma UX flows, responsive component libraries, and clean handoff specs for engineering teams."},
+        {"title": "أبحاث تجربة المستخدم واختبارات القابلية (User Research & Testing)", "title_en": "User Research, Personas & Usability Testing", "price": 2500, "category": "أبحاث وتجربة المستخدم", "category_en": "User Research", "badge": "مبني على بيانات", "badge_en": "Data-Driven", "desc": "إجراء مقابلات المستخدمين، بناء رحلات العميل Customer Journeys، وتحليل قابلية الاستخدام لرفع معدلات التحويل.", "desc_en": "User interviews, persona synthesis, customer journey maps, and heuristic evaluations to maximize conversion."},
+        {"title": "نماذج تفاعلية عالية الدقة والرسوم المتحركة (Interactive Prototyping)", "title_en": "High-Fidelity Interactive Prototypes & Motion", "price": 2000, "category": "نماذج تفاعلية", "category_en": "Interactive Prototypes", "badge": "تفاعلي 100%", "badge_en": "Interactive", "desc": "بروتوتايب تفاعلي حي يحاكي التطبيق النهائي بدقة على Figma مع انتقالات سلسة وحركات ميكرو Micro-interactions.", "desc_en": "Pixel-perfect clickable Figma prototypes with smooth micro-interactions and realistic user flows."},
+        {"title": "إعادة تصميم وتدقيق تجربة الاستخدام (UI/UX Audit & Redesign)", "title_en": "UX Heuristic Audit & Product Redesign", "price": 1800, "category": "استشارات وتدقيق التصميم", "category_en": "Design Advisory", "badge": "تقرير شامل", "badge_en": "Audit Report", "desc": "فحص شامل للمنتج الحالي، كشف نقاط الاحتكاك ومشاكل الواجهات، وتقديم مقترحات إعادة تصميم فورية قابلة للتطبيق.", "desc_en": "Deep heuristic review of current products, UX friction identification, and quick-win redesign mockups."},
     ]
 }
 
@@ -472,6 +478,11 @@ CATEGORY_TRANS = {
     "هندسة الأنظمة": "System Architecture",
     "تحسين الأداء": "Performance",
     "استشارات برمجية": "Dev Advisory",
+    # UI/UX Portfolio
+    "تصميم واجهات وتجربة المستخدم": "UI/UX Design",
+    "أبحاث وتجربة المستخدم": "User Research",
+    "نماذج تفاعلية": "Interactive Prototypes",
+    "استشارات وتدقيق التصميم": "Design Advisory",
     "الكل": "All",
     "عام": "General",
 }
@@ -479,6 +490,9 @@ CATEGORY_TRANS = {
 BADGE_TRANS = {
     "الأكثر طلباً": "Most Popular",
     "الأكثر مبيعاً": "Best Seller",
+    "مبني على بيانات": "Data-Driven",
+    "تفاعلي 100%": "100% Interactive",
+    "تقرير شامل": "Full Audit",
     "شامل التقرير": "Full Report",
     "موصى به للشركات": "Recommended",
     "موصى به للمؤسسات": "Enterprise",
@@ -706,9 +720,15 @@ def detect_niche(text: str) -> str:
 
 
 def detect_portfolio_track(context: str) -> str:
-    """Infers the specialized professional track for a portfolio: 'ai', 'dev', or 'cyber'."""
+    """Infers the specialized professional track for a portfolio: 'ai', 'dev', 'design', or 'cyber'."""
     ctx = (context or "").lower()
     if any(k in ctx for k in [
+        "ui", "ux", "ui/ux", "ui-ux", "تصميم واجهات", "تجربة المستخدم",
+        "figma", "فوتوشوب", "ديزاين", "ديزاينر", "مصمم", "تغذية بصرية",
+        "wireframe", "prototype", "design system", "user research", "case study"
+    ]):
+        return "design"
+    elif any(k in ctx for k in [
         "ai", "ذكاء اصطناعي", "machine learning", "deep learning",
         "تعلم آلة", "تعلم العميق", "ديب ليرنينج", "data science",
         "علم بيانات", "وكلاء ذكاء", "وكيل ذكي", "وكلاء مستقلين",
@@ -728,7 +748,9 @@ def get_default_catalog(niche: str, context: str = "") -> list:
     """Retrieves default catalog items tailored to niche and portfolio specialization track."""
     if niche == "portfolio":
         track = detect_portfolio_track(context)
-        if track == "ai":
+        if track == "design":
+            return DEFAULT_CATALOGS.get("portfolio_design", DEFAULT_CATALOGS["portfolio"])
+        elif track == "ai":
             return DEFAULT_CATALOGS.get("portfolio_ai", DEFAULT_CATALOGS["portfolio"])
         elif track == "dev":
             return DEFAULT_CATALOGS.get("portfolio_dev", DEFAULT_CATALOGS["portfolio"])
@@ -764,12 +786,17 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
     track = detect_portfolio_track(ctx_full)
 
     # Extract candidate name
-    default_name = "ياسين أحمد | Yaseen Ahmed" if track == "cyber" else ("الفاروق إبراهيم | Alfarouq Ibrahim" if track == "ai" else "أحمد محمود | Ahmed Mahmoud")
+    default_name = (
+        "ياسين أحمد | Yaseen Ahmed" if track == "cyber"
+        else ("عمر مختار | Omar Mokhtar" if track == "design"
+        else ("الفاروق إبراهيم | Alfarouq Ibrahim" if track == "ai"
+        else "أحمد محمود | Ahmed Mahmoud"))
+    )
     brand_name = _safe_text(settings.get("brand_name") or client, default_name, 120)
     if brand_name.startswith("tg:"):
         brand_name = default_name
 
-    pal = PALETTES["cyber"]
+    pal = PALETTES["royal"] if track == "design" else PALETTES["cyber"]
     primary = _safe_hex_color(settings.get("color_primary"), pal["primary"])
     secondary = _safe_hex_color(settings.get("color_secondary"), pal["secondary"])
     accent = pal["accent"]
@@ -809,7 +836,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         for i, it in enumerate(items):
             it_dict = dict(it)
             t_ar = str(it_dict.get("title") or f"خدمة {i+1}").strip()
-            c_ar = str(it_dict.get("category") or ("استشارات ذكاء اصطناعي" if track == "ai" else ("تطوير برمجيات" if track == "dev" else "خدمات الفحص الأمني"))).strip()
+            c_ar = str(it_dict.get("category") or ("تصميم واجهات وتجربة المستخدم" if track == "design" else ("استشارات ذكاء اصطناعي" if track == "ai" else ("تطوير برمجيات" if track == "dev" else "خدمات الفحص الأمني")))).strip()
             b_ar = str(it_dict.get("badge") or "").strip()
             d_ar = str(it_dict.get("description") or it_dict.get("desc") or "").strip()
             normalized_items.append({
@@ -949,6 +976,67 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         modal_hire_title_en = "Request Software Advisory or Platform Engineering 💻"
         modal_hire_sub_ar = "أدخل بياناتك وسيتم التواصل وتأكيد التعاقد فوراً"
         modal_hire_sub_en = "Submit your requirements for swift architecture review and planning."
+    elif track == "design":
+        track_icon = "🎨"
+        default_slogan = "مصمم واجهات وتجربة المستخدم وتطوير الأنظمة التصميمية الرقمية"
+        default_slogan_en = "Lead UI/UX Product Designer & Design Systems Architect"
+        role_sub_ar = "تصميم واجهات وتجربة المستخدم"
+        role_sub_en = "LEAD UI/UX PRODUCT DESIGNER"
+        hero_tag_ar = "⚡ مصمم واجهات وتجربة المستخدم • أنظمة تصميم وبروتوتايب"
+        hero_tag_en = "⚡ LEAD UI/UX PRODUCT DESIGNER • DESIGN SYSTEMS"
+        hero_desc_ar = "متخصص في تصميم تجارب المستخدم الرقمية السلسة والواجهات العصرية (UI/UX)، بناء أنظمة التصميم الشاملة (Design Systems) على Figma، وإجراء أبحاث المستخدمين لتحويل المنتجات المعقدة إلى تجارب تفاعلية ممتعة تضاعف معدلات التحويل."
+        hero_desc_en = "Crafting intuitive digital experiences and sleek modern interfaces, architecting scalable design systems in Figma, and leading user research to turn complex software into high-converting products."
+        cta_audit_ar = "🎨 اطلب استشارة أو تصميم منتج"
+        cta_audit_en = "🎨 Request UI/UX Design / Audit"
+        stat_1_val, stat_1_ar, stat_1_en = "+40", "تطبيق ومنتج مصمم", "Shipped UI/UX Projects"
+        stat_2_val, stat_2_ar, stat_2_en = "98%", "رضا واختبارات المستخدمين", "User Usability Score"
+        stat_3_val, stat_3_ar, stat_3_en = "3.2x", "مضاعفة معدل التحويل", "Conversion Multiplier"
+        stat_4_val, stat_4_ar, stat_4_en = "+5", "سنوات خبرة في التصميم", "Years UX Experience"
+        skills_arsenal_tag = "DESIGN ARSENAL & TOOLING"
+        skills_title_ar = "المهارات والشهادات المعتمدة في الـ UI/UX"
+        skills_title_en = "Verified UI/UX Skills & Certifications"
+        skill_1_icon = "🎨"
+        skill_1_t_ar = "UI/UX & Design Systems"
+        skill_1_t_en = "UI/UX & Design Systems"
+        skill_1_d_ar = "إتقان كامل لـ Figma، بناء مكتبات المكونات التفاعلية، ومطابقة معايير إمكانية الوصول والتسليم البرمجي."
+        skill_1_d_en = "Mastery in Figma, scalable design tokens, WCAG accessibility, and pixel-perfect dev handoffs."
+        skill_2_icon = "🔍"
+        skill_2_t_ar = "User Research & Heuristic Audit"
+        skill_2_t_en = "User Research & Heuristic Audit"
+        skill_2_d_ar = "أبحاث سلوك المستخدمين، خرائط التعاطف، واختبارات القابلية لتحسين رحلة العميل وتقليل الاحتكاك."
+        skill_2_d_en = "Behavioral user research, empathy mapping, usability testing, and frictionless journey optimization."
+        skill_3_icon = "✨"
+        skill_3_t_ar = "Interactive Prototyping & Motion"
+        skill_3_t_en = "Interactive Prototyping & Motion"
+        skill_3_d_ar = "بناء بروتوتايب تفاعلي متقدم يحاكي المنتج الحقيقي بحركات دقيقة وانتقالات سلسة."
+        skill_3_d_en = "High-fidelity clickable prototypes with realistic states, micro-interactions, and smart animation."
+        certs = [
+            ("🎖️ Google Certified Professional UX Designer", "🎖️ Google Certified Professional UX Designer"),
+            ("🎨 Nielsen Norman Group (NN/g) UX Master", "🎨 Nielsen Norman Group (NN/g) UX Master"),
+            ("✨ Interaction Design Foundation (IxDF)", "✨ Interaction Design Foundation (IxDF)"),
+            ("🚀 Figma Advanced Design Systems Specialist", "🚀 Figma Advanced Design Systems Specialist"),
+        ]
+        projects_tag = "DESIGN CASE STUDIES"
+        projects_title_ar = "أبرز مشاريع وتجارب المستخدم المنفذة"
+        projects_title_en = "Featured UI/UX Case Studies"
+        proj_1_tag = "FINTECH MOBILE APP"
+        proj_1_t_ar = "تصميم تطبيق مالي رقمي وسهل الاستخدام"
+        proj_1_t_en = "FinTech Mobile Banking & Wallet App"
+        proj_1_d_ar = "إعادة تصميم تجربة التحويلات المالية وإدارة البطاقات والمحافظ برحلة مستخدم فائقة البساطة رفعت نسبة الإكمال بـ 45%."
+        proj_1_d_en = "End-to-end UX redesign for personal banking and digital wallet, reducing onboarding drop-off by 45%."
+        proj_1_b_ar = "✅ زيادة معدل الإكمال 45% وتجربة خالية من التعقيد"
+        proj_1_b_en = "✅ +45% Task Completion & Zero UX Friction"
+        proj_2_tag = "ENTERPRISE SAAS DASHBOARD"
+        proj_2_t_ar = "نظام تصميم ولوحة تحكم متطورة للمؤسسات"
+        proj_2_t_en = "Enterprise B2B SaaS Dashboard & Design System"
+        proj_2_d_ar = "بناء نظام تصميم متكامل بأكثر من 200 مكون تفاعلي مع لوحة بيانات ذكية متوافقة مع الوضعين الليلي والنهاري."
+        proj_2_d_en = "Architected a design system with 200+ Figma components and a high-density data dashboard with full dark mode."
+        proj_2_b_ar = "✅ 200+ مكون تفاعلي وتسريع دورة تطوير الواجهات 3x"
+        proj_2_b_en = "✅ 200+ Components & 3x Accelerated Frontend Delivery"
+        modal_hire_title_ar = "طلب استشارة تصميم أو مشروع UI/UX 🎨"
+        modal_hire_title_en = "Request UI/UX Advisory or Project Design 🎨"
+        modal_hire_sub_ar = "أدخل بياناتك وسيتم التواصل معك لمناقشة التفاصيل فوراً"
+        modal_hire_sub_en = "Submit your product details for immediate design review and scoping."
     else:  # "cyber"
         track_icon = "🛡️"
         default_slogan = "خبير الأمن السيبراني واختبار الاختراق وتأمين الأنظمة السحابية"

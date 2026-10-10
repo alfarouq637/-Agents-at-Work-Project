@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover - exercised by deployment readiness.
     PasswordHasher = None
     Type = None
 
-MAX_SITES_PER_CLIENT = 2
+MAX_SITES_PER_CLIENT = 5
 TOKEN_TTL_SECONDS = 30 * 86400
 # OWASP's current Argon2id baseline: 19 MiB, two passes, one lane. These
 # values must be benchmarked again before raising costs on the production tier.

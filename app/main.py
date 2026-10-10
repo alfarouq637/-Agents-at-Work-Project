@@ -754,6 +754,11 @@ def is_store_creation_intent(text: str) -> bool:
     t = re.sub(r'[إأآا]', 'ا', t)
     t = re.sub(r'[ة]', 'ه', t)
     t = re.sub(r'[ى]', 'ي', t)
+
+    # Deletion guardrail: explicit deletion requests must NEVER be classified as creation
+    del_words = ["احذف", "امسح", "حذف", "مسح", "ازال", "ازاله", "الغاء", "الغي", "delete", "remove", "drop"]
+    if any(d in t for d in del_words):
+        return False
     
     creation_verbs = ["انشا", "تنشا", "اعمل", "تعمل", "صمم", "ابني", "تبني", "بناء", "برمج", "تطوير", "اطلق", "سوي", "كريت", "جهز", "build", "create", "make"]
     target_nouns = ["موقع", "ويب", "متجر", "ستور", "صفحه", "صفحة", "منيو", "مشروع", "بورتفوليو", "بروفايل", "سيرة", "cv", "portfolio"]
@@ -3055,27 +3060,30 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
         port_m = re.search(r'(?:بورتفوليو|بروفايل|موقع\s*شخصي|cv|سيرة\s*ذاتية)\s+(?:لـ\s*|ل_\s*)?([^\n،,\.؛]+)', p, re.IGNORECASE)
         if port_m:
             target = port_m.group(1).strip()
+            # Clean introductory phrases: "لشخص اسمه عمر مختار", "لواحد اسمه عمر مختار", "شخص اسمه عمر مختار", "واحد اسمه عمر مختار", "اسمه عمر مختار"
+            target = re.sub(r'^(?:لـ|لل|ل)?(?:شخص\s*اسمه|واحد\s*اسمه|شخص\s*يدعى|واحد\s*يدعى|اسمه)\s+', '', target).strip()
             # Clean Arabic preposition prefixes: "للفاروق" -> "الفاروق", "لياسين" -> "ياسين"
             if target.startswith("لل"):
                 target = "ال" + target[2:]
             elif target.startswith("ل") and not target.startswith("لا") and not any(target.startswith(k) for k in ["ليلى", "لطفي", "لقمان", "لؤي", "ليث"]):
                 target = target[1:].strip()
 
-            role_split_pat = r'\s+(?=(?:مهندس|مطور|مبرمج|خبير|مصمم|باحث|استشاري|دكتور|طبيب|كاتب|محلل|أخصائي|اخصائي|مدير|تقني|engineer|developer|designer|architect|specialist|consultant|scientist)\b)'
+            role_split_pat = r'\s+(?=(?:مهندس|مطور|مبرمج|خبير|مصمم|باحث|استشاري|دكتور|طبيب|كاتب|محلل|أخصائي|اخصائي|مدير|تقني|متخصص|engineer|developer|designer|architect|specialist|consultant|scientist)\b)'
             parts = re.split(role_split_pat, target, 1)
             raw_name = parts[0].strip()
-            raw_name = re.split(r'\s+(?:في\s+مجال|في\s+ال|في|تخصص|شغال\s+في|شغال|بيشتغل|يعمل\s+في)\b', raw_name)[0].strip()
+            raw_name = re.split(r'\s+(?:في\s+مجال|في\s+ال|في|تخصص|شغال\s+في|شغال|بيشتغل|يعمل\s+في|متخصص\s+في|متخصص)\b', raw_name)[0].strip()
             raw_role = parts[1].strip() if len(parts) > 1 else ""
 
             prompt_context = (raw_role + " " + p).lower()
-            if any(k in prompt_context for k in ["ai", "ذكاء اصطناعي", "machine learning", "deep learning", "تعلم آلة", "ديب ليرنينج", "data science", "علم بيانات"]):
+            p_norm = re.sub(r'[إأآا]', 'ا', prompt_context)
+            if any(k in p_norm for k in ["تصميم", "مصمم", "ديزاين", "ui", "ux", "جرافيك"]):
+                final_role = "مصمم واجهات وتجربة المستخدم | UI/UX Designer"
+            elif any(k in p_norm for k in ["ai", "ذكاء اصطناعي", "machine learning", "deep learning", "تعلم اله", "ديب ليرنينج", "data science", "علم بيانات"]):
                 final_role = "مهندس ذكاء اصطناعي | AI Engineer"
-            elif any(k in prompt_context for k in ["سايبر", "سيكيورتي", "أمن سيبراني", "امن سيبراني", "اختراق", "pentest"]):
+            elif any(k in p_norm for k in ["سايبر", "سيكيورتي", "امن سيبراني", "اختراق", "pentest"]):
                 final_role = "مهندس أمن سيبراني | Cybersecurity Specialist"
-            elif any(k in prompt_context for k in ["برمج", "مطور", "مبرمج", "ويب", "software", "full stack", "frontend", "backend"]):
+            elif any(k in p_norm for k in ["برمج", "مطور", "مبرمج", "ويب", "software", "full stack", "frontend", "backend"]):
                 final_role = "مهندس برمجيات | Software Engineer"
-            elif any(k in prompt_context for k in ["تصميم", "مصمم", "ديزاينر", "ui", "ux", "جرافيك"]):
-                final_role = "مصمم واجهات | UI/UX Designer"
             elif raw_role:
                 final_role = raw_role
             else:
@@ -3098,7 +3106,9 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
             if len(extracted) >= 2 and extracted not in ("ايه", "اي", "كدا", "كذا", "الموقع", "المتجر"):
                 if niche in ("portfolio", "cybersecurity") and not any(k in extracted for k in ["خبير", "مهندس", "مطور"]):
                     prompt_ctx = p.lower()
-                    if any(k in prompt_ctx for k in ["ai", "ذكاء اصطناعي"]):
+                    if any(k in prompt_ctx for k in ["ui", "ux", "تصميم", "مصمم", "ديزاين"]):
+                        return f"{extracted} | مصمم واجهات وتجربة المستخدم | UI/UX Designer"
+                    elif any(k in prompt_ctx for k in ["ai", "ذكاء اصطناعي"]):
                         return f"{extracted} | مهندس ذكاء اصطناعي | AI Engineer"
                     elif any(k in prompt_ctx for k in ["برمج", "مطور", "مبرمج"]):
                         return f"{extracted} | مهندس برمجيات | Software Engineer"
@@ -3153,7 +3163,7 @@ def extract_smart_brand(prompt: str, niche: str) -> str:
             elif any(k in prompt_ctx for k in ["برمج", "مطور", "مبرمج", "ويب", "software"]):
                 return f"{cand_name} | مهندس برمجيات | Software Engineer"
             elif any(k in prompt_ctx for k in ["تصميم", "مصمم", "ديزاينر", "ui", "ux"]):
-                return f"{cand_name} | مصمم واجهات | UI/UX Designer"
+                return f"{cand_name} | مصمم واجهات وتجربة المستخدم | UI/UX Designer"
             return f"{cand_name} | خبير الأمن السيبراني"
         return "بورتفوليو مهندس البرمجيات والذكاء الاصطناعي"
 
@@ -3362,7 +3372,9 @@ async def handle_telegram_update(u: dict):
                 f"  الحالة: {s['status']} | {paid_str}\n"
                 f"  الرابط: {base_url}/sites/{slug}/\n"
             )
-        msg_lines.append("\n💡 يمكنك تحميل حزمة هوستينجر أو ربط دومين خاص بك من لوحة تحكم الويب.")
+        msg_lines.append(f"\n💡 رصيدك المستخدم: {len(sites)} من {auth.MAX_SITES_PER_CLIENT} مواقع.")
+        msg_lines.append("🗑️ لحذف أي موقع وتفريغ رصيدك: أرسل /delete رقم_الموقع (مثال: /delete 29) أو اكتب 'احذف كل المواقع'.")
+        msg_lines.append("🌐 يمكنك تحميل حزمة هوستينجر أو ربط دومين خاص بك من لوحة تحكم الويب.")
         await corp.tg_send(chat_id, "\n".join(msg_lines))
         return
 
@@ -3375,16 +3387,21 @@ async def handle_telegram_update(u: dict):
         )
         return
 
-    # 6.1 /delete command: delete site by ID
-    if text.startswith("/delete"):
-        parts = text.split()
-        if len(parts) > 1 and parts[1].isdigit():
-            target_jid = int(parts[1])
+    # 6.1 Natural Language Deletion & /delete Command
+    del_kws = ["احذف", "امسح", "حذف", "مسح", "ازال", "ازالة", "الغاء", "الغي", "delete", "remove"]
+    t_del_clean = text.lower().strip()
+    is_deletion_request = text.startswith("/delete") or any(k in t_del_clean for k in del_kws)
+
+    if is_deletion_request:
+        # Check if an explicit project ID number was provided
+        digits = re.findall(r'\b\d+\b', text)
+        if digits:
+            target_jid = int(digits[0])
             target_job = db.one("SELECT * FROM jobs WHERE id=?", (target_jid,))
             if not target_job:
                 await corp.tg_send(chat_id, f"❌ المشروع #{target_jid} غير موجود.")
                 return
-            can_del = is_user_admin or (user_id and target_job.get("user_id") == user_id) or str(target_job.get("client")) == f"tg:{chat_id}"
+            can_del = is_user_admin or (user_id and target_job.get("user_id") == user_id) or str(target_job.get("client")) == f"tg:{chat_id}" or str(target_job.get("client", "")).startswith(f"tg:{chat_id}")
             if can_del:
                 audit.record(
                     "site.deletion_requested",
@@ -3395,11 +3412,62 @@ async def handle_telegram_update(u: dict):
                 )
                 delete_tenant_records(target_jid)
                 shutil.rmtree(os.path.join(corp.SITES, str(target_jid)), ignore_errors=True)
-                await corp.tg_send(chat_id, f"🗑️ تم حذف المشروع #{target_jid} وكافة ملفاته وبياناته نهائياً بنجاح!")
+                
+                # Check remaining count
+                if user_id:
+                    rem_row = db.one("SELECT count(*) as c FROM jobs WHERE user_id = ?", (user_id,))
+                else:
+                    rem_row = db.one("SELECT count(*) as c FROM jobs WHERE client = ? OR client LIKE ?", (f"tg:{chat_id}", f"tg:{chat_id}%"))
+                rem_count = int(rem_row.get("c", 0) or 0) if rem_row else 0
+                free_slots = max(0, auth.MAX_SITES_PER_CLIENT - rem_count)
+                
+                await corp.tg_send(
+                    chat_id,
+                    f"🗑️ تم حذف المشروع #{target_jid} ({target_job.get('client')}) وكافة ملفاته بنجاح!\n"
+                    f"✨ رصيدك المتاح الآن: {free_slots} من {auth.MAX_SITES_PER_CLIENT} مواقع.\n"
+                    f"🚀 يمكنك الآن إرسال فكرة موقعك أو البورتفوليو الجديد لنبدأ برمجته فوراً!"
+                )
             else:
                 await corp.tg_send(chat_id, "❌ ليس لديك صلاحية لحذف هذا المشروع.")
-        else:
-            await corp.tg_send(chat_id, "⚠️ الصيغة الصحيحة: /delete رقم_المشروع (مثال: /delete 5)")
+            return
+
+        # No specific ID: Handle bulk deletion or conversational deletion
+        bulk_kws = ["كل", "الموقعين", "المواقع", "احذفهم", "امسحهم", "اتعملوا", "عملتهم", "كلهم", "مواقعي", "دول"]
+        user_sites = db.q(
+            "SELECT id, client FROM jobs WHERE user_id = ? OR client LIKE ? OR client = ? ORDER BY id DESC",
+            (user_id or -1, f"tg:{chat_id}%", user_name)
+        )
+        if not user_sites:
+            await corp.tg_send(chat_id, "ℹ️ ليس لديك أي مواقع سابقة لحذفها. رصيدك متاح بالكامل ويمكنك طلب بناء موقعك الجديد فوراً! 🚀")
+            return
+
+        # If user explicitly asked for bulk/all, or has only 1 site, or asked "احذفهم" / "امسحهم" / "الموقعين":
+        if any(k in t_del_clean for k in bulk_kws) or len(user_sites) == 1:
+            deleted_ids = []
+            for s in user_sites:
+                jid = s["id"]
+                audit.record("site.deletion_requested", actor_id=user_id, actor_type="telegram_user", target_type="job", target_id=str(jid))
+                delete_tenant_records(jid)
+                shutil.rmtree(os.path.join(corp.SITES, str(jid)), ignore_errors=True)
+                deleted_ids.append(f"#{jid}")
+            
+            ids_str = " و ".join(deleted_ids)
+            await corp.tg_send(
+                chat_id,
+                f"🗑️ تم حذف مشاريعك السابقة ({ids_str}) وكافة ملفاتها بنجاح!\n\n"
+                f"✨ رصيدك الآن متاح بالكامل (0 من {auth.MAX_SITES_PER_CLIENT} مواقع).\n"
+                f"🚀 يمكنك الآن إرسال فكرة موقعك أو البورتفوليو الجديد لنبدأ برمجته فوراً!"
+            )
+            return
+
+        # If multiple sites exist and user didn't specify, guide them:
+        lines = [
+            f"⚠️ لديك {len(user_sites)} مواقع مسجلة. لتحديد الموقع المراد حذفه:\n",
+        ]
+        for s in user_sites:
+            lines.append(f"• لحذف موقع #{s['id']} ({s['client']}): أرسل /delete {s['id']}")
+        lines.append(f"\n💡 أو اكتب ببساطة: 'احذف كل المواقع' لحذفها جميعاً وتفريغ رصيدك بالكامل فوراً.")
+        await corp.tg_send(chat_id, "\n".join(lines))
         return
 
     # 7. Conversational Handling & Guardrails
@@ -3521,7 +3589,10 @@ async def handle_telegram_update(u: dict):
                 await corp.tg_send(
                     chat_id,
                     f"⚠️ عفواً، لقد استنفدت الحد الأقصى المسموح به ({auth.MAX_SITES_PER_CLIENT} مواقع) في باقتك الحالية!\n\n"
-                    "يمكنك استعراض مواقعك السابقة عبر كتابة /my_sites أو الترقية لإنشاء مواقع جديدة."
+                    "💡 لتفريغ رصيدك وبناء مواقع جديدة، يمكنك حذف أي موقع سابق بسهولة:\n"
+                    "• اكتب 'احذف كل المواقع' لتفريغ رصيدك بالكامل فوراً.\n"
+                    "• أو اكتب /delete رقم_الموقع (مثال: /delete 29).\n"
+                    "• أو اكتب /my_sites لمعاينة روابط مواقعك الحالية وأرقامها."
                 )
                 return
 
@@ -3634,17 +3705,23 @@ async def handle_telegram_update(u: dict):
 
         if niche == "portfolio":
             p_track = builder.detect_portfolio_track(text + " " + brand)
-            if p_track == "ai":
+            if p_track == "design":
+                prof_label = "تصميم واجهات وتجربة المستخدم (UI/UX Design)"
+                prof_icon = "🎨"
+            elif p_track == "ai":
                 prof_label = "هندسة الذكاء الاصطناعي والتعلم العميق (AI & Deep Learning)"
+                prof_icon = "🧠"
             elif p_track == "dev":
                 prof_label = "هندسة البرمجيات وتطوير الحلول الرقمية (Software Engineering)"
+                prof_icon = "💻"
             else:
                 prof_label = "أمن سيبراني واختبار اختراق متقدم (Cybersecurity & Pentesting)"
+                prof_icon = "🛡️"
 
             congrats_msg = (
                 f"🎉 تم استلام طلبك وبدء العمل على موقعك الشخصي (Portfolio) بنجاح! 🚀\n\n"
                 f"👤 الاسم: {brand}\n"
-                f"🛡️ التخصص: {prof_label}\n"
+                f"{prof_icon} التخصص: {prof_label}\n"
                 f"🤖 يقوم فريق وكلاء الذكاء الاصطناعي (CEO + Frontend Developer + تدقيق الأمان بنموذج Deep Learning + Code Reviewer) بفحص ومراجعة وتأمين موقعك الآن!\n\n"
                 f"🌐 رابط الموقع المباشر:\n{site_link}\n\n"
                 f"📊 يمكنك متابعة سجلات تنفيذ الوكلاء اللحظية مباشرة عبر لوحة تحكم AutoCorp."
