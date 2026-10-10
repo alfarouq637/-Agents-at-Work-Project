@@ -1229,6 +1229,42 @@ def get_jobs(
     return JSONResponse(content=rows, headers=page_headers)
 
 
+@app.get("/api/public/showcase")
+@app.get("/api/showcase")
+def get_public_showcase(limit: int = Query(default=12, ge=1, le=50)):
+    """Returns safe, public metadata for live delivered storefronts for the showcase gallery.
+    Zero secret tokens, zero user_id, zero orders, zero internal config."""
+    rows = db.q("""
+        SELECT j.id, j.client, j.request, j.status, j.created_at,
+               s.brand_name, s.category, s.color_primary
+        FROM jobs j
+        LEFT JOIN site_settings s ON s.job_id = j.id
+        WHERE j.status = 'delivered'
+        ORDER BY j.id DESC
+        LIMIT ?
+    """, (limit,))
+    results = []
+    for r in rows:
+        jid = r["id"]
+        bname = (r.get("brand_name") or "").strip()
+        client = str(r.get("client") or "").strip()
+        display_name = bname or client or "متجر إلكتروني"
+        slug = make_site_slug(jid, display_name)
+        req = str(r.get("request") or "").strip()
+        results.append({
+            "id": jid,
+            "brand_name": display_name,
+            "client": display_name,
+            "category": r.get("category") or "general",
+            "request": req[:150],
+            "slug": slug,
+            "frontend_url": f"/sites/{slug}/",
+            "status": "delivered",
+            "color_primary": r.get("color_primary") or "#ff7a00"
+        })
+    return JSONResponse(content=results)
+
+
 @app.get("/api/jobs/{jid}")
 def get_job_detail(
     jid: int,

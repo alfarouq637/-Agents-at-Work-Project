@@ -1949,4 +1949,29 @@ def test_portfolio_multi_track_specialization_and_prepositions():
     assert "OSCP Certified" in cyber_html
 
 
+def test_public_showcase_gallery_is_open_and_does_not_leak_private_data():
+    client = TestClient(app)
+    response = client.get("/api/public/showcase")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    for site in data:
+        assert site["status"] == "delivered"
+        assert "user_id" not in site
+        assert "password" not in site
+        assert "cookie" not in site
+        assert "token" not in site
+        assert "orders" not in site
 
+
+def test_builder_filters_dummy_phone_numbers():
+    html = builder.build_site_html(
+        100,
+        "Clean Store",
+        "fashion",
+        settings={"phone": "01023456789", "whatsapp": "01023456789"},
+        items=[],
+    )
+    assert "01023456789" not in html
+    assert "wa.me/201023456789" not in html
+    assert "tel:01023456789" not in html

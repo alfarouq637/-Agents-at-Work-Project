@@ -322,7 +322,7 @@ textarea{resize:vertical;min-height:75px}
             تصفح نماذج من المواقع والتطبيقات التي تم إنشاؤها بالكامل بواسطة وكلاء AutoCorp.
           </p>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="loadJobs()">🔄 <span data-i18n="btn_refresh">تحديث المعرض</span></button>
+        <button class="btn btn-ghost btn-sm" onclick="loadPublicShowcase()">🔄 <span data-i18n="btn_refresh">تحديث المعرض</span></button>
       </div>
       <div id="public-showcase-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
         <!-- Rendered via JS -->
@@ -2294,7 +2294,33 @@ async function rejectJobPlan(jid){
   }
 }
 
+async function loadPublicShowcase(){
+  const c = $('#public-showcase-container');
+  if(!c) return;
+  try{
+    const res = await fetch('/api/public/showcase');
+    if(!res.ok){
+      if(!c.children.length){
+        c.innerHTML = '<div style="color:var(--fg3);padding:14px">لا توجد متاجر معروضة حالياً.</div>';
+      }
+      return;
+    }
+    const sites = await res.json();
+    if(Array.isArray(sites) && sites.length){
+      renderPublicShowcase(sites);
+    } else if(!c.children.length){
+      c.innerHTML = '<div style="color:var(--fg3);padding:14px">لا توجد متاجر معروضة حالياً.</div>';
+    }
+  }catch(e){
+    console.error("Failed loading showcase:", e);
+    if(!c.children.length){
+      c.innerHTML = '<div style="color:var(--fg3);padding:14px">لا توجد متاجر معروضة حالياً.</div>';
+    }
+  }
+}
+
 async function loadJobs(){
+  loadPublicShowcase();
   try{
     const reqHeaders = {};
     const userToken = getSafeToken();
@@ -2303,6 +2329,9 @@ async function loadJobs(){
       credentials: 'same-origin',
       headers: reqHeaders
     });
+    if(!res.ok){
+      return;
+    }
     const jobs = await res.json();
     if(!Array.isArray(jobs)){
       return;
@@ -2315,9 +2344,6 @@ async function loadJobs(){
     // Update badge with the user's ACTUAL stores count (or total for admin)
     const badgeEl = $('#stores-count-badge');
     if(badgeEl) badgeEl.textContent = myStores.length;
-
-    // 1. Render Public Showcase (Live Sites ONLY - NO settings visible publicly)
-    renderPublicShowcase(jobs);
 
     // 2. Render "My Stores" View (Filtered to user's stores or all if admin)
     renderMyStores(jobs);
@@ -2332,7 +2358,7 @@ async function loadJobs(){
 function renderPublicShowcase(jobs){
   const c = $('#public-showcase-container');
   if(!c) return;
-  const deliveredJobs = jobs.filter(j => j.status === 'delivered');
+  const deliveredJobs = Array.isArray(jobs) ? jobs.filter(j => j.status === 'delivered') : [];
   if(!deliveredJobs.length){
     c.innerHTML = '<div style="color:var(--fg3);padding:14px">لا توجد متاجر معروضة حالياً.</div>';
     return;
@@ -4130,6 +4156,7 @@ async function loadAdminSitesManager(){
 applyTheme();
 applyTranslations();
 checkAuthSession();
+loadPublicShowcase();
 loadJobs();
 // Pre-populate 2 default catalog items in wizard
 addCatalogRow('طماطم بلدي نخب أول (كيلو)', '18', 'خضار طازج', 'طازج اليوم');

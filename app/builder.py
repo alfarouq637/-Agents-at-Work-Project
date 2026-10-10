@@ -66,9 +66,17 @@ def _safe_hex_color(value, fallback: str) -> str:
     return candidate if re.fullmatch(r"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?(?:[0-9A-Fa-f]{2})?", candidate) else fallback
 
 
+DUMMY_PHONE_PATTERNS = {
+    "01023456789", "01012345678", "01000000000", "123456789", "0123456789",
+    "201023456789", "201012345678", "00000000000", "11111111111", "99999999999"
+}
+
+
 def _safe_phone(value, fallback: str = "") -> str:
-    """Keep telephone URLs and displayed contact values free of markup."""
+    """Keep telephone URLs and displayed contact values free of markup. Filters out dummy/fake numbers."""
     digits = re.sub(r"\D", "", str(value or ""))[:20]
+    if not digits or digits in DUMMY_PHONE_PATTERNS:
+        return ""
     return digits or fallback
 
 
@@ -1444,7 +1452,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-1" data-i18n="lbl_phone">رقم الهاتف / واتساب *</label>
-          <input type="tel" id="h-phone" required placeholder="مثال: 01012345678" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-cyan-500">
+          <input type="tel" id="h-phone" required placeholder="رقم الهاتف للتواصل" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-cyan-500">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-1" data-i18n="lbl_service">الخدمة المطلوبة *</label>
@@ -2238,7 +2246,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1" data-i18n="checkout_phone_lbl">رقم الهاتف / الواتساب *</label>
-          <input type="tel" id="cust-phone" required data-i18n="checkout_phone_ph" placeholder="مثال: 01012345678" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <input type="tel" id="cust-phone" required data-i18n="checkout_phone_ph" placeholder="أدخل رقم هاتفك لتأكيد الطلب والتوصيل" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1" data-i18n="checkout_address_lbl">عنوان التوصيل بالتفصيل *</label>
@@ -2282,7 +2290,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
       </div>
 
       <div class="space-y-3">
-        <a id="res-whatsapp-link" href="#" target="_blank" rel="noopener" class="w-full block py-3.5 rounded-xl font-black text-white text-xs bg-emerald-500 hover:bg-emerald-600 shadow-md transition" data-i18n="success_wa_btn">
+        <a id="res-whatsapp-link" href="#" target="_blank" rel="noopener" class="w-full block py-3.5 rounded-xl font-black text-white text-xs bg-emerald-500 hover:bg-emerald-600 shadow-md transition" data-i18n="success_wa_btn" style="{'' if clean_wa else 'display:none;'}">
           💬 إرسال تفاصيل الأوردر للواتساب للتأكيد
         </a>
         <button onclick="closeSuccessModal()" class="w-full py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 text-xs transition" data-i18n="success_close_btn">
@@ -2379,7 +2387,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         checkout_name_lbl: 'الاسم بالكامل *',
         checkout_name_ph: 'مثال: أحمد محمود',
         checkout_phone_lbl: 'رقم الهاتف / الواتساب *',
-        checkout_phone_ph: 'مثال: 01012345678',
+        checkout_phone_ph: 'أدخل رقم هاتفك لتأكيد الطلب والتوصيل',
         checkout_address_lbl: 'عنوان التوصيل بالتفصيل *',
         checkout_address_ph: 'المدينة، الحي، اسم الشارع، رقم العمارة والشقة',
         checkout_payment_lbl: 'حالة الدفع',
@@ -2465,7 +2473,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         checkout_name_lbl: 'Full Name *',
         checkout_name_ph: 'e.g. Ahmed Mahmoud',
         checkout_phone_lbl: 'Phone / WhatsApp *',
-        checkout_phone_ph: 'e.g. 01012345678',
+        checkout_phone_ph: 'Enter phone number for delivery confirmation',
         checkout_address_lbl: 'Delivery Address *',
         checkout_address_ph: 'City, district, street, building and apartment',
         checkout_payment_lbl: 'Payment Status',
