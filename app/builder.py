@@ -1487,7 +1487,7 @@ def build_portfolio_html(job_id: int, client: str, request: str, settings: dict 
         port_nav_contact: 'تواصل معي',
         port_hire_btn: '💼 طلب استشارة / توظيف',
         port_hero_tag: '{hero_tag_ar}',
-        port_hero_headline: {html.escape(_json_for_script(slogan))},
+        port_hero_headline: {_json_for_script(slogan)},
         port_hero_desc: '{hero_desc_ar}',
         port_cta_audit: '{cta_audit_ar}',
         hero_wa_cta: '💬 محادثة واتساب مباشرة',
@@ -2294,7 +2294,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
 
   <script>
     const SITE_JOB_ID = {job_id};
-    const STORE_NAME = {html.escape(_json_for_script(brand_name))};
+    const STORE_NAME = {_json_for_script(brand_name)};
     const WA_PHONE = '{clean_wa}';
     const PRODUCTS = {items_json};
 
@@ -2316,7 +2316,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         theme_dark: 'ليلي',
         theme_light: 'نهاري',
         lang_btn: 'English',
-        brand_name: {html.escape(_json_for_script(brand_name))},
+        brand_name: {_json_for_script(brand_name)},
         brand_sub: 'المتجر الإلكتروني المعتمد 🇪🇬',
         nav_home: 'الرئيسية',
         nav_catalog: 'قائمة المنتجات',
@@ -2325,7 +2325,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         nav_contact: 'تواصل معنا',
         cart_btn: 'السلة',
         hero_badge: '✨ المتجر الرقمي المتكامل • دفع مصري مباشر',
-        hero_slogan: {html.escape(_json_for_script(slogan))},
+        hero_slogan: {_json_for_script(slogan)},
         hero_sub: 'أرسل طلبك من المتجر، وسيتم التواصل معك من التاجر لتأكيد التوافر وطريقة الدفع والتسليم.',
         hero_cta: '🛒 تصفح القائمة والأسعار',
         hero_wa_cta: '💬 محادثة واتساب سريعة',
@@ -2402,7 +2402,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         theme_dark: 'Dark',
         theme_light: 'Light',
         lang_btn: 'العربية',
-        brand_name: {html.escape(_json_for_script(brand_name))},
+        brand_name: {_json_for_script(brand_name)},
         brand_sub: 'Certified Online Store 🇪🇬',
         nav_home: 'Home',
         nav_catalog: 'Catalog',
@@ -2411,7 +2411,7 @@ def build_store_html(job_id: int, client: str, request: str, settings: dict, ite
         nav_contact: 'Contact',
         cart_btn: 'Cart',
         hero_badge: '✨ Full-Featured Digital Store • Express Delivery',
-        hero_slogan: {html.escape(_json_for_script(slogan_en))},
+        hero_slogan: {_json_for_script(slogan_en)},
         hero_sub: 'Submit your order directly; our merchant team will contact you immediately to confirm delivery and payment.',
         hero_cta: '🛒 Browse Catalog & Prices',
         hero_wa_cta: '💬 Direct WhatsApp Chat',
